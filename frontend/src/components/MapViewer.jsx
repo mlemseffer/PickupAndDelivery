@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from 'react-leaflet';
+import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -113,28 +113,6 @@ export default function MapViewer({ mapData, onClearMap }) {
             }
             return null;
           })}
-          
-          {/* Affichage des intersections (nœuds) */}
-          {mapData.nodes && mapData.nodes.map((node) => (
-            <CircleMarker
-              key={node.id}
-              center={[node.latitude, node.longitude]}
-              radius={1.5}
-              fillColor="#fbbf24"
-              color="#f59e0b"
-              weight={0.5}
-              opacity={0.9}
-              fillOpacity={0.7}
-            >
-              <Popup>
-                <div>
-                  <strong>Intersection ID:</strong> {node.id}<br />
-                  <strong>Latitude:</strong> {node.latitude}<br />
-                  <strong>Longitude:</strong> {node.longitude}
-                </div>
-              </Popup>
-            </CircleMarker>
-          ))}
         </MapContainer>
       </div>
     </>
