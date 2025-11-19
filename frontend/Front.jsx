@@ -93,10 +93,31 @@ export default function PickupDeliveryUI() {
 
         {/* Map View */}
         {mapData && activeTab === 'map' && (
-          <MapViewer 
-            mapData={mapData}
-            onClearMap={handleClearMap}
-          />
+          <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
+            {/* Ligne du haut : Carte + Panneau d'informations */}
+            <div className="flex-1 flex gap-4 min-h-0">
+              {/* Carte sur la gauche */}
+              <div className="w-3/5 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
+                <MapViewer 
+                  mapData={mapData}
+                  onClearMap={handleClearMap}
+                />
+              </div>
+              
+              {/* Espace réservé pour les tableaux et boutons à droite */}
+              <div className="flex-1 bg-gray-700 rounded-lg p-6">
+                <h3 className="text-xl font-semibold mb-4">Informations</h3>
+                <p className="text-gray-400">
+                  Les tableaux et boutons s'afficheront ici.
+                </p>
+              </div>
+            </div>
+            
+            {/* Zone du bas : espace réservé pour les futurs boutons */}
+            <div className="h-32 bg-gray-700 rounded-lg p-4 flex items-center justify-center">
+              <p className="text-gray-400">Espace réservé pour les boutons d'action</p>
+            </div>
+          </div>
         )}
 
         {/* Deliveries View - À implémenter */}

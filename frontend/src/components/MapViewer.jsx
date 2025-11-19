@@ -21,16 +21,16 @@ export default function MapViewer({ mapData, onClearMap }) {
 
   return (
     <>
-      <div className="p-4 bg-gray-700 border-b border-gray-600">
+      <div className="p-3 bg-gray-600 border-b border-gray-500">
         <div className="flex justify-between items-center">
-          <h3 className="text-lg font-semibold">
-            Carte chargée - {mapData.nodes?.length || 0} nœuds, {mapData.segments?.length || 0} segments
+          <h3 className="text-sm font-semibold">
+            {mapData.nodes?.length || 0} nœuds, {mapData.segments?.length || 0} segments
           </h3>
           <button
             onClick={onClearMap}
-            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg transition-colors"
+            className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
           >
-            Charger une nouvelle carte
+            Nouvelle carte
           </button>
         </div>
       </div>
