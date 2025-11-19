@@ -1,6 +1,24 @@
-import React from 'react';
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet';
+import React, { useEffect, useRef } from 'react';
+import { MapContainer, TileLayer, Polyline, CircleMarker, Popup, useMap } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
+
+/**
+ * Composant pour forcer le redimensionnement de la carte
+ */
+function MapResizer() {
+  const map = useMap();
+  
+  useEffect(() => {
+    // Forcer le redimensionnement après un court délai
+    const timer = setTimeout(() => {
+      map.invalidateSize();
+    }, 100);
+    
+    return () => clearTimeout(timer);
+  }, [map]);
+  
+  return null;
+}
 
 /**
  * Composant pour afficher la carte avec Leaflet
@@ -19,12 +37,21 @@ export default function MapViewer({ mapData, onClearMap }) {
     return [avgLat, avgLng];
   };
 
+  // Créer un index des nœuds par ID pour un accès rapide
+  const nodesById = React.useMemo(() => {
+    if (!mapData?.nodes) return {};
+    return mapData.nodes.reduce((acc, node) => {
+      acc[node.id] = node;
+      return acc;
+    }, {});
+  }, [mapData?.nodes]);
+
   return (
     <>
       <div className="p-3 bg-gray-600 border-b border-gray-500">
         <div className="flex justify-between items-center">
           <h3 className="text-sm font-semibold">
-            {mapData.nodes?.length || 0} nœuds, {mapData.segments?.length || 0} segments
+            {mapData.nodes?.length || 0} intersections, {mapData.segments?.length || 0} tronçons
           </h3>
           <button
             onClick={onClearMap}
@@ -35,31 +62,73 @@ export default function MapViewer({ mapData, onClearMap }) {
         </div>
       </div>
       
-      <div className="flex-1">
+      <div className="flex-1 relative">
         <MapContainer
+          key={`map-${mapData?.nodes?.length || 0}`}
           center={getMapCenter()}
           zoom={13}
-          style={{ height: '100%', width: '100%' }}
+          style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}
+          scrollWheelZoom={true}
+          whenReady={() => {
+            // Force un redimensionnement quand la carte est prête
+            setTimeout(() => {
+              window.dispatchEvent(new Event('resize'));
+            }, 100);
+          }}
         >
+          <MapResizer />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           />
           
+          {/* Affichage des tronçons (segments/rues) */}
+          {mapData.segments && mapData.segments.map((segment, index) => {
+            const originNode = nodesById[segment.origin];
+            const destinationNode = nodesById[segment.destination];
+            
+            // Si les deux nœuds existent, dessiner le tronçon
+            if (originNode && destinationNode) {
+              return (
+                <Polyline
+                  key={`segment-${index}`}
+                  positions={[
+                    [originNode.latitude, originNode.longitude],
+                    [destinationNode.latitude, destinationNode.longitude]
+                  ]}
+                  color="#3b82f6"
+                  weight={3}
+                  opacity={0.7}
+                >
+                  <Popup>
+                    <div>
+                      <strong>Rue:</strong> {segment.name}<br />
+                      <strong>Longueur:</strong> {segment.length.toFixed(2)} m<br />
+                      <strong>De:</strong> {segment.origin}<br />
+                      <strong>À:</strong> {segment.destination}
+                    </div>
+                  </Popup>
+                </Polyline>
+              );
+            }
+            return null;
+          })}
+          
+          {/* Affichage des intersections (nœuds) */}
           {mapData.nodes && mapData.nodes.map((node) => (
             <CircleMarker
               key={node.id}
               center={[node.latitude, node.longitude]}
-              radius={4}
+              radius={1.5}
               fillColor="#fbbf24"
               color="#f59e0b"
-              weight={1}
-              opacity={0.8}
-              fillOpacity={0.6}
+              weight={0.5}
+              opacity={0.9}
+              fillOpacity={0.7}
             >
               <Popup>
                 <div>
-                  <strong>Nœud ID:</strong> {node.id}<br />
+                  <strong>Intersection ID:</strong> {node.id}<br />
                   <strong>Latitude:</strong> {node.latitude}<br />
                   <strong>Longitude:</strong> {node.longitude}
                 </div>
