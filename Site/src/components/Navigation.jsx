@@ -1,0 +1,53 @@
+import React from 'react';
+import { Home, MapPin, Bike, Route } from 'lucide-react';
+
+/**
+ * Composant de navigation principal
+ */
+export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
+  return (
+    <nav className="bg-gray-700 border-b border-gray-600">
+      <div className="flex">
+        {/* Home Icon */}
+        <button 
+          className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'home' ? 'bg-gray-500' : ''}`}
+          onClick={() => onTabChange('home')}
+        >
+          <Home size={32} className="text-white" />
+        </button>
+        
+        {/* Map Pin Icon */}
+        <button 
+          className={`p-6 relative cursor-pointer ${activeTab === 'map' ? 'bg-gray-500' : 'hover:bg-gray-600'} transition-colors`}
+          onClick={() => onTabChange('map')}
+        >
+          <MapPin size={32} className={`${activeTab === 'map' ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
+          {showMapMessage && (
+            <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-800 px-4 py-3 rounded-2xl shadow-lg whitespace-nowrap pointer-events-none">
+              <div className="text-sm font-semibold text-center leading-tight">
+                Commencez en<br />chargeant une<br />carte
+              </div>
+              <div className="absolute -top-2 left-1/2 -translate-x-1/2 w-0 h-0 border-l-8 border-r-8 border-b-8 border-l-transparent border-r-transparent border-b-yellow-400"></div>
+            </div>
+          )}
+        </button>
+        
+        {/* Bike Icon - Deliveries */}
+        <button 
+          className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'deliveries' ? 'bg-gray-500' : ''}`}
+          onClick={() => onTabChange('deliveries')}
+        >
+          <Bike size={32} className="text-white" />
+        </button>
+        
+        {/* Route Icon - Tours */}
+        <button 
+          className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'tours' ? 'bg-gray-500' : ''}`}
+          onClick={() => onTabChange('tours')}
+        >
+          <Route size={32} className="text-white" />
+        </button>
+      </div>
+    </nav>
+  );
+}

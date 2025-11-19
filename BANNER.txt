@@ -1,0 +1,90 @@
+
+ _____ _      _                      ___   ____       _ _                       
+|  __ (_)    | |                    ( _ ) |  _ \     | (_)                      
+| |__) |  ___| | ___   _ _ __       / _ \/\ | | | ___| |___   _____ _ __ _   _ 
+|  ___/ |/ __| |/ / | | | '_ \     | (_>  < | | |/ _ \ | \ \ / / _ \ '__| | | |
+| |   | | (__|   <| |_| | |_) |     \___/\/ |_| |  __/ | |\ V /  __/ |  | |_| |
+|_|   |_|\___|_|\_\\__,_| .__/                |_/ \___|_|_| \_/ \___|_|   \__, |
+                        | |                                                __/ |
+                        |_|                                               |___/ 
+
+================================================================================
+        🚴 APPLICATION DE GESTION DE TOURNÉES DE LIVRAISON À VÉLO 🚴
+================================================================================
+
+📦 ARCHITECTURE REST MODERNE
+   ├─ Backend:  Spring Boot 3.2 (Java 17)
+   ├─ Frontend: React 19.2 + Vite
+   └─ API:      REST HTTP/JSON
+
+🎯 FONCTIONNALITÉS
+   ✅ Chargement de cartes (fichiers XML)
+   ✅ Gestion des demandes de livraison
+   ✅ Affichage interactif avec Leaflet
+   ⚠️ Calcul de tournées optimisées (à compléter)
+
+🏗️ ARCHITECTURE EN COUCHES
+   Backend:
+   ├─ Contrôleurs (REST API)
+   ├─ Services (Logique métier)
+   └─ Modèles (Domaine)
+   
+   Frontend:
+   ├─ Composants React
+   ├─ Services API
+   └─ State Management
+
+📊 STATISTIQUES
+   ├─ 29 fichiers Backend (Java)
+   ├─ 12 fichiers Frontend (React)
+   ├─ 6 fichiers Documentation
+   ├─ 9 tests unitaires
+   └─ 8 endpoints REST
+
+🚀 DÉMARRAGE RAPIDE
+   1. Lire: INDEX.md ou QUICKSTART.md
+   2. Backend: cd backend && mvn spring-boot:run
+   3. Frontend: cd Site && npm run dev
+   4. Ouvrir: http://localhost:5173
+
+📚 DOCUMENTATION COMPLÈTE
+   ├─ INDEX.md                       → Navigation documentation
+   ├─ README.md                      → Vue d'ensemble
+   ├─ QUICKSTART.md                  → Guide démarrage rapide
+   ├─ ARCHITECTURE.md                → Architecture détaillée
+   ├─ ARCHITECTURE_SUMMARY.md        → Résumé architecture
+   ├─ ARCHITECTURE_PRESENTATION.md   → Présentation
+   ├─ PROJECT_STRUCTURE.md           → Structure projet
+   └─ SUMMARY.md                     → Récapitulatif complet
+
+🛠️ TECHNOLOGIES
+   Backend:
+   ├─ Spring Boot (REST API)
+   ├─ Spring MVC (Architecture)
+   ├─ Lombok (Code generation)
+   ├─ Maven (Build tool)
+   └─ JUnit (Tests)
+   
+   Frontend:
+   ├─ React (UI Framework)
+   ├─ Vite (Build tool)
+   ├─ Leaflet (Cartographie)
+   ├─ Lucide React (Icônes)
+   └─ Fetch API (HTTP)
+
+✨ POINTS FORTS
+   ✅ Architecture REST professionnelle
+   ✅ Séparation frontend/backend
+   ✅ Code modulaire et maintenable
+   ✅ Tests unitaires
+   ✅ Documentation exhaustive
+   ✅ Scripts de démarrage automatiques
+   ✅ Prêt pour développement collaboratif
+
+🎓 DÉVELOPPÉ POUR
+   Cours d'Agilité - 4IF
+   INSA Lyon
+
+================================================================================
+              Pour commencer : lisez INDEX.md ou QUICKSTART.md
+================================================================================

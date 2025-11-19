@@ -1,0 +1,52 @@
+/* Corrections pour Leaflet dans un environnement React */
+.leaflet-container {
+  height: 100% !important;
+  width: 100% !important;
+  z-index: 1;
+}
+
+/* Assurer que les icônes Leaflet s'affichent correctement */
+.leaflet-default-icon-path {
+  background-image: url('https://unpkg.com/leaflet@1.7.1/dist/images/marker-icon.png');
+}
+
+/* Style pour les marqueurs personnalisés */
+.leaflet-div-icon {
+  background: transparent !important;
+  border: none !important;
+}
+
+/* Améliorer le contraste des popups */
+.leaflet-popup-content-wrapper {
+  background-color: #374151 !important;
+  color: white !important;
+}
+
+.leaflet-popup-tip {
+  background-color: #374151 !important;
+}
+
+/* S'assurer que la carte prend toute la place disponible */
+.leaflet-container, .leaflet-map-pane, .leaflet-objects-pane {
+  height: 100% !important;
+}
+
+/* Corrections pour les tuiles */
+.leaflet-tile-container {
+  margin: 0 !important;
+}
+
+/* Style pour les contrôles de zoom */
+.leaflet-control-zoom {
+  border: none !important;
+}
+
+.leaflet-control-zoom a {
+  background-color: #4B5563 !important;
+  color: white !important;
+  border: 1px solid #6B7280 !important;
+}
+
+.leaflet-control-zoom a:hover {
+  background-color: #6B7280 !important;
+}
