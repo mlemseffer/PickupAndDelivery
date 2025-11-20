@@ -11,225 +11,487 @@
 
 ---
 
-## 📚 Navigation Documentation
+## 📑 Table des Matières
 
-**🆕 Nouveau ? Commencez ici :**
-- 📖 **[INDEX.md](INDEX.md)** - Guide de navigation dans toute la documentation
-- 🚀 **[QUICKSTART.md](QUICKSTART.md)** - Démarrer l'application en 5 minutes
-- ✅ **[SUMMARY.md](SUMMARY.md)** - Récapitulatif complet du projet
-
-**Pour les développeurs :**
-- 🏗️ **[ARCHITECTURE.md](ARCHITECTURE.md)** - Architecture détaillée avec diagrammes
-- 📋 **[ARCHITECTURE_SUMMARY.md](ARCHITECTURE_SUMMARY.md)** - Résumé architecture
-- 📁 **[PROJECT_STRUCTURE.md](PROJECT_STRUCTURE.md)** - Structure complète des fichiers
-
-**Pour les présentations :**
-- 🎓 **[ARCHITECTURE_PRESENTATION.md](ARCHITECTURE_PRESENTATION.md)** - Présentation des choix techniques
+1. [Description du Projet](#-description-du-projet)
+2. [Démarrage Rapide](#-démarrage-rapide)
+3. [Architecture](#-architecture)
+4. [Structure du Projet](#-structure-du-projet)
+5. [API REST](#-api-rest)
+6. [Technologies](#-technologies)
+7. [Développement](#-développement)
 
 ---
 
 ## 🎯 Description du Projet
 
+Application web de gestion de tournées de livraison à vélo permettant :
+- 📍 Chargement de plans de ville (intersections et tronçons)
+- 📦 Gestion des demandes de livraison
+- 🗺️ Visualisation interactive sur carte Leaflet
+- 🚴 Calcul de tournées optimisées
+
+**Projet développé pour le cours d'Agilité - 4IF INSA Lyon**
+
+---
+
+## 🚀 Démarrage Rapide
+
+### Prérequis
+
+**Backend :**
+- ☕ Java 17+ : [Télécharger](https://adoptium.net/)
+- 📦 Maven 3.6+ : [Installer](https://maven.apache.org/install.html)
+
+**Frontend :**
+- 🟢 Node.js 18+ : [Télécharger](https://nodejs.org/)
+- 📦 npm (inclus avec Node.js)
+
+### Installation et Lancement
+
+#### Option 1 : Script de Démarrage Automatique (Windows)
+
+Exécutez simplement le script :
+```bash
+.\start.bat
+```
+
+Ou avec PowerShell :
+```powershell
+.\start.ps1
+```
+
+#### Option 2 : Lancement Manuel
+
+**Terminal 1 - Backend :**
+```bash
+cd backend
+mvn clean install
+mvn spring-boot:run
+```
+✅ Backend disponible sur `http://localhost:8080`
+
+**Terminal 2 - Frontend :**
+```bash
+cd Site
+npm install
+npm run dev
+```
+✅ Frontend disponible sur `http://localhost:5173`
+
+### Vérification
+
+Testez l'API backend :
+```bash
+curl http://localhost:8080/api/maps/status
+```
+
+Ouvrez le frontend : `http://localhost:5173`
+
+---
+
 ## 🏗️ Architecture
 
-### Backend (Spring Boot)
+### Vue d'Ensemble
 
-Architecture **REST** avec **Spring MVC** :
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     FRONTEND (React)                         │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  Components: Header, Navigation, MapViewer         │    │
+│  │  Services: apiService.js (HTTP Client)             │    │
+│  └────────────────────────────────────────────────────┘    │
+└──────────────────────┬──────────────────────────────────────┘
+                       │ HTTP/JSON (REST)
+┌──────────────────────▼──────────────────────────────────────┐
+│                   BACKEND (Spring Boot)                      │
+│  ┌────────────────────────────────────────────────────┐    │
+│  │  Controllers: MapController, DeliveryController    │    │
+│  │  Services: MapService, DeliveryService, TourService│    │
+│  │  XmlParsers: MapXmlParser, DeliveryRequestXmlParser│    │
+│  │  Models: Node, Segment, CityMap, DeliveryRequest   │    │
+│  └────────────────────────────────────────────────────┘    │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Architecture Backend (Spring MVC)
 
 ```
 backend/
-├── src/main/java/com/pickupdelivery/
-│   ├── PickupDeliveryApplication.java     # Point d'entrée
-│   ├── controller/                        # Couche Contrôleur (REST API)
-│   │   ├── MapController.java
-│   │   ├── DeliveryController.java
-│   │   └── TourController.java
-│   ├── service/                           # Couche Service (Logique métier)
-│   │   ├── MapService.java
-│   │   ├── DeliveryService.java
-│   │   └── TourService.java
-│   ├── model/                             # Couche Modèle (Domaine métier)
-│   │   ├── Node.java
-│   │   ├── Segment.java
-│   │   ├── CityMap.java
-│   │   ├── DeliveryRequest.java
-│   │   └── Tour.java
-│   ├── dto/                               # Data Transfer Objects
-│   │   ├── ApiResponse.java
-│   │   └── MapUploadResponse.java
-│   ├── config/                            # Configuration
-│   │   └── WebConfig.java
-│   └── exception/                         # Gestion des exceptions
-│       └── GlobalExceptionHandler.java
-└── src/main/resources/
-    └── application.properties
+├── controller/          # Endpoints REST (HTTP → JSON)
+│   ├── MapController
+│   ├── DeliveryController
+│   └── TourController
+│
+├── service/            # Logique métier
+│   ├── MapService
+│   ├── DeliveryService
+│   └── TourService
+│
+├── xmlparser/          # Parsing XML
+│   ├── MapXmlParser
+│   └── DeliveryRequestXmlParser
+│
+├── model/              # Entités du domaine
+│   ├── Node, Segment, CityMap
+│   ├── DeliveryRequest
+│   └── Tour
+│
+└── dto/                # Data Transfer Objects
+    ├── ApiResponse<T>
+    └── MapUploadResponse
 ```
 
 **Responsabilités par couche :**
+- **Controllers** : Exposent les endpoints REST, gèrent HTTP
+- **Services** : Contiennent la logique métier et algorithmes
+- **XmlParsers** : Parsent les fichiers XML en objets métier
+- **Models** : Représentent les entités du domaine
+- **DTOs** : Encapsulent les réponses JSON
 
-- **Contrôleurs** : Exposent les endpoints REST, valident les requêtes HTTP, retournent des JSON
-- **Services** : Contiennent la logique métier et les algorithmes
-- **Modèles** : Représentent les entités du domaine métier
-- **DTOs** : Encapsulent les données échangées avec le frontend
-
-### Frontend (React)
-
-Architecture par **composants indépendants** :
+### Architecture Frontend (React)
 
 ```
 Site/
-├── src/
-│   ├── components/                        # Composants React réutilisables
-│   │   ├── Header.jsx
-│   │   ├── Navigation.jsx
-│   │   ├── MapUploader.jsx
-│   │   └── MapViewer.jsx
-│   └── services/                          # Services d'appel API
-│       └── apiService.js                  # Communication HTTP avec le backend
-├── Front.jsx                              # Composant principal
-├── main.jsx                               # Point d'entrée
-└── package.json
+├── components/         # Composants React
+│   ├── Header.jsx
+│   ├── Navigation.jsx
+│   ├── MapUploader.jsx
+│   └── MapViewer.jsx
+│
+└── services/           # Communication backend
+    └── apiService.js
 ```
 
-**Principe de fonctionnement :**
-- Les composants React sont **autonomes** et **découplés**
-- Toute communication avec le backend passe par `apiService.js`
-- Les composants consomment les **JSON retournés** par les contrôleurs Spring
-- Aucune logique métier dans le frontend, seulement de la logique de présentation
+**Principe :**
+- Composants autonomes et réutilisables
+- Communication backend via `apiService.js`
+- Pas de logique métier dans le frontend
 
-## 🔄 Flux de Communication
+### Flux de Données
 
 ```
-┌─────────────┐         HTTP/JSON          ┌──────────────┐
-│   Frontend  │ ◄────────────────────────► │   Backend    │
-│   (React)   │      REST API Calls        │ (Spring Boot)│
-└─────────────┘                            └──────────────┘
-      │                                            │
-      │                                            │
-   Components                                  Controllers
-      │                                            │
-      └─► apiService ─────────────────────────► MapController
-                           GET/POST                   │
-                           JSON                       │
-                                                  MapService
-                                                      │
-                                                   Model
+User Action → Component → apiService → HTTP Request
+                                            ↓
+                                      Controller
+                                            ↓
+                                        Service
+                                            ↓
+                                      XmlParser/Model
+                                            ↓
+                                      HTTP Response
+                                            ↓
+Component Update ← JSON Data ← apiService ←
 ```
 
-## 🚀 Démarrage
+### Principes d'Architecture
 
-### Backend (Spring Boot)
+✅ **Séparation des responsabilités** : Chaque couche a un rôle précis  
+✅ **REST API** : Communication HTTP/JSON standardisée  
+✅ **Découplage** : Frontend et Backend indépendants  
+✅ **Testabilité** : Chaque couche testable séparément
 
-#### Prérequis
-- Java 17+
-- Maven 3.6+
+---
 
-#### Commandes
-```bash
-cd backend
+## 📁 Structure du Projet
 
-# Compilation
-mvn clean install
+### Backend - Spring Boot
 
-# Lancement
-mvn spring-boot:run
+```
+backend/
+├── pom.xml                                    # Configuration Maven
+├── src/main/java/com/pickupdelivery/
+│   ├── PickupDeliveryApplication.java         # Point d'entrée
+│   │
+│   ├── controller/                            # REST API
+│   │   ├── MapController.java                 # Endpoints cartes
+│   │   ├── DeliveryController.java            # Endpoints livraisons
+│   │   └── TourController.java                # Endpoints tournées
+│   │
+│   ├── service/                               # Logique métier
+│   │   ├── MapService.java
+│   │   ├── DeliveryService.java
+│   │   └── TourService.java
+│   │
+│   ├── xmlparser/                             # Parsing XML
+│   │   ├── MapXmlParser.java
+│   │   └── DeliveryRequestXmlParser.java
+│   │
+│   ├── model/                                 # Domaine métier
+│   │   ├── Node.java                          # Intersection
+│   │   ├── Segment.java                       # Tronçon de rue
+│   │   ├── CityMap.java                       # Plan complet
+│   │   ├── DeliveryRequest.java               # Demande de livraison
+│   │   └── Tour.java                          # Tournée calculée
+│   │
+│   ├── dto/                                   # Data Transfer Objects
+│   │   ├── ApiResponse.java
+│   │   └── MapUploadResponse.java
+│   │
+│   ├── config/                                # Configuration
+│   │   └── WebConfig.java                     # CORS, Web
+│   │
+│   └── exception/                             # Gestion erreurs
+│       └── GlobalExceptionHandler.java
+│
+└── src/test/java/                             # Tests
+    ├── controller/MapControllerTest.java
+    └── service/MapServiceTest.java
 ```
 
-Le serveur démarre sur `http://localhost:8080`
+### Frontend - React + Vite
 
-### Frontend (React + Vite)
-
-#### Prérequis
-- Node.js 18+
-- npm ou yarn
-
-#### Commandes
-```bash
-cd Site
-
-# Installation des dépendances
-npm install
-
-# Lancement en mode développement
-npm run dev
+```
+Site/
+├── package.json                               # Dépendances npm
+├── vite.config.js                             # Configuration Vite
+├── .env                                       # Variables d'environnement
+├── index.html                                 # Point d'entrée HTML
+├── main.jsx                                   # Point d'entrée React
+├── Front.jsx                                  # Composant principal
+├── leaflet-custom.css                         # Styles carte
+│
+└── src/
+    ├── components/                            # Composants React
+    │   ├── Header.jsx                         # En-tête
+    │   ├── Navigation.jsx                     # Barre de navigation
+    │   ├── MapUploader.jsx                    # Upload XML
+    │   └── MapViewer.jsx                      # Affichage carte
+    │
+    └── services/                              # Services HTTP
+        └── apiService.js                      # Client API REST
 ```
 
-Le frontend démarre sur `http://localhost:5173`
+### Fichiers XML de Test
 
-## 📡 API REST Endpoints
+```
+fichiersXMLPickupDelivery/
+├── Plans (Cartes)
+│   ├── petitPlan.xml                          # ~100 nœuds
+│   ├── moyenPlan.xml                          # ~500 nœuds
+│   └── grandPlan.xml                          # ~1000+ nœuds
+│
+└── Demandes de Livraison
+    ├── demandePetit1.xml                      # 1 livraison
+    ├── demandePetit2.xml                      # 2 livraisons
+    ├── demandeMoyen3.xml                      # 3 livraisons
+    ├── demandeMoyen5.xml                      # 5 livraisons
+    ├── demandeGrand7.xml                      # 7 livraisons
+    └── demandeGrand9.xml                      # 9 livraisons
+```
+
+---
+
+## 📡 API REST
 
 ### Cartes
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/api/maps/upload` | Upload un fichier XML de carte |
-| GET | `/api/maps/current` | Récupère la carte chargée |
-| GET | `/api/maps/status` | Vérifie si une carte est chargée |
-| DELETE | `/api/maps/current` | Supprime la carte courante |
+| Méthode | Endpoint | Description | Corps de la requête |
+|---------|----------|-------------|---------------------|
+| POST | `/api/maps/upload` | Upload fichier XML de carte | `MultipartFile` |
+| GET | `/api/maps/current` | Récupère la carte chargée | - |
+| GET | `/api/maps/status` | Vérifie si carte chargée | - |
+| DELETE | `/api/maps/current` | Supprime la carte | - |
 
 ### Livraisons
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/api/deliveries/upload` | Upload un fichier XML de demandes |
-| GET | `/api/deliveries` | Récupère toutes les demandes |
-| POST | `/api/deliveries` | Ajoute une demande de livraison |
-| DELETE | `/api/deliveries` | Supprime toutes les demandes |
+| Méthode | Endpoint | Description | Corps de la requête |
+|---------|----------|-------------|---------------------|
+| POST | `/api/deliveries/upload` | Upload fichier XML demandes | `MultipartFile` |
+| GET | `/api/deliveries` | Liste toutes les demandes | - |
+| POST | `/api/deliveries` | Ajoute une demande | `DeliveryRequest` JSON |
+| DELETE | `/api/deliveries` | Supprime toutes les demandes | - |
 
 ### Tournées
 
-| Méthode | Endpoint | Description |
-|---------|----------|-------------|
-| POST | `/api/tours/calculate` | Calcule une tournée optimisée |
+| Méthode | Endpoint | Description | Paramètres |
+|---------|----------|-------------|------------|
+| POST | `/api/tours/calculate` | Calcule tournée optimisée | `warehouseAddress` (String) |
 
-## 🎯 Avantages de l'Architecture
+### Format de Réponse
 
-### Séparation des responsabilités
-- **Backend** : Logique métier, traitement des données, algorithmes
-- **Frontend** : Interface utilisateur, expérience utilisateur
+Toutes les API retournent un objet `ApiResponse<T>` :
 
-### Évolutivité
-- Ajout facile de nouveaux endpoints REST
-- Ajout de nouveaux composants React sans impact sur le backend
-- Possibilité de scaler backend et frontend indépendamment
-
-### Maintenabilité
-- Code organisé par couches clairement définies
-- Chaque classe/composant a une responsabilité unique
-- Facilite les tests unitaires et d'intégration
-
-### Testabilité
-- **Backend** : Tests unitaires des services, tests d'intégration des contrôleurs
-- **Frontend** : Tests unitaires des composants, tests d'intégration de l'API
-
-## 🧪 Tests
-
-### Backend
-```bash
-cd backend
-mvn test
+```json
+{
+  "success": true,
+  "message": "Operation successful",
+  "data": { ... }
+}
 ```
 
+### Formats XML
+
+**Carte (Plan) :**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<reseau>
+    <noeud id="1" latitude="45.75" longitude="4.85"/>
+    <troncon origine="1" destination="2" longueur="100.5" nomRue="Rue Example"/>
+</reseau>
+```
+
+**Demandes de Livraison :**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<demandeDeLivraisons>
+    <entrepot adresse="1"/>
+    <livraison adresseEnlevement="2" adresseLivraison="3" 
+               dureeEnlevement="180" dureeLivraison="240"/>
+</demandeDeLivraisons>
+```
+
+---
+
+## 💻 Technologies
+
+### Backend
+- **Spring Boot 3.2** - Framework Java
+- **Spring MVC** - Architecture REST
+- **Lombok** - Réduction code boilerplate
+- **Maven** - Gestion dépendances
+- **JUnit & Mockito** - Tests
+
 ### Frontend
+- **React 19** - Bibliothèque UI
+- **Vite 7** - Build tool rapide
+- **Leaflet 1.9** - Cartographie interactive
+- **Lucide React** - Icônes modernes
+
+### DevOps
+- **Git** - Contrôle de version
+- **Maven** - Build backend
+- **npm** - Build frontend
+
+---
+
+## 🛠️ Développement
+
+### Tests
+
+**Backend :**
+```bash
+cd backend
+mvn test                          # Tous les tests
+mvn test -Dtest=MapServiceTest    # Test spécifique
+```
+
+**Frontend :**
 ```bash
 cd Site
 npm test
 ```
 
-## 📝 Technologies Utilisées
+### Hot Reload
 
-### Backend
-- **Spring Boot 3.2** - Framework Java
-- **Spring MVC** - Architecture MVC/REST
-- **Lombok** - Réduction du code boilerplate
-- **Maven** - Gestion des dépendances
+- **Backend** : Spring Boot DevTools recharge automatiquement
+- **Frontend** : Vite recharge à chaque modification
 
-### Frontend
-- **React 19** - Bibliothèque UI
-- **Vite** - Build tool rapide
-- **Leaflet** - Cartographie interactive
-- **Lucide React** - Icônes modernes
+### Build Production
+
+**Backend :**
+```bash
+cd backend
+mvn clean package
+java -jar target/pickup-delivery-backend-1.0.0.jar
+```
+
+**Frontend :**
+```bash
+cd Site
+npm run build
+# Fichiers dans dist/
+```
+
+### Ports Utilisés
+
+| Service | Port | URL |
+|---------|------|-----|
+| Backend API | 8080 | http://localhost:8080 |
+| Frontend Dev | 5173 | http://localhost:5173 |
+
+### Configuration
+
+**Backend - `application.properties` :**
+```properties
+server.port=8080
+spring.servlet.multipart.max-file-size=10MB
+```
+
+**Frontend - `.env` :**
+```env
+VITE_API_BASE_URL=http://localhost:8080/api
+```
+
+---
+
+## 🔧 Résolution de Problèmes
+
+### Port 8080 déjà utilisé
+
+**Windows :**
+```bash
+netstat -ano | findstr :8080
+taskkill /PID <PID> /F
+```
+
+**Ou modifier le port :**
+```properties
+# application.properties
+server.port=8081
+```
+
+### Frontend ne se connecte pas au backend
+
+Vérifiez :
+1. Backend démarré sur port 8080
+2. Fichier `.env` correctement configuré
+3. CORS activé dans `WebConfig.java`
+
+### Erreur parsing XML
+
+Vérifiez :
+1. Fichier XML bien formé
+2. Attributs correspondent aux noms attendus
+3. Encodage UTF-8
+
+---
+
+## 📊 Avantages de l'Architecture
+
+| Aspect | Avantage |
+|--------|----------|
+| **Maintenabilité** | Code organisé par couches, facile à modifier |
+| **Évolutivité** | Ajout de fonctionnalités sans refonte majeure |
+| **Testabilité** | Tests unitaires et d'intégration simplifiés |
+| **Réutilisabilité** | Composants et services réutilisables |
+| **Performance** | Backend et frontend scalables indépendamment |
+| **Flexibilité** | Changement frontend possible sans toucher backend |
+| **Collaboration** | Équipes frontend/backend travaillent en parallèle |
+
+---
+
+## 🤝 Contribution
+
+Pour contribuer au projet :
+1. Fork le repository
+2. Créez une branche (`git checkout -b feature/AmazingFeature`)
+3. Committez vos changements (`git commit -m 'Add AmazingFeature'`)
+4. Push vers la branche (`git push origin feature/AmazingFeature`)
+5. Ouvrez une Pull Request
+
+---
+
+## 📄 License
+
+Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
+
+---
 
 ## 👥 Équipe
 
-Projet développé pour le cours d'Agilité - 4IF INSA Lyon
+**Projet Agilité - 4IF INSA Lyon**
+
+---
+
+**Bon développement ! 🚀**
