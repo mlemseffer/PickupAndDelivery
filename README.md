@@ -96,21 +96,21 @@ Ouvrez le frontend : `http://localhost:5173`
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                     FRONTEND (React)                         │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │  Components: Header, Navigation, MapViewer         │    │
-│  │  Services: apiService.js (HTTP Client)             │    │
-│  └────────────────────────────────────────────────────┘    │
+│                     FRONTEND (React)                        │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │  Components: Header, Navigation, MapViewer         │     │
+│  │  Services: apiService.js (HTTP Client)             │     │
+│  └────────────────────────────────────────────────────┘     │
 └──────────────────────┬──────────────────────────────────────┘
                        │ HTTP/JSON (REST)
 ┌──────────────────────▼──────────────────────────────────────┐
-│                   BACKEND (Spring Boot)                      │
-│  ┌────────────────────────────────────────────────────┐    │
-│  │  Controllers: MapController, DeliveryController    │    │
-│  │  Services: MapService, DeliveryService, TourService│    │
-│  │  XmlParsers: MapXmlParser, DeliveryRequestXmlParser│    │
-│  │  Models: Node, Segment, CityMap, DeliveryRequest   │    │
-│  └────────────────────────────────────────────────────┘    │
+│                   BACKEND (Spring Boot)                     │
+│  ┌────────────────────────────────────────────────────┐     │
+│  │  Controllers: MapController, DeliveryController    │     │
+│  │  Services: MapService, DeliveryService, TourService│     │
+│  │  XmlParsers: MapXmlParser, DeliveryRequestXmlParser│     │
+│  │  Models: Node, Segment, CityMap, DeliveryRequest   │     │
+│  └────────────────────────────────────────────────────┘     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
