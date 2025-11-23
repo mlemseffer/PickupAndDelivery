@@ -73,7 +73,7 @@ mvn spring-boot:run
 
 **Terminal 2 - Frontend :**
 ```bash
-cd Site
+cd frontend
 npm install
 npm run dev
 ```
