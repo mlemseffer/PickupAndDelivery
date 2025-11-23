@@ -490,8 +490,6 @@ Ce projet est sous licence MIT. Voir le fichier `LICENSE` pour plus de détails.
 
 ## 👥 Équipe
 
-**Projet Agilité - 4IF INSA Lyon**
+**Projet Agilité - 4IF H34 INSA Lyon**
 
 ---
-
-**Bon développement ! 🚀**
