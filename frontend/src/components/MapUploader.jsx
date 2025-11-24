@@ -15,7 +15,7 @@ export default function MapUploader({ onMapLoaded, onCancel }) {
     if (!file) return;
 
     if (!file.name.endsWith('.xml')) {
-      setError('Veuillez sélectionner un fichier XML valide svp.');
+      setError('Veuillez sélectionner un fichier XML valide.');
       return;
     }
 
