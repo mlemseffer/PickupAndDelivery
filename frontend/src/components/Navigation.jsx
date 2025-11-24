@@ -4,7 +4,7 @@ import { Home, MapPin, Bike, Route } from 'lucide-react';
 /**
  * Composant de navigation principal
  */
-export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
+export default function Navigation({ activeTab, onTabChange, showMapMessage, hasMap }) {
   return (
     <nav className="bg-gray-700 border-b border-gray-600">
       <div className="flex items-center justify-between px-6">
@@ -32,7 +32,7 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
           className={`p-6 relative cursor-pointer ${activeTab === 'map' ? 'bg-gray-500' : 'hover:bg-gray-600'} transition-colors`}
           onClick={() => onTabChange('map')}
         >
-          <MapPin size={32} className={`${activeTab === 'map' ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
+          <MapPin size={32} className={`${!hasMap && activeTab === 'map' ? 'text-yellow-400 fill-yellow-400' : 'text-white'}`} />
           {showMapMessage && (
             <div className="absolute top-16 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-800 px-4 py-3 rounded-2xl shadow-lg whitespace-nowrap pointer-events-none">
               <div className="text-sm font-semibold text-center leading-tight">
@@ -48,7 +48,7 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
           className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'deliveries' ? 'bg-gray-500' : ''}`}
           onClick={() => onTabChange('deliveries')}
         >
-          <Bike size={32} className="text-white" />
+          <Bike size={32} className={`${hasMap ? 'text-yellow-400' : 'text-white'}`} />
         </button>
         
         {/* Route Icon - Tours */}
@@ -56,7 +56,7 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
           className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'tours' ? 'bg-gray-500' : ''}`}
           onClick={() => onTabChange('tours')}
         >
-          <Route size={32} className="text-white" />
+          <Route size={32} className={`${hasMap ? 'text-yellow-400' : 'text-white'}`} />
         </button>
         </div>
       </div>

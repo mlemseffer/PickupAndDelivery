@@ -63,6 +63,7 @@ export default function PickupDeliveryUI() {
         activeTab={activeTab}
         onTabChange={handleTabChange}
         showMapMessage={showMessage}
+        hasMap={mapData !== null}
       />
 
       {/* Main Content */}
