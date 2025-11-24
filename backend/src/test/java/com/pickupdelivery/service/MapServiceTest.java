@@ -1,11 +1,19 @@
 package com.pickupdelivery.service;
 
 import com.pickupdelivery.model.CityMap;
+import com.pickupdelivery.model.Node;
+import com.pickupdelivery.model.Segment;
+import com.pickupdelivery.xmlparser.MapXmlParser;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.MockitoAnnotations;
 import org.springframework.mock.web.MockMultipartFile;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 
 /**
  * Tests unitaires pour MapService
@@ -13,31 +21,33 @@ import static org.junit.jupiter.api.Assertions.*;
  */
 class MapServiceTest {
 
+    @Mock
+    private MapXmlParser mapXmlParser;
+
+    @InjectMocks
     private MapService mapService;
 
     @BeforeEach
     void setUp() {
-        mapService = new MapService();
+        MockitoAnnotations.openMocks(this);
     }
 
     @Test
     void parseMapFromXML_WithValidXML_ShouldParseSuccessfully() throws Exception {
         // Arrange
-        String xmlContent = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <reseau>
-                <noeud id="1" latitude="45.75" longitude="4.85"/>
-                <noeud id="2" latitude="45.76" longitude="4.86"/>
-                <troncon origine="1" destination="2" longueur="100.5" nomRue="Rue Test"/>
-            </reseau>
-            """;
-        
         MockMultipartFile file = new MockMultipartFile(
             "file",
             "test.xml",
             "text/xml",
-            xmlContent.getBytes()
+            "test content".getBytes()
         );
+        
+        CityMap mockMap = new CityMap();
+        mockMap.getNodes().add(new Node("1", 45.75, 4.85));
+        mockMap.getNodes().add(new Node("2", 45.76, 4.86));
+        mockMap.getSegments().add(new Segment("1", "2", 100.5, "Rue Test"));
+        
+        when(mapXmlParser.parseMapFromXML(any())).thenReturn(mockMap);
 
         // Act
         CityMap map = mapService.parseMapFromXML(file);
@@ -53,19 +63,17 @@ class MapServiceTest {
     @Test
     void hasMap_WhenMapIsLoaded_ShouldReturnTrue() throws Exception {
         // Arrange
-        String xmlContent = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <reseau>
-                <noeud id="1" latitude="45.75" longitude="4.85"/>
-            </reseau>
-            """;
-        
         MockMultipartFile file = new MockMultipartFile(
             "file",
             "test.xml",
             "text/xml",
-            xmlContent.getBytes()
+            "test content".getBytes()
         );
+        
+        CityMap mockMap = new CityMap();
+        mockMap.getNodes().add(new Node("1", 45.75, 4.85));
+        
+        when(mapXmlParser.parseMapFromXML(any())).thenReturn(mockMap);
 
         // Act
         mapService.parseMapFromXML(file);
@@ -83,19 +91,17 @@ class MapServiceTest {
     @Test
     void clearMap_ShouldRemoveCurrentMap() throws Exception {
         // Arrange
-        String xmlContent = """
-            <?xml version="1.0" encoding="UTF-8"?>
-            <reseau>
-                <noeud id="1" latitude="45.75" longitude="4.85"/>
-            </reseau>
-            """;
-        
         MockMultipartFile file = new MockMultipartFile(
             "file",
             "test.xml",
             "text/xml",
-            xmlContent.getBytes()
+            "test content".getBytes()
         );
+        
+        CityMap mockMap = new CityMap();
+        mockMap.getNodes().add(new Node("1", 45.75, 4.85));
+        
+        when(mapXmlParser.parseMapFromXML(any())).thenReturn(mockMap);
         
         mapService.parseMapFromXML(file);
         assertTrue(mapService.hasMap());
