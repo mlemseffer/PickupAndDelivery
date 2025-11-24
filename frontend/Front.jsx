@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import Header from './src/components/Header';
 import Navigation from './src/components/Navigation';
 import MapUploader from './src/components/MapUploader';
 import MapViewer from './src/components/MapViewer';
@@ -59,10 +58,7 @@ export default function PickupDeliveryUI() {
 
   return (
     <div className="h-screen bg-gray-800 text-white flex flex-col">
-      {/* Header */}
-      <Header />
-
-      {/* Navigation Bar */}
+      {/* Navigation Bar avec titre intégré */}
       <Navigation 
         activeTab={activeTab}
         onTabChange={handleTabChange}
@@ -93,29 +89,32 @@ export default function PickupDeliveryUI() {
 
         {/* Map View */}
         {mapData && activeTab === 'map' && (
-          <div className="flex-1 flex flex-col p-4 gap-4 overflow-hidden">
-            {/* Ligne du haut : Carte + Panneau d'informations */}
-            <div className="flex-1 flex gap-4 min-h-0">
-              {/* Carte sur la gauche */}
-              <div className="w-3/5 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
+          <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+            {/* Ligne principale : Carte + Panneau d'informations */}
+            <div className="flex-1 flex gap-4 min-h-0 p-4 pt-2">
+              {/* Carte sur la gauche - plus grande */}
+              <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
                 <MapViewer 
                   mapData={mapData}
                   onClearMap={handleClearMap}
                 />
               </div>
               
-              {/* Espace réservé pour les tableaux et boutons à droite */}
-              <div className="flex-1 bg-gray-700 rounded-lg p-6">
-                <h3 className="text-xl font-semibold mb-4">Informations</h3>
-                <p className="text-gray-400">
-                  Les tableaux et boutons s'afficheront ici.
-                </p>
+              {/* Panneau droit avec informations et boutons */}
+              <div className="flex-1 flex flex-col gap-4">
+                {/* Espace pour les tableaux */}
+                <div className="flex-1 bg-gray-700 rounded-lg p-6">
+                  <h3 className="text-xl font-semibold mb-4">Informations</h3>
+                  <p className="text-gray-400">
+                    Les tableaux et boutons s'afficheront ici.
+                  </p>
+                </div>
+                
+                {/* Boutons d'action en bas à droite */}
+                <div className="h-32 bg-gray-700 rounded-lg p-4 flex items-center justify-center">
+                  <p className="text-gray-400">Boutons d'action</p>
+                </div>
               </div>
-            </div>
-            
-            {/* Zone du bas : espace réservé pour les futurs boutons */}
-            <div className="h-32 bg-gray-700 rounded-lg p-4 flex items-center justify-center">
-              <p className="text-gray-400">Espace réservé pour les boutons d'action</p>
             </div>
           </div>
         )}

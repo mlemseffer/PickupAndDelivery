@@ -7,9 +7,20 @@ import { Home, MapPin, Bike, Route } from 'lucide-react';
 export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
   return (
     <nav className="bg-gray-700 border-b border-gray-600">
-      <div className="flex">
-        {/* Home Icon */}
-        <button 
+      <div className="flex items-center justify-between px-6">
+        {/* Titre de l'application à gauche */}
+        <div className="flex items-center gap-3">
+          <span className="text-3xl">🚴</span>
+          <div>
+            <h1 className="text-xl font-bold">Pickup & Delivery</h1>
+            <p className="text-sm text-gray-300">Optimisation des tournées de livraison à vélo</p>
+          </div>
+        </div>
+        
+        {/* Boutons de navigation à droite */}
+        <div className="flex">
+          {/* Home Icon */}
+          <button 
           className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'home' ? 'bg-gray-500' : ''}`}
           onClick={() => onTabChange('home')}
         >
@@ -47,6 +58,7 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage }) {
         >
           <Route size={32} className="text-white" />
         </button>
+        </div>
       </div>
     </nav>
   );
