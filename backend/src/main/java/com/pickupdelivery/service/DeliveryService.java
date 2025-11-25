@@ -1,6 +1,7 @@
 package com.pickupdelivery.service;
 
 import com.pickupdelivery.model.DeliveryRequest;
+import com.pickupdelivery.model.DeliveryRequestSet;
 import com.pickupdelivery.xmlparser.DeliveryRequestXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -17,6 +18,7 @@ import java.util.List;
 public class DeliveryService {
 
     private List<DeliveryRequest> currentRequests = new ArrayList<>();
+    private DeliveryRequestSet currentRequestSet;
     
     @Autowired
     private DeliveryRequestXmlParser deliveryRequestXmlParser;
@@ -55,5 +57,26 @@ public class DeliveryService {
      */
     public void clearRequests() {
         this.currentRequests.clear();
+        this.currentRequestSet = null;
+    }
+
+    /**
+     * Charge un ensemble de demandes de livraison depuis un fichier XML
+     * @param file Le fichier XML contenant les demandes
+     * @return L'ensemble des demandes avec l'entrepôt
+     * @throws Exception Si le parsing échoue
+     */
+    public DeliveryRequestSet loadDeliveryRequests(MultipartFile file) throws Exception {
+        DeliveryRequestSet requestSet = deliveryRequestXmlParser.parseDeliveryRequestFromXML(file);
+        this.currentRequestSet = requestSet;
+        return requestSet;
+    }
+
+    /**
+     * Récupère l'ensemble des demandes actuelles
+     * @return L'ensemble des demandes avec l'entrepôt
+     */
+    public DeliveryRequestSet getCurrentRequestSet() {
+        return currentRequestSet;
     }
 }

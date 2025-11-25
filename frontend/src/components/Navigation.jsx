@@ -4,7 +4,7 @@ import { Home, MapPin, Bike, Route } from 'lucide-react';
 /**
  * Composant de navigation principal
  */
-export default function Navigation({ activeTab, onTabChange, showMapMessage, hasMap }) {
+export default function Navigation({ activeTab, onTabChange, showMapMessage, hasMap, onLoadDeliveryRequests }) {
   return (
     <nav className="bg-gray-700 border-b border-gray-600">
       <div className="flex items-center justify-between px-6">
@@ -43,12 +43,18 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage, has
           )}
         </button>
         
-        {/* Bike Icon - Deliveries */}
+        {/* Bike Icon - Charger demandes XML */}
         <button 
-          className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'deliveries' ? 'bg-gray-500' : ''}`}
-          onClick={() => onTabChange('deliveries')}
+          className={`p-6 relative hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'deliveries' ? 'bg-gray-500' : ''}`}
+          onClick={() => hasMap ? onLoadDeliveryRequests() : alert('Veuillez d\'abord charger une carte')}
+          title={hasMap ? "Charger un fichier de demandes XML" : "Chargez d'abord une carte"}
         >
-          <Bike size={32} className={`${hasMap ? 'text-yellow-400' : 'text-white'}`} />
+          <Bike size={32} className={`${hasMap ? 'text-yellow-400' : 'text-gray-500'}`} />
+          {hasMap && (
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 px-2 py-0.5 rounded text-xs font-bold pointer-events-none">
+              XML
+            </div>
+          )}
         </button>
         
         {/* Route Icon - Tours */}

@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import Navigation from './src/components/Navigation';
 import MapUploader from './src/components/MapUploader';
 import MapViewer from './src/components/MapViewer';
+import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
+import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -14,7 +16,10 @@ export default function PickupDeliveryUI() {
   const [activeTab, setActiveTab] = useState('home');
   const [showMessage, setShowMessage] = useState(true);
   const [showMapUpload, setShowMapUpload] = useState(false);
+  const [showDeliveryUpload, setShowDeliveryUpload] = useState(false);
+  const [showManualForm, setShowManualForm] = useState(false);
   const [mapData, setMapData] = useState(null);
+  const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -50,10 +55,60 @@ export default function PickupDeliveryUI() {
     try {
       await apiService.clearMap();
       setMapData(null);
+      setDeliveryRequestSet(null);
       setShowMapUpload(true);
     } catch (error) {
       console.error('Erreur lors de la suppression de la carte:', error);
     }
+  };
+
+  // Gestion du chargement des demandes de livraison
+  const handleDeliveryRequestsLoaded = (requestSet) => {
+    setDeliveryRequestSet(requestSet);
+    setShowDeliveryUpload(false);
+  };
+
+  // Gestion de l'annulation du chargement des demandes
+  const handleCancelDeliveryUpload = () => {
+    setShowDeliveryUpload(false);
+  };
+
+  // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
+  const handleAddDeliveryManually = () => {
+    if (!mapData) {
+      alert('Veuillez d\'abord charger une carte');
+      return;
+    }
+    setShowManualForm(true);
+  };
+
+  // Gestion de l'ajout manuel d'une demande
+  const handleManualDemandAdd = (demand) => {
+    // Créer ou mettre à jour le DeliveryRequestSet
+    const newDemand = {
+      id: Date.now().toString(),
+      ...demand,
+      status: 'NON_TRAITEE',
+      courierId: null,
+      // Assigner une couleur aléatoire
+      color: '#' + Math.floor(Math.random()*16777215).toString(16)
+    };
+
+    if (!deliveryRequestSet) {
+      // Créer un nouveau set avec juste cette demande
+      setDeliveryRequestSet({
+        warehouse: null,
+        demands: [newDemand]
+      });
+    } else {
+      // Ajouter à la liste existante
+      setDeliveryRequestSet({
+        ...deliveryRequestSet,
+        demands: [...deliveryRequestSet.demands, newDemand]
+      });
+    }
+
+    setShowManualForm(false);
   };
 
   return (
@@ -64,6 +119,7 @@ export default function PickupDeliveryUI() {
         onTabChange={handleTabChange}
         showMapMessage={showMessage}
         hasMap={mapData !== null}
+        onLoadDeliveryRequests={() => setShowDeliveryUpload(true)}
       />
 
       {/* Main Content */}
@@ -88,8 +144,25 @@ export default function PickupDeliveryUI() {
           />
         )}
 
+        {/* Delivery Upload View (XML) */}
+        {showDeliveryUpload && mapData && (
+          <DeliveryRequestUploader 
+            onRequestsLoaded={handleDeliveryRequestsLoaded}
+            onCancel={handleCancelDeliveryUpload}
+          />
+        )}
+
+        {/* Manual Delivery Form */}
+        {showManualForm && mapData && (
+          <ManualDeliveryForm 
+            onAdd={handleManualDemandAdd}
+            onCancel={() => setShowManualForm(false)}
+            availableNodes={mapData.nodes}
+          />
+        )}
+
         {/* Map View */}
-        {mapData && activeTab === 'map' && (
+        {mapData && activeTab === 'map' && !showDeliveryUpload && (
           <div className="flex-1 flex flex-col gap-4 overflow-hidden">
             {/* Ligne principale : Carte + Panneau d'informations */}
             <div className="flex-1 flex gap-4 min-h-0 p-4 pt-2">
@@ -98,6 +171,7 @@ export default function PickupDeliveryUI() {
                 <MapViewer 
                   mapData={mapData}
                   onClearMap={handleClearMap}
+                  deliveryRequestSet={deliveryRequestSet}
                 />
               </div>
               
@@ -106,9 +180,6 @@ export default function PickupDeliveryUI() {
                 {/* Espace pour les tableaux */}
                 <div className="flex-1 bg-gray-700 rounded-lg p-6">
                   <h3 className="text-xl font-semibold mb-4">Informations</h3>
-                  <p className="text-gray-400">
-                    Les tableaux et boutons s'afficheront ici.
-                  </p>
                 </div>
                 
                 {/* Boutons d'action en bas à droite */}
@@ -119,8 +190,12 @@ export default function PickupDeliveryUI() {
                       Nombre de livreurs
                     </button>
                     
-                    {/* Bouton Ajouter Pickup&Delivery */}
-                    <button className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg">
+                    {/* Bouton Ajouter Pickup&Delivery (manuel) */}
+                    <button 
+                      onClick={handleAddDeliveryManually}
+                      className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                      title="Ajouter manuellement une demande de livraison"
+                    >
                       Ajouter Pickup&Delivery
                     </button>
                     

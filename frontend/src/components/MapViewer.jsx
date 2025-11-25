@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
 import { Maximize2, Minimize2 } from 'lucide-react';
+import DeliveryMarkers from './DeliveryMarkers';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -24,7 +25,7 @@ function MapResizer() {
 /**
  * Composant pour afficher la carte avec Leaflet
  */
-export default function MapViewer({ mapData, onClearMap }) {
+export default function MapViewer({ mapData, onClearMap, deliveryRequestSet }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mapContainerRef = useRef(null);
 
@@ -166,6 +167,14 @@ export default function MapViewer({ mapData, onClearMap }) {
             }
             return null;
           })}
+
+          {/* Affichage des demandes de livraison */}
+          {deliveryRequestSet && (
+            <DeliveryMarkers 
+              requestSet={deliveryRequestSet} 
+              nodesById={nodesById}
+            />
+          )}
         </MapContainer>
       </div>
     </div>

@@ -471,6 +471,334 @@ Vérifiez :
 
 ---
 
+## 📦 Guide des Demandes de Livraison
+
+### Chargement des Demandes
+
+L'application permet de charger des demandes de livraison de **deux façons** :
+
+#### 1. 🚴 Chargement via Fichier XML
+
+**Cliquez sur l'icône de vélo** dans la barre de navigation (badge jaune "XML").
+
+**Format XML attendu :**
+```xml
+<?xml version="1.0" encoding="UTF-8"?>
+<demandeDeLivraisons>
+  <entrepot adresse="1349383079" heureDepart="8:0:0"/>
+  <livraison adresseEnlevement="26121686" adresseLivraison="191134392" 
+             dureeEnlevement="300" dureeLivraison="540"/>
+  <livraison adresseEnlevement="55444018" adresseLivraison="26470086" 
+             dureeEnlevement="60" dureeLivraison="420"/>
+</demandeDeLivraisons>
+```
+
+**Attributs :**
+- `adresse` : ID du nœud de l'entrepôt (doit exister dans la carte chargée)
+- `heureDepart` : Heure de départ au format `HH:mm:ss`
+- `adresseEnlevement` : ID du nœud de pickup
+- `adresseLivraison` : ID du nœud de delivery
+- `dureeEnlevement` : Durée du pickup en secondes
+- `dureeLivraison` : Durée de la livraison en secondes
+
+**Exemples de fichiers disponibles :**
+- `demandePetit1.xml` - 1 livraison
+- `demandeMoyen3.xml` - 3 livraisons
+- `demandeGrand7.xml` - 7 livraisons
+
+#### 2. ➕ Ajout Manuel
+
+**Cliquez sur le bouton vert "Ajouter Pickup&Delivery"**.
+
+Un formulaire modal s'ouvre avec les champs :
+- **Nœud de Pickup** : ID du nœud d'enlèvement
+- **Durée Pickup** : Temps d'enlèvement (secondes)
+- **Nœud de Delivery** : ID du nœud de livraison
+- **Durée Delivery** : Temps de livraison (secondes)
+
+**Validation automatique :**
+- ✅ Pickup et delivery doivent être différents
+- ✅ Durées doivent être positives
+- ✅ Les nœuds doivent exister dans la carte
+
+### Visualisation sur la Carte
+
+Une fois les demandes chargées, vous verrez des **logos colorés** :
+
+| Icône | Type | Couleur | Description |
+|-------|------|---------|-------------|
+| 🏢 (Maison) | Entrepôt | Gris | Point de départ des tournées |
+| 📦 (Paquet) | Pickup | Couleur unique | Point d'enlèvement |
+| 📍 (Pin) | Delivery | Même couleur que pickup | Point de livraison |
+
+**Système de couleurs :**
+- Chaque demande (pickup + delivery) a une **couleur unique**
+- Les 2 marqueurs d'une même demande partagent la même couleur
+- Palette de 20 couleurs : `#FF6B6B`, `#4ECDC4`, `#45B7D1`, `#FFA07A`, etc.
+
+### Popup d'Informations
+
+Cliquez sur un marqueur pour voir :
+- **Entrepôt** : Heure de départ, ID du nœud
+- **Pickup** : Numéro de demande, durée, ID du nœud, statut
+- **Delivery** : Numéro de demande, durée, ID du nœud, statut
+
+---
+
+## 🎨 Guide Visuel de l'Interface
+
+### Layout Principal
+
+```
+┌──────────────────────────────────────────────────────────────────┐
+│  🏠 Pickup & Delivery         [🏠] [📍] [🚴 XML] [🛣️]         │ HEADER
+└──────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────┬────────────────────────────────────┐
+│                             │                                    │
+│                             │    📋 Informations                 │
+│         CARTE               │                                    │
+│       (Leaflet)             │    (Vide pour l'instant)          │
+│        66%                  │                                    │
+│                             │                                    │
+│                             ├────────────────────────────────────┤
+│                             │  [Nombre de livreurs]             │
+│                             │  [Ajouter Pickup&Delivery]        │
+│                             │  [Calculer tournée]               │
+└─────────────────────────────┴────────────────────────────────────┘
+```
+
+### États de l'Application
+
+#### État 1 : Initial (Aucune carte)
+```
+Navigation : Icônes désactivées (grisées)
+Carte      : Message "Chargez une carte XML pour commencer"
+Info       : Vide
+```
+
+#### État 2 : Carte Chargée
+```
+Navigation : [🏠] actif, autres activés (jaune)
+Carte      : Affiche intersections et tronçons
+Info       : Vide
+Boutons    : Actifs
+```
+
+#### État 3 : Demandes Chargées (XML)
+```
+Navigation : [🚴 XML] badge jaune
+Carte      : Carte + logos colorés (entrepôt, pickups, deliveries)
+Info       : Vide
+Popup      : Clic sur logo → détails
+```
+
+#### État 4 : Ajout Manuel
+```
+Modal      : Formulaire "Ajouter une demande"
+Champs     : Pickup node, Pickup duration, Delivery node, Delivery duration
+Validation : En temps réel
+```
+
+### Workflow Utilisateur
+
+```
+1. Charger Carte
+   └─→ Clic [🏠] → Sélectionner petitPlan.xml
+       └─→ Carte affichée avec nœuds et segments
+
+2. Charger Demandes (Option A : XML)
+   └─→ Clic [🚴 XML] → Sélectionner demandeGrand7.xml
+       └─→ Logos colorés apparaissent sur carte
+
+   Ou (Option B : Manuel)
+   └─→ Clic [Ajouter Pickup&Delivery] → Remplir formulaire
+       └─→ Nouveau logo ajouté avec couleur aléatoire
+
+3. Visualiser
+   └─→ Clic sur logo → Popup avec détails
+       └─→ Pan/Zoom sur carte
+       └─→ Fullscreen disponible
+
+4. Calculer Tournée (À venir)
+   └─→ Clic [Calculer tournée]
+       └─→ Affichage du trajet optimisé
+```
+
+### Icônes de Navigation
+
+| Icône | Titre | Badge | Action | État Initial |
+|-------|-------|-------|--------|--------------|
+| 🏠 | Charger Plan | - | Ouvre dialogue upload XML carte | Actif |
+| 📍 | Charger XML | - | (Placeholder) | Désactivé |
+| 🚴 | Charger Demandes | XML (jaune) | Ouvre dialogue upload XML demandes | Désactivé → Actif après carte |
+| 🛣️ | Calculer Tournée | - | (À implémenter) | Désactivé → Actif après demandes |
+
+### Différence XML vs Manuel
+
+| Aspect | Chargement XML (🚴) | Ajout Manuel (➕) |
+|--------|---------------------|-------------------|
+| **Déclencheur** | Icône vélo dans navigation | Bouton vert en bas à droite |
+| **Interface** | Dialogue fichier système | Modal formulaire |
+| **Quantité** | Plusieurs demandes d'un coup | 1 demande à la fois |
+| **Source** | Fichier `.xml` | Saisie utilisateur |
+| **Validation** | Parser XML backend | Formulaire frontend + backend |
+| **Couleurs** | Assignées automatiquement (palette) | Aléatoire parmi palette |
+| **Use Case** | Import de scénarios de test | Ajustements ponctuels |
+
+---
+
+## 🔄 Modèles de Données
+
+### Backend - Entités Java
+
+#### CityMap
+```java
+@Data
+public class CityMap {
+    private List<Node> nodes;           // Intersections
+    private List<Segment> segments;     // Tronçons
+    private Map<String, Node> nodesById; // Index rapide
+}
+```
+
+#### Node (Intersection)
+```java
+@Data
+public class Node {
+    private String id;
+    private double latitude;
+    private double longitude;
+}
+```
+
+#### Segment (Tronçon)
+```java
+@Data
+public class Segment {
+    private String origin;       // ID nœud origine
+    private String destination;  // ID nœud destination
+    private double length;       // Longueur en mètres
+    private String streetName;   // Nom de rue
+}
+```
+
+#### Warehouse (Entrepôt)
+```java
+@Data
+public class Warehouse {
+    private String id;
+    private String nodeId;           // FK → Node
+    private String departureTime;    // Format "HH:mm:ss"
+}
+```
+
+#### Demand (Demande de Livraison)
+```java
+@Data
+public class Demand {
+    private String id;
+    private String pickupNodeId;         // FK → Node
+    private String deliveryNodeId;       // FK → Node
+    private int pickupDurationSec;
+    private int deliveryDurationSec;
+    private DemandStatus status;         // NON_TRAITEE, AFFECTEE, TRAITEE, REJETEE
+    private String courierId;            // FK → Courier (nullable)
+    private String color;                // Couleur hex (#FF6B6B)
+}
+```
+
+#### DeliveryRequestSet
+```java
+@Data
+public class DeliveryRequestSet {
+    private Warehouse warehouse;
+    private List<Demand> demands;
+}
+```
+
+### Frontend - États React
+
+```javascript
+// État principal (Front.jsx)
+const [cityMap, setCityMap] = useState(null);
+const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
+const [showDeliveryUpload, setShowDeliveryUpload] = useState(false);
+const [showManualForm, setShowManualForm] = useState(false);
+
+// Structure cityMap
+{
+  nodes: [{ id, latitude, longitude }, ...],
+  segments: [{ origin, destination, length, streetName }, ...]
+}
+
+// Structure deliveryRequestSet
+{
+  warehouse: { id, nodeId, departureTime },
+  demands: [
+    { 
+      id, 
+      pickupNodeId, 
+      deliveryNodeId, 
+      pickupDurationSec, 
+      deliveryDurationSec,
+      status,
+      color 
+    },
+    ...
+  ]
+}
+```
+
+---
+
+## 🧪 Tests et Validation
+
+### Tests Backend
+
+**Exécuter tous les tests :**
+```bash
+cd backend
+mvn test
+```
+
+**Couverture des tests :**
+- ✅ MapService : Upload, parsing, validation
+- ✅ DeliveryService : Chargement XML, ajout manuel
+- ✅ MapController : Endpoints REST
+- ✅ XmlParsers : Parsing correct des fichiers
+- ⚠️ ValidationService : À implémenter
+
+### Validation des Données
+
+**Important :** Les adresses de livraison correspondent **obligatoirement** à des nœuds !
+
+Selon le diagramme de classe :
+- `Demand.pickupNodeId` → FK vers `Node`
+- `Demand.deliveryNodeId` → FK vers `Node`
+- `Warehouse.nodeId` → FK vers `Node`
+
+**Validation à implémenter dans `ValidationService.java` :**
+```java
+public void validateDeliveryRequest(DeliveryRequestSet request, CityMap map) {
+    // Vérifier que warehouse.nodeId existe
+    if (!map.getNodesById().containsKey(request.getWarehouse().getNodeId())) {
+        throw new ValidationException("Warehouse node not found");
+    }
+    
+    // Vérifier chaque demande
+    for (Demand demand : request.getDemands()) {
+        if (!map.getNodesById().containsKey(demand.getPickupNodeId())) {
+            throw new ValidationException("Pickup node not found");
+        }
+        if (!map.getNodesById().containsKey(demand.getDeliveryNodeId())) {
+            throw new ValidationException("Delivery node not found");
+        }
+    }
+}
+```
+
+---
+
 ## 🤝 Contribution
 
 Pour contribuer au projet :

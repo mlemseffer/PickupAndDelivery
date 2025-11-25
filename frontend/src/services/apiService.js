@@ -153,6 +153,44 @@ class ApiService {
 
     return response.json();
   }
+
+  /**
+   * Charge un ensemble de demandes de livraison depuis un fichier XML
+   * @param {File} file - Le fichier XML contenant les demandes
+   * @returns {Promise} L'ensemble des demandes avec l'entrepôt et les couleurs
+   */
+  async loadDeliveryRequests(file) {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${API_BASE_URL}/deliveries/load`, {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.message || 'Erreur lors du chargement des demandes');
+    }
+
+    const result = await response.json();
+    return result.data; // Retourne directement les données
+  }
+
+  /**
+   * Récupère l'ensemble des demandes actuelles
+   * @returns {Promise} L'ensemble des demandes avec l'entrepôt
+   */
+  async getCurrentRequestSet() {
+    const response = await fetch(`${API_BASE_URL}/deliveries/current`);
+    
+    if (!response.ok) {
+      throw new Error('Erreur lors de la récupération des demandes');
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
 }
 
 export default new ApiService();

@@ -2,6 +2,7 @@ package com.pickupdelivery.controller;
 
 import com.pickupdelivery.dto.ApiResponse;
 import com.pickupdelivery.model.DeliveryRequest;
+import com.pickupdelivery.model.DeliveryRequestSet;
 import com.pickupdelivery.service.DeliveryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -87,5 +88,49 @@ public class DeliveryController {
     public ResponseEntity<ApiResponse<Void>> clearDeliveryRequests() {
         deliveryService.clearRequests();
         return ResponseEntity.ok(ApiResponse.success("Demandes de livraison supprimées avec succès", null));
+    }
+
+    /**
+     * Charge un ensemble de demandes de livraison depuis un fichier XML
+     * POST /api/deliveries/load
+     * @param file Le fichier XML contenant les demandes
+     * @return L'ensemble des demandes avec l'entrepôt et les couleurs
+     */
+    @PostMapping("/load")
+    public ResponseEntity<ApiResponse<DeliveryRequestSet>> loadDeliveryRequests(
+            @RequestParam("file") MultipartFile file) {
+        try {
+            if (file.isEmpty()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Le fichier est vide"));
+            }
+
+            if (!file.getOriginalFilename().endsWith(".xml")) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("Le fichier doit être au format XML"));
+            }
+
+            DeliveryRequestSet requestSet = deliveryService.loadDeliveryRequests(file);
+            
+            return ResponseEntity.ok(
+                    ApiResponse.success("Demandes de livraison chargées avec succès", requestSet));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors du chargement des demandes: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Récupère l'ensemble des demandes actuelles
+     * GET /api/deliveries/current
+     * @return L'ensemble des demandes avec l'entrepôt
+     */
+    @GetMapping("/current")
+    public ResponseEntity<ApiResponse<DeliveryRequestSet>> getCurrentRequestSet() {
+        DeliveryRequestSet requestSet = deliveryService.getCurrentRequestSet();
+        if (requestSet == null) {
+            return ResponseEntity.ok(ApiResponse.success("Aucune demande chargée", null));
+        }
+        return ResponseEntity.ok(ApiResponse.success(requestSet));
     }
 }
