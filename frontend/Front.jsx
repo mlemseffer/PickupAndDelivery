@@ -112,8 +112,23 @@ export default function PickupDeliveryUI() {
                 </div>
                 
                 {/* Boutons d'action en bas à droite */}
-                <div className="h-32 bg-gray-700 rounded-lg p-4 flex items-center justify-center">
-                  <p className="text-gray-400">Boutons d'action</p>
+                <div className="bg-gray-700 rounded-lg p-4">
+                  <div className="flex gap-3 justify-center">
+                    {/* Bouton Nombre de livreurs */}
+                    <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg">
+                      Nombre de livreurs
+                    </button>
+                    
+                    {/* Bouton Ajouter Pickup&Delivery */}
+                    <button className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg">
+                      Ajouter Pickup&Delivery
+                    </button>
+                    
+                    {/* Bouton Calculer tournée */}
+                    <button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg">
+                      Calculer tournée
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
