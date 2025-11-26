@@ -295,4 +295,257 @@ public class ServiceAlgo {
         graph.setDistancesMatrix(distancesMatrix);
         return graph;
     }
+
+    // =========================================================================
+    // PHASE 1: PRÉPARATION DES DONNÉES POUR L'ALGORITHME TSP
+    // =========================================================================
+
+    /**
+     * Extrait le stop de type WAREHOUSE depuis le Graph
+     * 
+     * @param graph Le graphe contenant tous les stops
+     * @return Le Stop warehouse
+     * @throws IllegalStateException Si aucun warehouse n'est trouvé
+     */
+    private Stop extractWarehouse(Graph graph) {
+        if (graph == null || graph.getDistancesMatrix() == null) {
+            throw new IllegalArgumentException("Graph ne peut pas être null");
+        }
+
+        return graph.getDistancesMatrix().keySet().stream()
+                .filter(stop -> stop.getTypeStop() == Stop.TypeStop.WAREHOUSE)
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Aucun entrepôt (warehouse) trouvé dans le Graph"));
+    }
+
+    /**
+     * Extrait tous les stops sauf le warehouse
+     * 
+     * @param graph Le graphe contenant tous les stops
+     * @return Liste des stops (pickups et deliveries uniquement)
+     */
+    private List<Stop> extractNonWarehouseStops(Graph graph) {
+        if (graph == null || graph.getDistancesMatrix() == null) {
+            throw new IllegalArgumentException("Graph ne peut pas être null");
+        }
+
+        return graph.getDistancesMatrix().keySet().stream()
+                .filter(stop -> stop.getTypeStop() != Stop.TypeStop.WAREHOUSE)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
+    /**
+     * Organise les pickups par ID de demande
+     * Permet de retrouver facilement tous les pickups associés à une demande
+     * 
+     * @param stops Liste de tous les stops (pickups et deliveries)
+     * @return Map avec clé = idDemande, valeur = liste des stops pickup de cette demande
+     */
+    private Map<String, List<Stop>> buildPickupsByRequestId(List<Stop> stops) {
+        if (stops == null) {
+            throw new IllegalArgumentException("La liste de stops ne peut pas être null");
+        }
+
+        return stops.stream()
+                .filter(stop -> stop.getTypeStop() == Stop.TypeStop.PICKUP)
+                .collect(java.util.stream.Collectors.groupingBy(Stop::getIdDemande));
+    }
+
+    /**
+     * Organise les deliveries par ID de demande
+     * Permet de retrouver facilement le delivery associé à une demande
+     * 
+     * @param stops Liste de tous les stops (pickups et deliveries)
+     * @return Map avec clé = idDemande, valeur = stop delivery de cette demande
+     */
+    private Map<String, Stop> buildDeliveryByRequestId(List<Stop> stops) {
+        if (stops == null) {
+            throw new IllegalArgumentException("La liste de stops ne peut pas être null");
+        }
+
+        return stops.stream()
+                .filter(stop -> stop.getTypeStop() == Stop.TypeStop.DELIVERY)
+                .collect(java.util.stream.Collectors.toMap(
+                        Stop::getIdDemande, 
+                        java.util.function.Function.identity()
+                ));
+    }
+
+    // =========================================================================
+    // PHASE 2: FONCTIONS UTILITAIRES POUR L'ALGORITHME TSP
+    // =========================================================================
+
+    /**
+     * Récupère la distance entre deux stops depuis la matrice d'adjacence du Graph
+     * 
+     * @param a Le stop de départ
+     * @param b Le stop d'arrivée
+     * @param graph Le graphe contenant la matrice de distances
+     * @return La distance entre les deux stops
+     * @throws IllegalArgumentException Si les paramètres sont null ou si la distance n'existe pas
+     */
+    private double distance(Stop a, Stop b, Graph graph) {
+        if (a == null || b == null || graph == null) {
+            throw new IllegalArgumentException("Les stops et le graph ne peuvent pas être null");
+        }
+
+        Map<Stop, Map<Stop, Trajet>> matrix = graph.getDistancesMatrix();
+        if (matrix == null || !matrix.containsKey(a)) {
+            throw new IllegalArgumentException("Stop source introuvable dans le graph: " + a.getIdNode());
+        }
+
+        Map<Stop, Trajet> destinations = matrix.get(a);
+        if (!destinations.containsKey(b)) {
+            throw new IllegalArgumentException("Pas de trajet trouvé entre " + a.getIdNode() + " et " + b.getIdNode());
+        }
+
+        Trajet trajet = destinations.get(b);
+        return trajet.getDistance();
+    }
+
+    /**
+     * Calcule la distance totale d'une tournée (route)
+     * 
+     * @param route Liste ordonnée des stops formant la tournée
+     * @param graph Le graphe contenant les distances entre stops
+     * @return La distance totale de la tournée en mètres
+     * @throws IllegalArgumentException Si les paramètres sont null ou si la route est invalide
+     */
+    private double computeRouteDistance(List<Stop> route, Graph graph) {
+        if (route == null || graph == null) {
+            throw new IllegalArgumentException("Route et graph ne peuvent pas être null");
+        }
+
+        if (route.size() < 2) {
+            return 0.0; // Une route avec 0 ou 1 stop a une distance de 0
+        }
+
+        double totalDistance = 0.0;
+
+        for (int i = 0; i < route.size() - 1; i++) {
+            Stop current = route.get(i);
+            Stop next = route.get(i + 1);
+            totalDistance += distance(current, next, graph);
+        }
+
+        return totalDistance;
+    }
+
+    /**
+     * Vérifie si un stop (en particulier une delivery) peut être visité
+     * Une delivery ne peut être visitée que si tous ses pickups correspondants ont déjà été visités
+     * Les pickups et le warehouse sont toujours faisables
+     * 
+     * @param stop Le stop à vérifier
+     * @param visited Ensemble des stops déjà visités
+     * @param pickupsByRequestId Map des pickups organisés par ID de demande
+     * @return true si le stop peut être visité, false sinon
+     */
+    private boolean isStopFeasible(
+            Stop stop,
+            Set<Stop> visited,
+            Map<String, List<Stop>> pickupsByRequestId
+    ) {
+        if (stop == null || visited == null || pickupsByRequestId == null) {
+            throw new IllegalArgumentException("Les paramètres ne peuvent pas être null");
+        }
+
+        // Les pickups et le warehouse sont toujours faisables
+        if (stop.getTypeStop() == Stop.TypeStop.PICKUP || 
+            stop.getTypeStop() == Stop.TypeStop.WAREHOUSE) {
+            return true;
+        }
+
+        // Pour une delivery, vérifier que tous ses pickups ont été visités
+        if (stop.getTypeStop() == Stop.TypeStop.DELIVERY) {
+            String requestId = stop.getIdDemande();
+            List<Stop> requiredPickups = pickupsByRequestId.get(requestId);
+
+            if (requiredPickups == null || requiredPickups.isEmpty()) {
+                // Pas de pickup requis (cas anormal, mais on considère comme faisable)
+                return true;
+            }
+
+            // Tous les pickups de cette demande doivent être dans visited
+            return visited.containsAll(requiredPickups);
+        }
+
+        return false;
+    }
+
+    /**
+     * Vérifie si une tournée respecte les contraintes de précédence
+     * Chaque delivery doit être visitée APRÈS tous les pickups de sa demande
+     * 
+     * @param route Liste ordonnée des stops formant la tournée
+     * @param pickupsByRequestId Map des pickups organisés par ID de demande
+     * @param deliveryByRequestId Map des deliveries organisés par ID de demande
+     * @return true si toutes les contraintes de précédence sont respectées, false sinon
+     */
+    private boolean respectsPrecedence(
+            List<Stop> route,
+            Map<String, List<Stop>> pickupsByRequestId,
+            Map<String, Stop> deliveryByRequestId
+    ) {
+        if (route == null || pickupsByRequestId == null || deliveryByRequestId == null) {
+            throw new IllegalArgumentException("Les paramètres ne peuvent pas être null");
+        }
+
+        Set<Stop> visited = new HashSet<>();
+
+        for (Stop stop : route) {
+            // Vérifier que le stop est faisable avec les stops déjà visités
+            if (!isStopFeasible(stop, visited, pickupsByRequestId)) {
+                return false; // Violation de contrainte : delivery avant son pickup
+            }
+            visited.add(stop);
+        }
+
+        return true;
+    }
+
+    /**
+     * Effectue un swap 2-opt sur une route
+     * Inverse le segment de route entre les indices i et k (inclus)
+     * 
+     * Exemple:
+     *   Route originale: [W, A, B, C, D, E, W]
+     *   twoOptSwap(route, 1, 4) → [W, D, C, B, A, E, W]
+     *   (inverse le segment A→B→C→D)
+     * 
+     * @param route La route originale
+     * @param i Index de début du segment à inverser (inclus)
+     * @param k Index de fin du segment à inverser (inclus)
+     * @return Une nouvelle route avec le segment inversé
+     * @throws IllegalArgumentException Si les indices sont invalides
+     */
+    private List<Stop> twoOptSwap(List<Stop> route, int i, int k) {
+        if (route == null) {
+            throw new IllegalArgumentException("Route ne peut pas être null");
+        }
+
+        if (i < 0 || k >= route.size() || i >= k) {
+            throw new IllegalArgumentException(
+                "Indices invalides: i=" + i + ", k=" + k + ", taille route=" + route.size() + 
+                " (requis: 0 <= i < k < size)"
+            );
+        }
+
+        List<Stop> newRoute = new ArrayList<>();
+
+        // Segment 1: début → i-1 (inchangé)
+        newRoute.addAll(route.subList(0, i));
+
+        // Segment 2: i → k (inversé)
+        List<Stop> segmentToReverse = new ArrayList<>(route.subList(i, k + 1));
+        Collections.reverse(segmentToReverse);
+        newRoute.addAll(segmentToReverse);
+
+        // Segment 3: k+1 → fin (inchangé)
+        if (k + 1 < route.size()) {
+            newRoute.addAll(route.subList(k + 1, route.size()));
+        }
+
+        return newRoute;
+    }
 }

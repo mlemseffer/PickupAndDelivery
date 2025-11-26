@@ -930,18 +930,20 @@ public class Stop {
 
 ### Backend
 
-- [ ] **Phase 1: Préparation des données**
-  - [ ] `extractWarehouse()`
-  - [ ] `extractNonWarehouseStops()`
-  - [ ] `buildPickupsByRequestId()`
-  - [ ] `buildDeliveryByRequestId()`
+- [x] **Phase 1: Préparation des données** ✅ **COMPLÉTÉ**
+  - [x] `extractWarehouse()`
+  - [x] `extractNonWarehouseStops()`
+  - [x] `buildPickupsByRequestId()`
+  - [x] `buildDeliveryByRequestId()`
+  - [x] Tests unitaires (12 tests - 100% success)
 
-- [ ] **Phase 2: Fonctions utilitaires**
-  - [ ] `distance()`
-  - [ ] `computeRouteDistance()`
-  - [ ] `isDeliveryFeasible()`
-  - [ ] `respectsPrecedence()`
-  - [ ] `twoOptSwap()`
+- [x] **Phase 2: Fonctions utilitaires** ✅ **COMPLÉTÉ**
+  - [x] `distance()`
+  - [x] `computeRouteDistance()`
+  - [x] `isStopFeasible()`
+  - [x] `respectsPrecedence()`
+  - [x] `twoOptSwap()`
+  - [x] Tests unitaires (21 tests - 100% success)
 
 - [ ] **Phase 3: Glouton**
   - [ ] `buildInitialRoute()`
