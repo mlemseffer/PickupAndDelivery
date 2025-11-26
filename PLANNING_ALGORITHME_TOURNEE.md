@@ -945,9 +945,10 @@ public class Stop {
   - [x] `twoOptSwap()`
   - [x] Tests unitaires (21 tests - 100% success)
 
-- [ ] **Phase 3: Glouton**
-  - [ ] `buildInitialRoute()`
-  - [ ] Tests avec 1-2 demandes
+- [x] **Phase 3: Glouton** ✅ **COMPLÉTÉ**
+  - [x] `buildInitialRoute()`
+  - [x] Tests avec 1-2 demandes
+  - [x] Tests unitaires (9 tests - 100% success)
 
 - [ ] **Phase 4: 2-opt**
   - [ ] `twoOptImprove()`

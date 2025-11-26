@@ -548,4 +548,97 @@ public class ServiceAlgo {
 
         return newRoute;
     }
+
+    // =========================================================================
+    // PHASE 3: CONSTRUCTION DE LA TOURNÉE INITIALE (ALGORITHME GLOUTON)
+    // =========================================================================
+
+    /**
+     * Construit une tournée initiale en utilisant l'algorithme glouton du plus proche voisin
+     * 
+     * Algorithme:
+     * 1. Commencer à l'entrepôt (warehouse)
+     * 2. Tant qu'il reste des stops non visités:
+     *    - Trouver le stop faisable le plus proche du stop courant
+     *    - Un stop est faisable si:
+     *      * C'est un PICKUP (toujours faisable)
+     *      * C'est une DELIVERY dont tous les pickups ont été visités
+     * 3. Retourner à l'entrepôt
+     * 
+     * @param graph Le graphe contenant les distances entre stops
+     * @param warehouse Le stop entrepôt (point de départ/arrivée)
+     * @param stops Liste de tous les stops à visiter (hors warehouse)
+     * @param pickupsByRequestId Map des pickups organisés par ID de demande
+     * @return Une route (tournée) valide commençant et finissant au warehouse
+     * @throws IllegalArgumentException Si les paramètres sont invalides
+     * @throws IllegalStateException Si aucun stop faisable n'est trouvé (bug logique)
+     */
+    private List<Stop> buildInitialRoute(
+            Graph graph,
+            Stop warehouse,
+            List<Stop> stops,
+            Map<String, List<Stop>> pickupsByRequestId
+    ) {
+        if (graph == null || warehouse == null || stops == null || pickupsByRequestId == null) {
+            throw new IllegalArgumentException("Les paramètres ne peuvent pas être null");
+        }
+
+        if (stops.isEmpty()) {
+            // Cas spécial: pas de stops à visiter, juste aller-retour au warehouse
+            return Arrays.asList(warehouse, warehouse);
+        }
+
+        List<Stop> route = new ArrayList<>();
+        Set<Stop> visited = new HashSet<>();
+        Set<Stop> remaining = new HashSet<>(stops);
+
+        // 1️⃣ Commencer à l'entrepôt
+        route.add(warehouse);
+        visited.add(warehouse);
+
+        // 2️⃣ Tant qu'il reste des stops non visités
+        while (!remaining.isEmpty()) {
+            Stop current = route.get(route.size() - 1);
+            Stop nearest = null;
+            double minDistance = Double.MAX_VALUE;
+
+            // 3️⃣ Chercher le stop faisable le plus proche
+            for (Stop candidate : remaining) {
+                // Vérifier si le stop est faisable (contraintes de précédence)
+                if (!isStopFeasible(candidate, visited, pickupsByRequestId)) {
+                    continue; // Delivery dont le pickup n'a pas encore été visité
+                }
+
+                // Calculer la distance
+                double dist = distance(current, candidate, graph);
+
+                // Garder le plus proche
+                if (dist < minDistance) {
+                    minDistance = dist;
+                    nearest = candidate;
+                }
+            }
+
+            // 4️⃣ Vérifier qu'on a trouvé un stop faisable
+            if (nearest == null) {
+                // Cela ne devrait jamais arriver si la logique est correcte
+                // Car il devrait toujours y avoir au moins un pickup faisable
+                throw new IllegalStateException(
+                    "Aucun stop faisable trouvé. Stops restants: " + remaining.size() + 
+                    ", Stops visités: " + visited.size() + 
+                    ". Cela indique un bug dans la logique de faisabilité."
+                );
+            }
+
+            // 5️⃣ Ajouter le stop le plus proche à la route
+            route.add(nearest);
+            visited.add(nearest);
+            remaining.remove(nearest);
+        }
+
+        // 6️⃣ Retour à l'entrepôt
+        route.add(warehouse);
+
+        return route;
+    }
 }
