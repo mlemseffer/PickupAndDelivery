@@ -15,7 +15,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Trajet {
-    private List<Segment> segments = new ArrayList<>();
+    private List<Segment> segments;
     private Stop stopDepart;
     private Stop stopArrivee;
     private double distance; // Distance totale en mètres
