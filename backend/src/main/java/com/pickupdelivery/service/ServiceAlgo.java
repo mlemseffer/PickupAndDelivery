@@ -283,7 +283,7 @@ public class ServiceAlgo {
                 trajet.setStopDepart(stopSource);
                 trajet.setStopArrivee(stopDestination);
                 trajet.setSegments(result.getSegments());
-                trajet.setDistance(result.getTotalDistance());
+                trajet.setDistance(result.getDistance());
 
                 // Ajouter dans la map
                 trajetsFromSource.put(stopDestination, trajet);
