@@ -52,8 +52,8 @@ export default function MapUploader({ onMapLoaded, onCancel }) {
         </p>
         
         {error && (
-          <div className="mb-4 p-3 bg-red-600 rounded-lg text-white text-sm">
-            {error}
+          <div className="mb-4 p-3 bg-red-900/30 border border-red-500 rounded-lg text-red-200 text-sm">
+            <div className="whitespace-pre-line">{error}</div>
           </div>
         )}
         
