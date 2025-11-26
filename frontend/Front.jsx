@@ -4,6 +4,7 @@ import MapUploader from './src/components/MapUploader';
 import MapViewer from './src/components/MapViewer';
 import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
+import CourierCountModal from './src/components/CourierCountModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -18,8 +19,10 @@ export default function PickupDeliveryUI() {
   const [showMapUpload, setShowMapUpload] = useState(false);
   const [showDeliveryUpload, setShowDeliveryUpload] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [showCourierModal, setShowCourierModal] = useState(false);
   const [mapData, setMapData] = useState(null);
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
+  const [courierCount, setCourierCount] = useState(1);
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -161,6 +164,17 @@ export default function PickupDeliveryUI() {
           />
         )}
 
+        {/* Courier Count Modal */}
+        <CourierCountModal 
+          isOpen={showCourierModal}
+          onClose={() => setShowCourierModal(false)}
+          onConfirm={(count) => {
+            setCourierCount(count);
+            console.log(`Nombre de livreurs défini à: ${count}`);
+          }}
+          currentCount={courierCount}
+        />
+
         {/* Map View */}
         {mapData && activeTab === 'map' && !showDeliveryUpload && (
           <div className="flex-1 flex flex-col gap-4 overflow-hidden">
@@ -186,8 +200,14 @@ export default function PickupDeliveryUI() {
                 <div className="bg-gray-700 rounded-lg p-4">
                   <div className="flex gap-3 justify-center">
                     {/* Bouton Nombre de livreurs */}
-                    <button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg">
-                      Nombre de livreurs
+                    <button 
+                      onClick={() => setShowCourierModal(true)}
+                      disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0}
+                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                               text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                      title="Choisir le nombre de livreurs"
+                    >
+                      Nombre de livreurs {deliveryRequestSet?.demands?.length > 0 && `(${courierCount})`}
                     </button>
                     
                     {/* Bouton Ajouter Pickup&Delivery (manuel) */}
