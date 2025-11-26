@@ -1,5 +1,6 @@
-package com.pickupdelivery.model;
+package com.pickupdelivery.model.AlgorithmModel;
 
+import com.pickupdelivery.model.Segment;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -17,5 +18,5 @@ public class Trajet {
     private List<Segment> segments = new ArrayList<>();
     private Stop stopDepart;
     private Stop stopArrivee;
-    private double duree;
+    private double distance; // Distance totale en mètres
 }

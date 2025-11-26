@@ -1,7 +1,5 @@
 package com.pickupdelivery.model.AlgorithmModel;
 
-import com.pickupdelivery.model.Stop;
-import com.pickupdelivery.model.Trajet;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;

@@ -3,6 +3,9 @@ package com.pickupdelivery.service;
 import com.pickupdelivery.dto.ShortestPathResult;
 import com.pickupdelivery.model.*;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
+import com.pickupdelivery.model.AlgorithmModel.Stop;
+import com.pickupdelivery.model.AlgorithmModel.StopSet;
+import com.pickupdelivery.model.AlgorithmModel.Trajet;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
@@ -26,6 +29,29 @@ public class ServiceAlgo {
             throw new IllegalArgumentException("Les paramètres ne peuvent pas être null");
         }
 
+        // Construction d'un graphe d'adjacence
+        Map<String, List<SegmentInfo>> adjacencyList = buildAdjacencyList(cityMap);
+        
+        return dijkstraWithAdjacency(start, end, adjacencyList, cityMap.getNodes());
+    }
+
+    /**
+     * Version optimisée de Dijkstra qui accepte une liste d'adjacence pré-calculée
+     * Utilisée par buildGraph() pour éviter de recalculer adjacencyList à chaque appel
+     *
+     * @param start         Le nœud de départ
+     * @param end           Le nœud d'arrivée
+     * @param adjacencyList La liste d'adjacence pré-calculée
+     * @param allNodes      La liste de tous les nœuds
+     * @return Un objet ShortestPathResult contenant la distance totale et la liste des segments du chemin
+     */
+    private ShortestPathResult dijkstraWithAdjacency(Node start, Node end, 
+                                                      Map<String, List<SegmentInfo>> adjacencyList,
+                                                      List<Node> allNodes) {
+        if (start == null || end == null) {
+            throw new IllegalArgumentException("Les paramètres ne peuvent pas être null");
+        }
+
         String startId = start.getId();
         String endId = end.getId();
 
@@ -36,11 +62,8 @@ public class ServiceAlgo {
         PriorityQueue<NodeDistance> queue = new PriorityQueue<>(Comparator.comparingDouble(nd -> nd.distance));
         Set<String> visited = new HashSet<>();
 
-        // Construction d'un graphe d'adjacence
-        Map<String, List<SegmentInfo>> adjacencyList = buildAdjacencyList(cityMap);
-
         // Initialisation
-        for (Node node : cityMap.getNodes()) {
+        for (Node node : allNodes) {
             distances.put(node.getId(), Double.POSITIVE_INFINITY);
         }
         distances.put(startId, 0.0);
@@ -144,13 +167,12 @@ public class ServiceAlgo {
 
     /**
      * Récupère un StopSet contenant tous les stops (pickup, delivery et warehouse)
-     * à partir d'un DeliveryRequestSet et d'une CityMap
+     * à partir d'un DeliveryRequestSet
      *
      * @param deliveryRequestSet L'ensemble des demandes de livraison avec l'entrepôt
-     * @param cityMap La carte de la ville
      * @return Un StopSet contenant tous les stops
      */
-    public StopSet getStopSet(DeliveryRequestSet deliveryRequestSet, CityMap cityMap) {
+    public StopSet getStopSet(DeliveryRequestSet deliveryRequestSet) {
         if (deliveryRequestSet == null) {
             throw new IllegalArgumentException("DeliveryRequestSet ne peut pas être null");
         }
@@ -162,7 +184,7 @@ public class ServiceAlgo {
         if (deliveryRequestSet.getWarehouse() != null) {
             Stop warehouseStop = new Stop();
             warehouseStop.setIdNode(deliveryRequestSet.getWarehouse().getNodeId());
-            warehouseStop.setIdDemande(Optional.empty());
+            warehouseStop.setIdDemande(null); // null pour le warehouse
             warehouseStop.setTypeStop(Stop.TypeStop.WAREHOUSE);
             stops.add(warehouseStop);
         }
@@ -173,14 +195,14 @@ public class ServiceAlgo {
                 // Ajouter le pickup
                 Stop pickupStop = new Stop();
                 pickupStop.setIdNode(demand.getPickupNodeId());
-                pickupStop.setIdDemande(Optional.of(demand.getId()));
+                pickupStop.setIdDemande(demand.getId());
                 pickupStop.setTypeStop(Stop.TypeStop.PICKUP);
                 stops.add(pickupStop);
 
                 // Ajouter le delivery
                 Stop deliveryStop = new Stop();
                 deliveryStop.setIdNode(demand.getDeliveryNodeId());
-                deliveryStop.setIdDemande(Optional.of(demand.getId()));
+                deliveryStop.setIdDemande(demand.getId());
                 deliveryStop.setTypeStop(Stop.TypeStop.DELIVERY);
                 stops.add(deliveryStop);
             }
@@ -208,7 +230,10 @@ public class ServiceAlgo {
             throw new IllegalArgumentException("StopSet ne peut pas être vide");
         }
 
-        // Créer une map pour trouver rapidement les nodes par leur ID
+        // PRÉ-CALCUL : Créer la liste d'adjacence UNE SEULE FOIS (optimisation critique)
+        Map<String, List<SegmentInfo>> adjacencyList = buildAdjacencyList(cityMap);
+        
+        // PRÉ-CALCUL : Créer une map pour trouver rapidement les nodes par leur ID
         Map<String, Node> nodeMap = new HashMap<>();
         for (Node node : cityMap.getNodes()) {
             nodeMap.put(node.getId(), node);
@@ -249,15 +274,16 @@ public class ServiceAlgo {
                     throw new IllegalArgumentException("Node non trouvé pour le stop: " + stopDestination.getIdNode());
                 }
 
-                // Calculer le plus court chemin avec Dijkstra
-                ShortestPathResult result = dijkstra(nodeSource, nodeDestination, cityMap);
+                // OPTIMISATION : Utiliser dijkstraWithAdjacency avec la liste d'adjacence pré-calculée
+                ShortestPathResult result = dijkstraWithAdjacency(
+                    nodeSource, nodeDestination, adjacencyList, cityMap.getNodes());
 
                 // Créer le trajet
                 Trajet trajet = new Trajet();
                 trajet.setStopDepart(stopSource);
                 trajet.setStopArrivee(stopDestination);
                 trajet.setSegments(result.getSegments());
-                trajet.setDuree(result.getTotalDistance());
+                trajet.setDistance(result.getTotalDistance());
 
                 // Ajouter dans la map
                 trajetsFromSource.put(stopDestination, trajet);

@@ -1,4 +1,4 @@
-package com.pickupdelivery.model;
+package com.pickupdelivery.model.AlgorithmModel;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
