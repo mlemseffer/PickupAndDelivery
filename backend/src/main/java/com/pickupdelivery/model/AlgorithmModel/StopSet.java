@@ -14,5 +14,5 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class StopSet {
-    private List<Stop> stops = new ArrayList<>();
+    private List<Stop> stops;
 }
