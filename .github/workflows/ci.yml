@@ -6,6 +6,7 @@ on:
 
 jobs:
   backend:
+    name: Backend Tests
     runs-on: ubuntu-latest
 
     steps:
@@ -23,6 +24,7 @@ jobs:
         run: mvn -B clean test
 
   frontend:
+    name: Frontend build
     runs-on: ubuntu-latest
 
     steps:
