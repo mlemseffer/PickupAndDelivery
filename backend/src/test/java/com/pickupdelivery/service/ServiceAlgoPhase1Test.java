@@ -1,5 +1,6 @@
 package com.pickupdelivery.service;
 
+import com.pickupdelivery.exception.AlgorithmException;
 import com.pickupdelivery.model.*;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
 import com.pickupdelivery.model.AlgorithmModel.Stop;
@@ -151,8 +152,10 @@ class ServiceAlgoPhase1Test {
             method.invoke(serviceAlgo, graphWithoutWarehouse);
         });
         
-        assertTrue(exception.getCause() instanceof IllegalStateException);
-        assertTrue(exception.getCause().getMessage().contains("Aucun entrepôt"));
+        assertTrue(exception.getCause() instanceof AlgorithmException);
+        AlgorithmException algoEx = (AlgorithmException) exception.getCause();
+        assertEquals(AlgorithmException.ErrorType.NO_WAREHOUSE, algoEx.getErrorType());
+        assertTrue(algoEx.getMessage().contains("Aucun entrepôt"));
     }
 
     @Test

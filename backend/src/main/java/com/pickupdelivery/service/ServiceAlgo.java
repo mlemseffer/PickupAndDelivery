@@ -1,6 +1,7 @@
 package com.pickupdelivery.service;
 
 import com.pickupdelivery.dto.ShortestPathResult;
+import com.pickupdelivery.exception.AlgorithmException;
 import com.pickupdelivery.model.*;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
 import com.pickupdelivery.model.AlgorithmModel.Stop;
@@ -16,6 +17,75 @@ import java.util.*;
 @Service
 public class ServiceAlgo {
 
+    // =========================================================================
+    // CONSTANTES
+    // =========================================================================
+    
+    /** Distance représentant l'absence de chemin entre deux points */
+    private static final double NO_PATH_DISTANCE = Double.POSITIVE_INFINITY;
+    
+    /** Distance initiale pour les nœuds non encore explorés dans Dijkstra */
+    private static final double UNVISITED_DISTANCE = Double.POSITIVE_INFINITY;
+    
+    /** ID du premier livreur (pour l'instant seul supporté) */
+    private static final int DEFAULT_COURIER_ID = 1;
+    
+    /** Seuil de warning pour le temps de calcul de Dijkstra (en ms) */
+    private static final long DIJKSTRA_SLOW_THRESHOLD_MS = 100;
+    
+    /** Seuil de warning pour le nombre d'itérations dans la file de priorité */
+    private static final int DIJKSTRA_ITERATIONS_WARNING_THRESHOLD = 1000;
+    
+    /** Taille maximale du cache LRU pour les résultats de Dijkstra */
+    private static final int DIJKSTRA_CACHE_SIZE = 500;
+
+    // =========================================================================
+    // CACHE POUR DIJKSTRA
+    // =========================================================================
+    
+    /**
+     * Cache LRU (Least Recently Used) pour stocker les résultats de Dijkstra
+     * Évite de recalculer les chemins déjà calculés
+     * Thread-safe grâce à Collections.synchronizedMap pour la parallélisation
+     */
+    private final Map<String, ShortestPathResult> dijkstraCache = Collections.synchronizedMap(
+        new LinkedHashMap<String, ShortestPathResult>(DIJKSTRA_CACHE_SIZE, 0.75f, true) {
+            @Override
+            protected boolean removeEldestEntry(Map.Entry<String, ShortestPathResult> eldest) {
+                return size() > DIJKSTRA_CACHE_SIZE;
+            }
+        }
+    );
+    
+    /**
+     * Génère une clé unique pour le cache Dijkstra
+     * Format: "startNodeId|endNodeId"
+     */
+    private String generateCacheKey(String startNodeId, String endNodeId) {
+        return startNodeId + "|" + endNodeId;
+    }
+    
+    /**
+     * Réinitialise le cache Dijkstra
+     * Utile pour les tests ou lorsque la carte change
+     */
+    public void clearDijkstraCache() {
+        dijkstraCache.clear();
+        System.out.println("🗑️  Cache Dijkstra vidé");
+    }
+    
+    /**
+     * Obtient les statistiques du cache
+     */
+    public String getCacheStats() {
+        return String.format("Cache Dijkstra: %d entrées / %d max", 
+                           dijkstraCache.size(), DIJKSTRA_CACHE_SIZE);
+    }
+
+    // =========================================================================
+    // DIJKSTRA - CALCUL DU PLUS COURT CHEMIN
+    // =========================================================================
+    
     /**
      * Calcule le plus court chemin entre deux nœuds en utilisant l'algorithme de Dijkstra
      *
@@ -38,6 +108,8 @@ public class ServiceAlgo {
     /**
      * Version optimisée de Dijkstra qui accepte une liste d'adjacence pré-calculée
      * Utilisée par buildGraph() pour éviter de recalculer adjacencyList à chaque appel
+     * 
+     * OPTIMISATION: Utilise un cache LRU pour éviter de recalculer les mêmes chemins
      *
      * @param start         Le nœud de départ
      * @param end           Le nœud d'arrivée
@@ -54,6 +126,20 @@ public class ServiceAlgo {
 
         String startId = start.getId();
         String endId = end.getId();
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // OPTIMISATION: Vérifier le cache avant de calculer
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        String cacheKey = generateCacheKey(startId, endId);
+        ShortestPathResult cachedResult = dijkstraCache.get(cacheKey);
+        
+        if (cachedResult != null) {
+            // Cache hit ! Pas besoin de recalculer
+            return cachedResult;
+        }
+
+        // Cache miss, on doit calculer
 
         // Structures de données pour Dijkstra
         Map<String, Double> distances = new HashMap<>();
@@ -62,17 +148,19 @@ public class ServiceAlgo {
         PriorityQueue<NodeDistance> queue = new PriorityQueue<>(Comparator.comparingDouble(nd -> nd.distance));
         Set<String> visited = new HashSet<>();
 
-        // Initialisation
-        for (Node node : allNodes) {
-            distances.put(node.getId(), Double.POSITIVE_INFINITY);
-        }
+        // Initialisation : seulement le nœud de départ (lazy initialization pour les autres)
         distances.put(startId, 0.0);
         queue.add(new NodeDistance(startId, 0.0));
 
+        // Métriques de performance
+        long startTime = System.currentTimeMillis();
+        int iterations = 0;
+
         // Algorithme de Dijkstra
         while (!queue.isEmpty()) {
+            iterations++;
             NodeDistance current = queue.poll();
-            String currentNodeId = current.nodeId;
+            String currentNodeId = current.nodeId();
 
             if (visited.contains(currentNodeId)) {
                 continue;
@@ -91,7 +179,10 @@ public class ServiceAlgo {
                 String neighborId = segmentInfo.destinationId;
                 double newDistance = distances.get(currentNodeId) + segmentInfo.segment.getLength();
 
-                if (newDistance < distances.get(neighborId)) {
+                // Utiliser getOrDefault pour lazy initialization
+                double currentNeighborDistance = distances.getOrDefault(neighborId, UNVISITED_DISTANCE);
+                
+                if (newDistance < currentNeighborDistance) {
                     distances.put(neighborId, newDistance);
                     predecessors.put(neighborId, currentNodeId);
                     segmentFromPredecessor.put(neighborId, segmentInfo.segment);
@@ -100,11 +191,18 @@ public class ServiceAlgo {
             }
         }
 
+        // Métriques de performance (pour debugging/monitoring)
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        if (elapsedTime > DIJKSTRA_SLOW_THRESHOLD_MS || iterations > DIJKSTRA_ITERATIONS_WARNING_THRESHOLD) {
+            System.out.println("⚠️  Dijkstra lent: " + elapsedTime + "ms, " + iterations + " itérations pour " + 
+                             startId + " → " + endId);
+        }
+
         // Reconstruction du chemin
-        double totalDistance = distances.get(endId);
-        if (totalDistance == Double.POSITIVE_INFINITY) {
+        double totalDistance = distances.getOrDefault(endId, NO_PATH_DISTANCE);
+        if (totalDistance == NO_PATH_DISTANCE) {
             // Pas de chemin trouvé
-            return new ShortestPathResult(Double.POSITIVE_INFINITY, Collections.emptyList());
+            return new ShortestPathResult(NO_PATH_DISTANCE, Collections.emptyList());
         }
 
         List<Segment> pathSegments = new ArrayList<>();
@@ -119,7 +217,15 @@ public class ServiceAlgo {
             currentNodeId = predecessors.get(currentNodeId);
         }
 
-        return new ShortestPathResult(totalDistance, pathSegments);
+        ShortestPathResult result = new ShortestPathResult(totalDistance, pathSegments);
+        
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // OPTIMISATION: Mettre le résultat en cache
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        dijkstraCache.put(cacheKey, result);
+        
+        return result;
     }
 
     /**
@@ -140,30 +246,16 @@ public class ServiceAlgo {
     }
 
     /**
-     * Classe interne pour représenter un nœud avec sa distance dans la file de priorité
+     * Record représentant un nœud avec sa distance dans la file de priorité de Dijkstra
+     * Utilisé pour l'algorithme de recherche du plus court chemin
      */
-    private static class NodeDistance {
-        String nodeId;
-        double distance;
-
-        NodeDistance(String nodeId, double distance) {
-            this.nodeId = nodeId;
-            this.distance = distance;
-        }
-    }
+    private record NodeDistance(String nodeId, double distance) {}
 
     /**
-     * Classe interne pour stocker les informations d'un segment dans la liste d'adjacence
+     * Record pour stocker les informations d'un segment dans la liste d'adjacence
+     * Associe une destination à un segment pour naviguer efficacement dans le graphe
      */
-    private static class SegmentInfo {
-        String destinationId;
-        Segment segment;
-
-        SegmentInfo(String destinationId, Segment segment) {
-            this.destinationId = destinationId;
-            this.segment = segment;
-        }
-    }
+    private record SegmentInfo(String destinationId, Segment segment) {}
 
     /**
      * Récupère un StopSet contenant tous les stops (pickup, delivery et warehouse)
@@ -215,6 +307,9 @@ public class ServiceAlgo {
     /**
      * Construit un graphe complet avec tous les trajets entre les stops
      * Calcule efficacement les distances entre tous les stops en utilisant Dijkstra
+     * 
+     * OPTIMISATION: Calcul parallélisé des trajets pour améliorer les performances
+     * sur les cartes avec beaucoup de stops
      *
      * @param stopSet L'ensemble des stops (pickup, delivery, warehouse)
      * @param cityMap La carte de la ville
@@ -229,6 +324,9 @@ public class ServiceAlgo {
         if (stops == null || stops.isEmpty()) {
             throw new IllegalArgumentException("StopSet ne peut pas être vide");
         }
+        
+        System.out.println("🔗 Construction du Graph avec " + stops.size() + " stops...");
+        long startTime = System.currentTimeMillis();
 
         // PRÉ-CALCUL : Créer la liste d'adjacence UNE SEULE FOIS (optimisation critique)
         Map<String, List<SegmentInfo>> adjacencyList = buildAdjacencyList(cityMap);
@@ -250,12 +348,16 @@ public class ServiceAlgo {
         graph.setStopDepart(warehouseStop);
         graph.setCout(0.0);
         
-        Map<Stop, Map<Stop, Trajet>> distancesMatrix = new HashMap<>();
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // OPTIMISATION: Calcul parallélisé avec ConcurrentHashMap pour thread-safety
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        Map<Stop, Map<Stop, Trajet>> distancesMatrix = new java.util.concurrent.ConcurrentHashMap<>();
 
-        // Calculer tous les trajets entre tous les stops
+        // Calculer tous les trajets entre tous les stops EN PARALLÈLE
         // Pour chaque stop source
-        for (Stop stopSource : stops) {
-            Map<Stop, Trajet> trajetsFromSource = new HashMap<>();
+        stops.parallelStream().forEach(stopSource -> {
+            Map<Stop, Trajet> trajetsFromSource = new java.util.concurrent.ConcurrentHashMap<>();
             Node nodeSource = nodeMap.get(stopSource.getIdNode());
             
             if (nodeSource == null) {
@@ -275,6 +377,7 @@ public class ServiceAlgo {
                 }
 
                 // OPTIMISATION : Utiliser dijkstraWithAdjacency avec la liste d'adjacence pré-calculée
+                // + cache automatique pour éviter les recalculs
                 ShortestPathResult result = dijkstraWithAdjacency(
                     nodeSource, nodeDestination, adjacencyList, cityMap.getNodes());
 
@@ -285,14 +388,22 @@ public class ServiceAlgo {
                 trajet.setSegments(result.getSegments());
                 trajet.setDistance(result.getDistance());
 
-                // Ajouter dans la map
+                // Ajouter dans la map (thread-safe avec ConcurrentHashMap)
                 trajetsFromSource.put(stopDestination, trajet);
             }
 
             distancesMatrix.put(stopSource, trajetsFromSource);
-        }
+        });
 
         graph.setDistancesMatrix(distancesMatrix);
+        
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        int totalPaths = stops.size() * (stops.size() - 1);
+        
+        System.out.println("   ✓ Graph construit en " + elapsedTime + " ms");
+        System.out.println("   ✓ Nombre de trajets calculés: " + totalPaths);
+        System.out.println("   ✓ " + getCacheStats());
+        
         return graph;
     }
 
@@ -315,7 +426,10 @@ public class ServiceAlgo {
         return graph.getDistancesMatrix().keySet().stream()
                 .filter(stop -> stop.getTypeStop() == Stop.TypeStop.WAREHOUSE)
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Aucun entrepôt (warehouse) trouvé dans le Graph"));
+                .orElseThrow(() -> new AlgorithmException(
+                    AlgorithmException.ErrorType.NO_WAREHOUSE,
+                    "Aucun entrepôt (warehouse) trouvé dans le Graph"
+                ));
     }
 
     /**
@@ -391,12 +505,18 @@ public class ServiceAlgo {
 
         Map<Stop, Map<Stop, Trajet>> matrix = graph.getDistancesMatrix();
         if (matrix == null || !matrix.containsKey(a)) {
-            throw new IllegalArgumentException("Stop source introuvable dans le graph: " + a.getIdNode());
+            throw new AlgorithmException(
+                AlgorithmException.ErrorType.STOP_NOT_FOUND,
+                "Stop source introuvable dans le graph: " + a.getIdNode()
+            );
         }
 
         Map<Stop, Trajet> destinations = matrix.get(a);
         if (!destinations.containsKey(b)) {
-            throw new IllegalArgumentException("Pas de trajet trouvé entre " + a.getIdNode() + " et " + b.getIdNode());
+            throw new AlgorithmException(
+                AlgorithmException.ErrorType.NO_PATH_FOUND,
+                "Pas de trajet trouvé entre " + a.getIdNode() + " et " + b.getIdNode()
+            );
         }
 
         Trajet trajet = destinations.get(b);
@@ -622,11 +742,11 @@ public class ServiceAlgo {
             // 4️⃣ Vérifier qu'on a trouvé un stop faisable
             if (nearest == null) {
                 // Cela ne devrait jamais arriver si la logique est correcte
-                // Car il devrait toujours y avoir au moins un pickup faisable
-                throw new IllegalStateException(
+                throw new AlgorithmException(
+                    AlgorithmException.ErrorType.NO_FEASIBLE_STOP,
                     "Aucun stop faisable trouvé. Stops restants: " + remaining.size() + 
                     ", Stops visités: " + visited.size() + 
-                    ". Cela indique un bug dans la logique de faisabilité."
+                    ". Vérifiez que toutes les deliveries ont des pickups correspondants."
                 );
             }
 
@@ -733,9 +853,10 @@ public class ServiceAlgo {
         boolean isValid = respectsPrecedence(initialRoute, pickupsByRequestId, deliveryByRequestId);
         
         if (!isValid) {
-            throw new IllegalStateException(
+            throw new AlgorithmException(
+                AlgorithmException.ErrorType.PRECEDENCE_VIOLATION,
                 "La tournée construite ne respecte pas les contraintes de précédence. " +
-                "Cela indique un bug dans l'algorithme."
+                "Une delivery a été placée avant son pickup correspondant."
             );
         }
         
@@ -749,7 +870,7 @@ public class ServiceAlgo {
         System.out.println("\n📦 Phase 5: Construction de l'objet Tour...");
         
         com.pickupdelivery.model.AlgorithmModel.Tour tour = buildTour(initialRoute, initialDistance, graph);
-        tour.setCourierId(1); // Premier livreur
+        tour.setCourierId(DEFAULT_COURIER_ID);
         
         System.out.println("   ✓ Tour créé avec succès");
         System.out.println("   ✓ Livreur ID: " + tour.getCourierId());
@@ -801,7 +922,8 @@ public class ServiceAlgo {
             Trajet trajet = graph.getDistancesMatrix().get(from).get(to);
             
             if (trajet == null) {
-                throw new IllegalStateException(
+                throw new AlgorithmException(
+                    AlgorithmException.ErrorType.INVALID_GRAPH,
                     "Trajet non trouvé dans le graph entre " + from.getIdNode() + " et " + to.getIdNode()
                 );
             }
