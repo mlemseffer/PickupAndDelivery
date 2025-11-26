@@ -23,6 +23,8 @@ export default function PickupDeliveryUI() {
   const [mapData, setMapData] = useState(null);
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
   const [courierCount, setCourierCount] = useState(1);
+  const [tourData, setTourData] = useState(null);
+  const [isCalculatingTour, setIsCalculatingTour] = useState(false);
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -59,6 +61,7 @@ export default function PickupDeliveryUI() {
       await apiService.clearMap();
       setMapData(null);
       setDeliveryRequestSet(null);
+      setTourData(null);
       setShowMapUpload(true);
     } catch (error) {
       console.error('Erreur lors de la suppression de la carte:', error);
@@ -68,12 +71,59 @@ export default function PickupDeliveryUI() {
   // Gestion du chargement des demandes de livraison
   const handleDeliveryRequestsLoaded = (requestSet) => {
     setDeliveryRequestSet(requestSet);
+    setTourData(null); // Réinitialiser la tournée si on charge de nouvelles demandes
     setShowDeliveryUpload(false);
   };
 
   // Gestion de l'annulation du chargement des demandes
   const handleCancelDeliveryUpload = () => {
     setShowDeliveryUpload(false);
+  };
+
+  // Gestion du calcul de la tournée
+  const handleCalculateTour = async () => {
+    if (!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0) {
+      alert('Veuillez d\'abord charger des demandes de livraison');
+      return;
+    }
+
+    setIsCalculatingTour(true);
+    
+    try {
+      console.log(`🚀 Calcul de la tournée pour ${courierCount} livreur(s)...`);
+      const result = await apiService.calculateTour(courierCount);
+      
+      console.log('📦 Résultat complet:', result);
+      
+      if (result.success && result.data && result.data.length > 0) {
+        const tour = result.data[0]; // Premier tour (pour 1 livreur)
+        console.log('✅ Tournée calculée avec succès:', tour);
+        
+        // Créer un objet tourData pour le MapViewer
+        const tourData = {
+          tour: tour.trajets,  // Liste des trajets
+          metrics: {
+            stopCount: tour.stops.length,
+            totalDistance: tour.totalDistance,
+            segmentCount: tour.trajets.length
+          }
+        };
+        
+        setTourData(tourData);
+        alert(`✅ Tournée calculée avec succès !\n\n` +
+              `📍 Stops: ${tourData.metrics.stopCount}\n` +
+              `📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n` +
+              `🛣️  Segments: ${tourData.metrics.segmentCount}`);
+      } else {
+        console.error('❌ Réponse invalide:', result);
+        alert(`Erreur: ${result.message || 'Réponse invalide du serveur'}`);
+      }
+    } catch (error) {
+      console.error('💥 Erreur lors du calcul de la tournée:', error);
+      alert(`Erreur: ${error.message}`);
+    } finally {
+      setIsCalculatingTour(false);
+    }
   };
 
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
@@ -186,6 +236,7 @@ export default function PickupDeliveryUI() {
                   mapData={mapData}
                   onClearMap={handleClearMap}
                   deliveryRequestSet={deliveryRequestSet}
+                  tourData={tourData}
                 />
               </div>
               
@@ -220,8 +271,14 @@ export default function PickupDeliveryUI() {
                     </button>
                     
                     {/* Bouton Calculer tournée */}
-                    <button className="flex-1 bg-purple-600 hover:bg-purple-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg">
-                      Calculer tournée
+                    <button 
+                      onClick={handleCalculateTour}
+                      disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
+                      className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                               text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                      title="Calculer la tournée optimale"
+                    >
+                      {isCalculatingTour ? 'Calcul en cours...' : 'Calculer tournée'}
                     </button>
                   </div>
                 </div>
