@@ -30,4 +30,9 @@ class MapXmlParserIntegrationTest {
         assertEquals(308, map.getNodes().size());
         assertEquals(616, map.getSegments().size());
     }
+
+    @Test
+    void always_false() throws Exception {
+        assertTrue(false, "c'est normal ! test du blocage du merge.");
+    }
 }
