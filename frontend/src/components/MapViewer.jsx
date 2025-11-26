@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
+import TourPolylines from './TourPolylines';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -25,7 +26,7 @@ function MapResizer() {
 /**
  * Composant pour afficher la carte avec Leaflet
  */
-export default function MapViewer({ mapData, onClearMap, deliveryRequestSet }) {
+export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tourData }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const mapContainerRef = useRef(null);
 
@@ -94,9 +95,16 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet }) {
     <div ref={mapContainerRef} className="flex-1 flex flex-col bg-gray-700">
       <div className="p-3 bg-gray-600 border-b border-gray-500">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold">
-            {mapData.nodes?.length || 0} intersections, {mapData.segments?.length || 0} tronçons
-          </h3>
+          <div>
+            <h3 className="text-sm font-semibold">
+              {mapData.nodes?.length || 0} intersections, {mapData.segments?.length || 0} tronçons
+            </h3>
+            {tourData && tourData.metrics && (
+              <p className="text-xs text-green-400 mt-1">
+                🚴 Tournée: {tourData.metrics.stopCount} stops, {tourData.metrics.totalDistance.toFixed(2)} m
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={toggleFullscreen}
@@ -172,6 +180,14 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet }) {
           {deliveryRequestSet && (
             <DeliveryMarkers 
               requestSet={deliveryRequestSet} 
+              nodesById={nodesById}
+            />
+          )}
+
+          {/* Affichage de la tournée calculée */}
+          {tourData && (
+            <TourPolylines 
+              tourData={tourData}
               nodesById={nodesById}
             />
           )}
