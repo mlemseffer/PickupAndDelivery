@@ -19,6 +19,7 @@ jobs:
           distribution: 'temurin'
 
       - name: Build & Test backend
+        working-directory: ./backend
         run: mvn -B clean test
 
   frontend:
@@ -34,8 +35,8 @@ jobs:
           node-version: '18'
 
       - name: Install & build frontend
+	working-directory: ./frontend
         run: |
-          cd frontend
           npm install
           npm run build
 
