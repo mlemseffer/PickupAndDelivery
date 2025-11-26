@@ -153,4 +153,5 @@ public class ServiceAlgoSimpleTest {
             byte[] content = fis.readAllBytes();
             return new MockMultipartFile("file", filePath, "text/xml", content);
         }
+	}
 }
