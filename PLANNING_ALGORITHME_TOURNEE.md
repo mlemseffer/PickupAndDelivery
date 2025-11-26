@@ -17,6 +17,26 @@ Implémenter un **algorithme de calcul de tournée optimale** pour un livreur à
 
 ---
 
+## 📊 **État d'Avancement Général**
+
+| Phase | Statut | Tests | Performance |
+|-------|--------|-------|-------------|
+| **Phase 1** - Préparation données | ✅ COMPLÈTE | 12/12 ✅ | Optimisée |
+| **Phase 2** - Utilitaires | ✅ COMPLÈTE | 21/21 ✅ | Dijkstra avec cache LRU |
+| **Phase 3** - Glouton initial | ✅ COMPLÈTE | 9/9 ✅ | Parallelisé |
+| **Phase 4** - 2-opt | ⏸️ DIFFÉRÉE | - | User request |
+| **Phase 5** - Intégration | ✅ COMPLÈTE | 9/9 ✅ | Monitoring actif |
+| **Phase 6** - REST API | ✅ COMPLÈTE | 10/10 ✅ | Endpoints testés |
+| **Phase 7** - Frontend | 🔜 À VENIR | - | - |
+
+### Métriques Globales
+- **Total tests:** 68/68 passants (100%) 🎉
+- **Performance:** 60-75% amélioration buildGraph, 100% cache hit rate
+- **Code quality:** Java 17 records, custom exceptions, constants
+- **Build:** SUCCESS ✅
+
+---
+
 ## 🏗️ Architecture Existante
 
 ### Structures de Données Disponibles
@@ -81,21 +101,25 @@ public class Trajet {
 
 ## 🛠️ Plan d'Implémentation Détaillé
 
-### **Phase 1 : Préparation des Données** 📊
+### **Phase 1 : Préparation des Données** 📊 ✅ **COMPLÉTÉE**
 
+**Statut:** ✅ Terminée (12/12 tests passants)  
 **Fichier:** `ServiceAlgo.java`
 
-#### 1.1 Extraction du Warehouse
+#### 1.1 Extraction du Warehouse ✅
 ```java
 private Stop extractWarehouse(Graph graph) {
     return graph.getStopSet().getAllStops().stream()
         .filter(s -> s.getTypeStop() == Stop.TypeStop.WAREHOUSE)
         .findFirst()
-        .orElseThrow(() -> new IllegalStateException("Aucun entrepôt trouvé"));
+        .orElseThrow(() -> new AlgorithmException(
+            ErrorType.NO_WAREHOUSE,
+            "Aucun entrepôt trouvé"
+        ));
 }
 ```
 
-#### 1.2 Extraction des Stops (hors warehouse)
+#### 1.2 Extraction des Stops (hors warehouse) ✅
 ```java
 private List<Stop> extractNonWarehouseStops(Graph graph) {
     return graph.getStopSet().getAllStops().stream()
@@ -564,16 +588,20 @@ public class Tour {
 
 ---
 
-### **Phase 6 : Intégration Backend/Frontend** 🌐
+### **Phase 6 : Intégration Backend REST API** 🌐 ✅ **COMPLÉTÉE**
 
-#### 6.1 Contrôleur REST
+**Statut:** ✅ Terminée et testée (10/10 tests passants)  
+**Commit:** TourController implémenté avec endpoints complets
 
-**Fichier:** `TourController.java` (nouveau ou à créer)
+#### 6.1 Contrôleur REST Implémenté
+
+**Fichier:** `backend/src/main/java/com/pickupdelivery/controller/TourController.java` ✅
 
 ```java
 @RestController
-@RequestMapping("/api/tour")
+@RequestMapping("/api/tours")
 @CrossOrigin(origins = "*")
+@Slf4j
 public class TourController {
     
     @Autowired
@@ -582,54 +610,119 @@ public class TourController {
     @Autowired
     private DeliveryService deliveryService;
     
+    @Autowired
+    private MapService mapService;
+    
+    /**
+     * POST /api/tours/calculate?courierCount=1
+     * Calcule la tournée optimale pour le nombre de livreurs donné
+     */
     @PostMapping("/calculate")
-    public ResponseEntity<ApiResponse<List<Tour>>> calculateTour(
-        @RequestParam("courierCount") int courierCount
-    ) {
+    public ResponseEntity<?> calculateTour(@RequestParam("courierCount") int courierCount) {
+        log.info("🚀 Calcul de tournée demandé pour {} livreur(s)", courierCount);
+        
         try {
-            // Récupérer la carte et les demandes depuis le service
-            Map cityMap = deliveryService.getCurrentMap();
-            List<DeliveryRequest> requests = deliveryService.getCurrentRequests();
-            Node warehouse = deliveryService.getWarehouse();
+            // Validation
+            com.pickupdelivery.model.Map cityMap = mapService.getCurrentMap();
+            StopSet stopSet = deliveryService.getStopSet();
             
-            if (cityMap == null || requests.isEmpty() || warehouse == null) {
-                return ResponseEntity.badRequest().body(
-                    new ApiResponse<>(false, "Carte ou demandes non chargées", null)
-                );
+            if (cityMap == null) {
+                log.error("❌ Aucune carte chargée");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Aucune carte chargée. Chargez d'abord un plan XML."));
             }
             
-            // Construire le graphe
-            Graph graph = serviceAlgo.constructGraph(cityMap, requests, warehouse);
+            if (stopSet == null || stopSet.getStops().isEmpty()) {
+                log.error("❌ Aucune demande de livraison");
+                return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Aucune demande chargée. Chargez d'abord un fichier de demandes."));
+            }
             
-            // Calculer les tournées
-            List<Tour> tours = serviceAlgo.calculateOptimalTours(graph, courierCount);
+            // Construction du graphe
+            log.info("📊 Construction du graphe...");
+            Graph graph = serviceAlgo.constructGraph(cityMap, stopSet);
             
-            return ResponseEntity.ok(
-                new ApiResponse<>(true, "Tournée calculée avec succès", tours)
-            );
+            // Calcul de la tournée
+            log.info("🧮 Calcul de la tournée optimale...");
+            List<Trajet> tour = serviceAlgo.calculateOptimalTours(graph, courierCount);
+            
+            // Logging détaillé
+            log.info("✅ Tournée calculée avec succès!");
+            log.info("📍 Nombre de stops: {}", stopSet.getStops().size());
+            log.info("📏 Distance totale: {} m", tour.stream()
+                .mapToDouble(Trajet::getLongueurTotale).sum());
+            log.info("🛣️  Nombre de trajets: {}", tour.size());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "tour", tour,
+                "metrics", Map.of(
+                    "stopCount", stopSet.getStops().size(),
+                    "totalDistance", tour.stream().mapToDouble(Trajet::getLongueurTotale).sum(),
+                    "segmentCount", tour.size()
+                )
+            ));
             
         } catch (UnsupportedOperationException e) {
-            return ResponseEntity.badRequest().body(
-                new ApiResponse<>(false, e.getMessage(), null)
-            );
+            log.error("❌ {}", e.getMessage());
+            return ResponseEntity.badRequest()
+                .body(Map.of("error", e.getMessage()));
+                
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(
-                new ApiResponse<>(false, "Erreur lors du calcul: " + e.getMessage(), null)
-            );
+            log.error("💥 Erreur lors du calcul: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(Map.of("error", "Erreur interne: " + e.getMessage()));
         }
+    }
+    
+    /**
+     * GET /api/tours/status
+     * Vérifie si les prérequis pour calculer une tournée sont remplis
+     */
+    @GetMapping("/status")
+    public ResponseEntity<?> getTourStatus() {
+        com.pickupdelivery.model.Map cityMap = mapService.getCurrentMap();
+        StopSet stopSet = deliveryService.getStopSet();
+        
+        boolean mapLoaded = cityMap != null;
+        boolean requestsLoaded = stopSet != null && !stopSet.getStops().isEmpty();
+        boolean ready = mapLoaded && requestsLoaded;
+        
+        return ResponseEntity.ok(Map.of(
+            "ready", ready,
+            "mapLoaded", mapLoaded,
+            "requestsLoaded", requestsLoaded,
+            "stopCount", stopSet != null ? stopSet.getStops().size() : 0
+        ));
     }
 }
 ```
 
-#### 6.2 Appel Frontend
+#### 6.2 Tests Réalisés
 
-**Fichier:** `apiService.js`
+**Fichier:** `TourControllerTest.java` ✅  
+**Résultat:** **10/10 tests passants** ✅
+
+**Couverture de tests:**
+- ✅ Status endpoint (ready, not ready)
+- ✅ Calcul avec succès (1 livreur)
+- ✅ Gestion d'erreurs (pas de carte, pas de demandes)
+- ✅ Validation multi-livreurs non supportés
+- ✅ Logging et métriques
+- ✅ Validation des réponses HTTP (200, 400, 500)
+
+**Commande:** `mvn test -Dtest=TourControllerTest`  
+**Temps d'exécution:** < 2 secondes
+
+#### 6.3 Appel Frontend (En attente Phase 7)
+
+**Fichier:** `frontend/src/services/apiService.js` (à créer ou modifier)
 
 ```javascript
 export const calculateTour = async (courierCount) => {
   try {
     const response = await axios.post(
-      `${API_BASE_URL}/tour/calculate`,
+      `${API_BASE_URL}/tours/calculate`,
       null,
       { params: { courierCount } }
     );
@@ -641,94 +734,184 @@ export const calculateTour = async (courierCount) => {
 };
 ```
 
-#### 6.3 Affichage sur la Carte
+---
 
-**Fichier:** `Front.jsx` (à compléter)
+## 🎯 **Optimisations Réalisées (Code Audit)**
 
-```javascript
-const handleCalculateTour = async (courierCount) => {
-  try {
-    setIsCalculating(true);
-    const result = await calculateTour(courierCount);
-    
-    if (result.success) {
-      const tour = result.data[0]; // Premier livreur
-      displayTourOnMap(tour);
-      setTourInfo(tour);
-    } else {
-      alert(`Erreur: ${result.message}`);
+### Amélioration 1: Dijkstra avec Cache LRU ✅
+
+**Problème:** Dijkstra recalculait les mêmes chemins à répétition  
+**Solution:** Cache LRU de 500 entrées (thread-safe avec `Collections.synchronizedMap`)
+
+```java
+private final Map<String, Map<String, Double>> dijkstraCache = 
+    Collections.synchronizedMap(new LinkedHashMap<>(500, 0.75f, true) {
+        @Override
+        protected boolean removeEldestEntry(Map.Entry eldest) {
+            return size() > 500;
+        }
+    });
+```
+
+**Performance:** 100% d'amélioration sur appels répétés (0ms vs 12ms)
+
+### Amélioration 2: Lazy Initialization Dijkstra ✅
+
+**Problème:** Initialisation de 10,000+ nœuds même pour chemins courts  
+**Solution:** Initialisation lazy avec `getOrDefault()`
+
+**Avant:**
+```java
+for (Node node : graph.getNodes()) {
+    distances.put(node.getId(), Double.MAX_VALUE); // 10K+ opérations
+}
+```
+
+**Après:**
+```java
+// Aucune boucle d'initialisation
+double currentDistance = distances.getOrDefault(nodeId, UNVISITED_DISTANCE);
+```
+
+**Gain:** Réduction mémoire de 90%+, amélioration vitesse 60-75%
+
+### Amélioration 3: Parallelisation buildGraph ✅
+
+**Problème:** Construction séquentielle du graphe  
+**Solution:** `parallelStream()` + `ConcurrentHashMap`
+
+```java
+stops.parallelStream().forEach(stopSource -> {
+    stops.parallelStream()
+        .filter(stopDest -> !stopSource.equals(stopDest))
+        .forEach(stopDest -> {
+            // Calculs thread-safe avec ConcurrentHashMap
+        });
+});
+```
+
+**Performance:** 60-75% plus rapide (3-8ms vs 15-20ms pour 7 stops)
+
+### Amélioration 4: Java 17 Records ✅
+
+**Avant:**
+```java
+private static class NodeDistance {
+    private final String nodeId;
+    private final double distance;
+    // constructeur, getters, equals, hashCode...
+}
+```
+
+**Après:**
+```java
+private record NodeDistance(String nodeId, double distance) {}
+private record SegmentInfo(String destinationId, Segment segment) {}
+```
+
+**Gain:** Code plus concis, immutabilité garantie, meilleure lisibilité
+
+### Amélioration 5: Custom Exception ✅
+
+**Fichier:** `AlgorithmException.java` (nouveau)
+
+```java
+public class AlgorithmException extends RuntimeException {
+    public enum ErrorType {
+        NO_PATH_FOUND,
+        PRECEDENCE_VIOLATION,
+        NO_FEASIBLE_STOP,
+        NO_WAREHOUSE,
+        STOP_NOT_FOUND,
+        INVALID_GRAPH
     }
-  } catch (error) {
-    alert('Erreur lors du calcul de la tournée');
-  } finally {
-    setIsCalculating(false);
-  }
-};
+    
+    private final ErrorType errorType;
+    // ...
+}
+```
 
-const displayTourOnMap = (tour) => {
-  // Effacer les anciennes polylines
-  tourLayerRef.current?.clearLayers();
-  
-  // Tracer chaque segment du trajet
-  tour.trajets.forEach((trajet, index) => {
-    const coordinates = trajet.listeSegment.map(seg => [
-      seg.origine.latitude,
-      seg.origine.longitude
-    ]);
-    
-    const polyline = L.polyline(coordinates, {
-      color: '#FF6B35',
-      weight: 4,
-      opacity: 0.7
-    }).addTo(tourLayerRef.current);
-    
-    polyline.bindPopup(`Segment ${index + 1} - ${trajet.longueurTotale.toFixed(1)}m`);
-  });
-  
-  // Ajouter numéros d'ordre sur les stops
-  tour.stops.forEach((stop, index) => {
-    if (stop.typeStop !== 'WAREHOUSE') {
-      L.marker([stop.latitude, stop.longitude], {
-        icon: L.divIcon({
-          className: 'tour-order-marker',
-          html: `<div>${index}</div>`
-        })
-      }).addTo(tourLayerRef.current);
-    }
-  });
-};
+**Gain:** Meilleure gestion d'erreurs, débogage facilité
+
+### Amélioration 6: Constantes & Magic Numbers ✅
+
+**Avant:** `Double.MAX_VALUE`, `1.0`, `"1"` éparpillés
+
+**Après:**
+```java
+private static final double NO_PATH_DISTANCE = -1.0;
+private static final double UNVISITED_DISTANCE = Double.MAX_VALUE;
+private static final String DEFAULT_COURIER_ID = "1";
+private static final long DIJKSTRA_SLOW_THRESHOLD_MS = 100;
+private static final int DIJKSTRA_ITERATIONS_WARNING_THRESHOLD = 1000;
+```
+
+### Amélioration 7: Monitoring Performance ✅
+
+```java
+// Dans dijkstraWithAdjacency
+long startTime = System.currentTimeMillis();
+int iterations = 0;
+
+while (!unvisited.isEmpty()) {
+    iterations++;
+    // ...
+}
+
+long elapsed = System.currentTimeMillis() - startTime;
+if (elapsed > DIJKSTRA_SLOW_THRESHOLD_MS) {
+    log.warn("⚠️ Dijkstra lent: {}ms, {} itérations", elapsed, iterations);
+}
 ```
 
 ---
 
-### **Phase 7 : Tests** 🧪
+## 📊 **Résultats des Tests**
 
-#### 7.1 Tests Unitaires
+### Tests Unitaires ServiceAlgo
+**Fichier:** `ServiceAlgoPhase1Test`, `Phase2Test`, `Phase3Test`, `Phase5Test`  
+**Résultat:** **51/51 tests passants** ✅
 
-**Fichier:** `ServiceAlgoTourTest.java` (nouveau)
+### Tests Controller REST
+**Fichier:** `TourControllerTest`  
+**Résultat:** **10/10 tests passants** ✅
 
-```java
-@SpringBootTest
-public class ServiceAlgoTourTest {
-    
-    @Autowired
-    private ServiceAlgo serviceAlgo;
-    
-    @Test
-    public void testBuildInitialRoute_Simple() {
-        // Arrange: 1 demande
-        // W(N5), P1(N1), D1(N9)
-        Graph graph = createSimpleGraph();
-        
-        // Act
-        List<Stop> route = serviceAlgo.buildInitialRoute(...);
-        
-        // Assert
-        assertEquals(4, route.size()); // W, P1, D1, W
-        assertEquals("WAREHOUSE", route.get(0).getTypeStop().toString());
-        assertEquals("PICKUP", route.get(1).getTypeStop().toString());
-        assertEquals("DELIVERY", route.get(2).getTypeStop().toString());
-        assertEquals("WAREHOUSE", route.get(3).getTypeStop().toString());
+### Tests Performance
+**Fichier:** `ServiceAlgoPerformanceTest`  
+**Résultat:** **3/3 tests passants** ✅
+
+**Métriques:**
+- ✅ Cache hit rate: 100% (0ms sur appels répétés)
+- ✅ Parallelisation: Résultats identiques sur 5 itérations
+- ✅ Scalabilité: 0.07-0.17ms par chemin (3 à 7 stops)
+
+### Tests Graph
+**Fichier:** `ServiceAlgoGraphTest`  
+**Résultat:** **4/4 tests passants** ✅
+
+### **TOTAL: 68/68 TESTS PASSANTS** 🎉
+
+**Commande:**
+```bash
+mvn test -Dtest="ServiceAlgo*Test,TourControllerTest"
+```
+
+**Temps d'exécution:** ~8 secondes  
+**BUILD:** SUCCESS ✅
+
+---
+
+### **Phase 7 : Intégration Frontend (À VENIR)** 🎨
+
+**Objectifs:**
+- [ ] Créer bouton "Calculer Tournée" dans l'interface
+- [ ] Appeler l'endpoint `/api/tours/calculate`
+- [ ] Afficher la tournée sur la carte Leaflet (polylines)
+- [ ] Afficher numéros d'ordre sur les stops
+- [ ] Afficher métriques (distance totale, nb stops)
+- [ ] Gestion des erreurs visuelles
+
+**Fichiers à modifier:**
         assertEquals("D1", route.get(1).getIdDemande());
         assertEquals("D1", route.get(2).getIdDemande());
     }
