@@ -19,10 +19,10 @@ class MapXmlParserUnitTest {
     @Test
     void parseMapFromXML_WithMinimalValidXML_ShouldParseCorrectly() throws Exception {
         String xml = """
-            <plan>
+            <reseau>
                 <noeud id="1" latitude="45.0" longitude="4.0"/>
                 <troncon origine="1" destination="2" longueur="100" nomRue="Rue A"/>
-            </plan>
+            </reseau>
         """;
 
         MockMultipartFile file = new MockMultipartFile(
@@ -54,12 +54,12 @@ class MapXmlParserUnitTest {
     @Test
     void parseMapFromXML_WithMultipleNodesAndSegments_ShouldParseAll() throws Exception {
         String xml = """
-            <plan>
+            <reseau>
                 <noeud id="1" latitude="1" longitude="2"/>
                 <noeud id="2" latitude="3" longitude="4"/>
                 <troncon origine="1" destination="2" longueur="10" nomRue="Rue 1"/>
                 <troncon origine="2" destination="1" longueur="20" nomRue="Rue 2"/>
-            </plan>
+            </reseau>
         """;
 
         MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", xml.getBytes());
@@ -71,19 +71,18 @@ class MapXmlParserUnitTest {
     }
 
     // ---------------------------------------------------------
-    // 3. XML vide
+    // 3. XML vide (sans nœuds) - doit lever une exception
     // ---------------------------------------------------------
     @Test
-    void parseMapFromXML_WithEmptyXML_ShouldReturnEmptyMap() throws Exception {
-        String xml = "<plan></plan>";
+    void parseMapFromXML_WithEmptyXML_ShouldThrowException() {
+        String xml = "<reseau></reseau>";
 
         MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", xml.getBytes());
 
-        CityMap map = parser.parseMapFromXML(file);
-
-        assertNotNull(map);
-        assertEquals(0, map.getNodes().size());
-        assertEquals(0, map.getSegments().size());
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+            () -> parser.parseMapFromXML(file));
+        
+        assertTrue(exception.getMessage().contains("aucun nœud trouvé"));
     }
 
     // ---------------------------------------------------------
@@ -92,9 +91,9 @@ class MapXmlParserUnitTest {
     @Test
     void parseMapFromXML_WithMissingAttributes_ShouldThrowException() {
         String xml = """
-            <plan>
+            <reseau>
                 <noeud id="1" latitude="45.0"/> <!-- longitude manquante -->
-            </plan>
+            </reseau>
         """;
 
         MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", xml.getBytes());
@@ -108,9 +107,9 @@ class MapXmlParserUnitTest {
     @Test
     void parseMapFromXML_WithInvalidNumber_ShouldThrowException() {
         String xml = """
-            <plan>
+            <reseau>
                 <noeud id="1" latitude="notANumber" longitude="4.0"/>
-            </plan>
+            </reseau>
         """;
 
         MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", xml.getBytes());
@@ -127,23 +126,22 @@ class MapXmlParserUnitTest {
     }
 
     // ---------------------------------------------------------
-    // 7. XML sans les balises attendues (aucun noeud/segment)
+    // 7. XML sans les balises attendues (aucun noeud/segment) - doit lever une exception
     // ---------------------------------------------------------
     @Test
-    void parseMapFromXML_WithOtherTags_ShouldReturnEmptyMap() throws Exception {
+    void parseMapFromXML_WithOtherTags_ShouldThrowException() {
         String xml = """
-            <plan>
+            <reseau>
                 <foo id="1"/>
                 <bar origine="2"/>
-            </plan>
+            </reseau>
         """;
 
         MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", xml.getBytes());
 
-        CityMap map = parser.parseMapFromXML(file);
-
-        assertNotNull(map);
-        assertEquals(0, map.getNodes().size());
-        assertEquals(0, map.getSegments().size());
+        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class, 
+            () -> parser.parseMapFromXML(file));
+        
+        assertTrue(exception.getMessage().contains("aucun nœud trouvé"));
     }
 }

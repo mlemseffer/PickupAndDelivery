@@ -43,32 +43,92 @@ public class DeliveryRequestXmlParser {
             Document document = builder.parse(inputStream);
             document.getDocumentElement().normalize();
 
+            // Vérifier que c'est bien un fichier de demandes de livraison
+            String rootElement = document.getDocumentElement().getNodeName();
+            if (!"demandeDeLivraisons".equals(rootElement)) {
+                throw new IllegalArgumentException(
+                    "❌ Format XML incorrect : le fichier doit être une demande de livraison.\n\n" +
+                    "Format attendu : <demandeDeLivraisons>\n" +
+                    "Format détecté : <" + rootElement + ">\n\n" +
+                    "💡 Astuce : Vous avez peut-être chargé un plan (carte) au lieu d'une demande de livraison.\n" +
+                    "   • Pour charger un plan : utilisez l'icône 🏠 (Charger Plan)\n" +
+                    "   • Pour charger une demande : utilisez l'icône 🚴 (Charger Demandes)"
+                );
+            }
+
             DeliveryRequestSet requestSet = new DeliveryRequestSet();
             
             // Parser l'entrepôt
             NodeList entrepotList = document.getElementsByTagName("entrepot");
-            if (entrepotList.getLength() > 0) {
-                Element entrepotElement = (Element) entrepotList.item(0);
-                Warehouse warehouse = new Warehouse();
-                warehouse.setId(UUID.randomUUID().toString());
-                warehouse.setNodeId(entrepotElement.getAttribute("adresse"));
-                warehouse.setDepartureTime(entrepotElement.getAttribute("heureDepart"));
-                requestSet.setWarehouse(warehouse);
+            if (entrepotList.getLength() == 0) {
+                throw new IllegalArgumentException(
+                    "❌ Format XML incorrect : aucun élément <entrepot> trouvé.\n\n" +
+                    "Le fichier doit contenir un entrepôt avec l'attribut 'adresse'."
+                );
             }
+            
+            Element entrepotElement = (Element) entrepotList.item(0);
+            String adresseEntrepot = entrepotElement.getAttribute("adresse");
+            if (adresseEntrepot == null || adresseEntrepot.isEmpty()) {
+                throw new IllegalArgumentException(
+                    "❌ Format XML incorrect : l'entrepôt doit avoir un attribut 'adresse'."
+                );
+            }
+            
+            Warehouse warehouse = new Warehouse();
+            warehouse.setId(UUID.randomUUID().toString());
+            warehouse.setNodeId(adresseEntrepot);
+            warehouse.setDepartureTime(entrepotElement.getAttribute("heureDepart"));
+            requestSet.setWarehouse(warehouse);
 
             // Parser les demandes de livraison
             NodeList livraisonList = document.getElementsByTagName("livraison");
+            
+            if (livraisonList.getLength() == 0) {
+                throw new IllegalArgumentException(
+                    "❌ Format XML incorrect : aucune demande de livraison trouvée.\n\n" +
+                    "Le fichier doit contenir au moins un élément <livraison>."
+                );
+            }
+            
             List<Demand> demands = new ArrayList<>();
             
             for (int i = 0; i < livraisonList.getLength(); i++) {
                 Element livraisonElement = (Element) livraisonList.item(i);
                 
+                // Valider les attributs requis
+                String adresseEnlevement = livraisonElement.getAttribute("adresseEnlevement");
+                String adresseLivraison = livraisonElement.getAttribute("adresseLivraison");
+                String dureeEnlevement = livraisonElement.getAttribute("dureeEnlevement");
+                String dureeLivraison = livraisonElement.getAttribute("dureeLivraison");
+                
+                if (adresseEnlevement.isEmpty() || adresseLivraison.isEmpty() || 
+                    dureeEnlevement.isEmpty() || dureeLivraison.isEmpty()) {
+                    throw new IllegalArgumentException(
+                        "❌ Format XML incorrect : la livraison #" + (i + 1) + " est incomplète.\n\n" +
+                        "Chaque <livraison> doit avoir les attributs :\n" +
+                        "  • adresseEnlevement\n" +
+                        "  • adresseLivraison\n" +
+                        "  • dureeEnlevement\n" +
+                        "  • dureeLivraison"
+                    );
+                }
+                
                 Demand demand = new Demand();
                 demand.setId(UUID.randomUUID().toString());
-                demand.setPickupNodeId(livraisonElement.getAttribute("adresseEnlevement"));
-                demand.setDeliveryNodeId(livraisonElement.getAttribute("adresseLivraison"));
-                demand.setPickupDurationSec(Integer.parseInt(livraisonElement.getAttribute("dureeEnlevement")));
-                demand.setDeliveryDurationSec(Integer.parseInt(livraisonElement.getAttribute("dureeLivraison")));
+                demand.setPickupNodeId(adresseEnlevement);
+                demand.setDeliveryNodeId(adresseLivraison);
+                
+                try {
+                    demand.setPickupDurationSec(Integer.parseInt(dureeEnlevement));
+                    demand.setDeliveryDurationSec(Integer.parseInt(dureeLivraison));
+                } catch (NumberFormatException e) {
+                    throw new IllegalArgumentException(
+                        "❌ Format XML incorrect : les durées de la livraison #" + (i + 1) + 
+                        " doivent être des nombres entiers."
+                    );
+                }
+                
                 demand.setStatus(DemandStatus.NON_TRAITEE);
                 demand.setCourierId(null);
                 
