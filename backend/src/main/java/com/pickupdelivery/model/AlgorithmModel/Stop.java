@@ -5,17 +5,21 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 /**
- * Représente un segment de route entre deux nœuds
+ * Représente un stop (noeud de pickup, delivery ou warehouse)
  */
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 public class Stop {
-    private String idNode;
-    private String idDemande;
-    private enum TypeStop {
+    
+    public enum TypeStop {
         PICKUP,
         DELIVERY,
         WAREHOUSE
-    } typeStop;
+    }
+    
+    private String idNode;
+    //optionnel car pour les entrepots on n'a pas d'idDemande
+    private java.util.Optional<String> idDemande = java.util.Optional.empty();
+    private TypeStop typeStop;
 }
