@@ -149,7 +149,8 @@ public class ServiceAlgoSimpleTest {
     }
 
     private static MockMultipartFile createMockFile(String filePath) throws Exception {
-        FileInputStream fis = new FileInputStream(filePath);
-        return new MockMultipartFile("file", filePath, "text/xml", fis);
-    }
+        try (FileInputStream fis = new FileInputStream(filePath)) {
+            byte[] content = fis.readAllBytes();
+            return new MockMultipartFile("file", filePath, "text/xml", content);
+        }
 }
