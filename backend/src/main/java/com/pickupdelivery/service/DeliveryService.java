@@ -22,6 +22,12 @@ public class DeliveryService {
     
     @Autowired
     private DeliveryRequestXmlParser deliveryRequestXmlParser;
+    
+    @Autowired
+    private ValidationService validationService;
+    
+    @Autowired
+    private MapService mapService;
 
     /**
      * Parse un fichier XML contenant les demandes de livraison
@@ -62,12 +68,19 @@ public class DeliveryService {
 
     /**
      * Charge un ensemble de demandes de livraison depuis un fichier XML
+     * Valide que tous les nœuds existent dans la carte chargée
      * @param file Le fichier XML contenant les demandes
      * @return L'ensemble des demandes avec l'entrepôt
-     * @throws Exception Si le parsing échoue
+     * @throws Exception Si le parsing échoue ou si des nœuds sont manquants
      */
     public DeliveryRequestSet loadDeliveryRequests(MultipartFile file) throws Exception {
+        // Parser le fichier XML
         DeliveryRequestSet requestSet = deliveryRequestXmlParser.parseDeliveryRequestFromXML(file);
+        
+        // Valider que tous les nœuds existent dans la carte chargée
+        validationService.validateDeliveryRequests(requestSet, mapService.getCurrentMap());
+        
+        // Si validation OK, sauvegarder
         this.currentRequestSet = requestSet;
         return requestSet;
     }

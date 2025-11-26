@@ -19,6 +19,12 @@ public class GlobalExceptionHandler {
                 .body(ApiResponse.error("Le fichier est trop volumineux. Taille maximale: 10MB"));
     }
 
+    @ExceptionHandler(ValidationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleValidationException(ValidationException exc) {
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .body(ApiResponse.error(exc.getMessage()));
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception exc) {
         return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
