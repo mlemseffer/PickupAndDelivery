@@ -641,4 +641,211 @@ public class ServiceAlgo {
 
         return route;
     }
+
+    // =========================================================================
+    // PHASE 5: INTÉGRATION - MÉTHODE PRINCIPALE DE CALCUL DE TOURNÉE
+    // =========================================================================
+
+    /**
+     * Calcule les tournées optimales pour un nombre donné de livreurs
+     * 
+     * IMPLÉMENTATION ACTUELLE: Algorithme glouton uniquement (1 livreur)
+     * - Utilise l'algorithme du plus proche voisin pour construire une tournée initiale
+     * - Respecte les contraintes de précédence (pickup avant delivery)
+     * - Retourne une liste contenant une seule tournée
+     * 
+     * AMÉLIORATIONS FUTURES:
+     * - Support multi-livreurs (clustering des demandes)
+     * - Optimisation 2-opt pour améliorer la qualité de la solution
+     * - Fenêtres horaires et autres contraintes
+     * 
+     * @param graph Le graphe contenant les distances et chemins entre tous les stops
+     * @param courierCount Nombre de livreurs (uniquement 1 supporté actuellement)
+     * @return Liste des tournées optimisées (1 seule pour l'instant)
+     * @throws IllegalArgumentException Si le graphe est null ou invalide
+     * @throws UnsupportedOperationException Si courierCount != 1
+     */
+    public List<com.pickupdelivery.model.AlgorithmModel.Tour> calculateOptimalTours(Graph graph, int courierCount) {
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 1️⃣ VALIDATION
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        if (graph == null) {
+            throw new IllegalArgumentException("Le graphe ne peut pas être null");
+        }
+
+        if (courierCount != 1) {
+            throw new UnsupportedOperationException(
+                "Multi-livreurs pas encore implémenté. " +
+                "Utilisez courierCount = 1 pour le moment. " +
+                "Fonctionnalité prévue pour une prochaine version."
+            );
+        }
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 2️⃣ PRÉPARATION DES DONNÉES (PHASE 1)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║     CALCUL DE TOURNÉE OPTIMALE - ALGORITHME GLOUTON           ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝");
+        
+        System.out.println("\n📊 Phase 1: Préparation des données...");
+        
+        Stop warehouse = extractWarehouse(graph);
+        List<Stop> stops = extractNonWarehouseStops(graph);
+        
+        if (stops.isEmpty()) {
+            System.out.println("⚠️  Aucune demande de livraison à traiter");
+            throw new IllegalStateException("Aucune demande de livraison à traiter");
+        }
+        
+        Map<String, List<Stop>> pickupsByRequestId = buildPickupsByRequestId(stops);
+        Map<String, Stop> deliveryByRequestId = buildDeliveryByRequestId(stops);
+        
+        System.out.println("   ✓ Entrepôt (warehouse): " + warehouse.getIdNode());
+        System.out.println("   ✓ Nombre de stops à visiter: " + stops.size());
+        System.out.println("   ✓ Nombre de demandes: " + pickupsByRequestId.size());
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 3️⃣ CONSTRUCTION DE LA TOURNÉE INITIALE - GLOUTON (PHASE 3)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n🛣️  Phase 3: Construction de la tournée (algorithme glouton)...");
+        
+        long startTime = System.currentTimeMillis();
+        
+        List<Stop> initialRoute = buildInitialRoute(graph, warehouse, stops, pickupsByRequestId);
+        
+        long elapsedTime = System.currentTimeMillis() - startTime;
+        
+        System.out.println("   ✓ Tournée construite en " + elapsedTime + " ms");
+        System.out.println("   ✓ Nombre de stops dans la tournée: " + initialRoute.size());
+        System.out.println("   ✓ Ordre de visite: " + formatRouteForLog(initialRoute));
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 4️⃣ VALIDATION ET CALCUL DE DISTANCE (PHASE 2)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n✅ Phase 2: Validation et calcul de distance...");
+        
+        double initialDistance = computeRouteDistance(initialRoute, graph);
+        boolean isValid = respectsPrecedence(initialRoute, pickupsByRequestId, deliveryByRequestId);
+        
+        if (!isValid) {
+            throw new IllegalStateException(
+                "La tournée construite ne respecte pas les contraintes de précédence. " +
+                "Cela indique un bug dans l'algorithme."
+            );
+        }
+        
+        System.out.println("   ✓ Distance totale: " + String.format("%.2f", initialDistance) + " m");
+        System.out.println("   ✓ Contraintes de précédence: RESPECTÉES");
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 5️⃣ CONSTRUCTION DE L'OBJET TOUR
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n📦 Phase 5: Construction de l'objet Tour...");
+        
+        com.pickupdelivery.model.AlgorithmModel.Tour tour = buildTour(initialRoute, initialDistance, graph);
+        tour.setCourierId(1); // Premier livreur
+        
+        System.out.println("   ✓ Tour créé avec succès");
+        System.out.println("   ✓ Livreur ID: " + tour.getCourierId());
+        System.out.println("   ✓ Nombre de trajets: " + tour.getTrajets().size());
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 6️⃣ RÉSUMÉ ET RETOUR
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
+        System.out.println("║                    RÉSULTAT DU CALCUL                          ║");
+        System.out.println("╠════════════════════════════════════════════════════════════════╣");
+        System.out.println("║  Distance totale : " + String.format("%10.2f", initialDistance) + " m                          ║");
+        System.out.println("║  Nombre de stops : " + String.format("%10d", initialRoute.size()) + "                                ║");
+        System.out.println("║  Demandes        : " + String.format("%10d", pickupsByRequestId.size()) + "                                ║");
+        System.out.println("║  Temps de calcul : " + String.format("%10d", elapsedTime) + " ms                             ║");
+        System.out.println("║  Algorithme      : Glouton (plus proche voisin)              ║");
+        System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
+        
+        return Arrays.asList(tour);
+    }
+
+    /**
+     * Construit un objet Tour à partir d'une route et de sa distance
+     * Récupère les trajets détaillés depuis la matrice du Graph
+     * 
+     * @param route Liste ordonnée des stops
+     * @param totalDistance Distance totale de la tournée
+     * @param graph Le graphe contenant les trajets détaillés
+     * @return Un objet Tour complet avec tous les trajets
+     */
+    private com.pickupdelivery.model.AlgorithmModel.Tour buildTour(List<Stop> route, double totalDistance, Graph graph) {
+        if (route == null || graph == null) {
+            throw new IllegalArgumentException("Route et graph ne peuvent pas être null");
+        }
+
+        com.pickupdelivery.model.AlgorithmModel.Tour tour = new com.pickupdelivery.model.AlgorithmModel.Tour();
+        tour.setStops(route);
+        tour.setTotalDistance(totalDistance);
+        
+        // Construire la liste des trajets détaillés entre chaque paire de stops consécutifs
+        List<Trajet> trajets = new ArrayList<>();
+        
+        for (int i = 0; i < route.size() - 1; i++) {
+            Stop from = route.get(i);
+            Stop to = route.get(i + 1);
+            
+            // Récupérer le trajet depuis la matrice du Graph
+            Trajet trajet = graph.getDistancesMatrix().get(from).get(to);
+            
+            if (trajet == null) {
+                throw new IllegalStateException(
+                    "Trajet non trouvé dans le graph entre " + from.getIdNode() + " et " + to.getIdNode()
+                );
+            }
+            
+            trajets.add(trajet);
+        }
+        
+        tour.setTrajets(trajets);
+        
+        return tour;
+    }
+
+    /**
+     * Formate une route pour l'affichage dans les logs
+     * Affiche W pour warehouse, P1/P2/... pour pickups, D1/D2/... pour deliveries
+     * 
+     * @param route La route à formater
+     * @return Une chaîne formatée (ex: "W → P1 → P2 → D1 → D2 → W")
+     */
+    private String formatRouteForLog(List<Stop> route) {
+        if (route == null || route.isEmpty()) {
+            return "[]";
+        }
+
+        StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < route.size(); i++) {
+            Stop stop = route.get(i);
+            
+            if (stop.getTypeStop() == Stop.TypeStop.WAREHOUSE) {
+                sb.append("W");
+            } else {
+                sb.append(stop.getTypeStop() == Stop.TypeStop.PICKUP ? "P" : "D");
+                // Extraire le numéro de la demande (ex: "D1" → "1")
+                String requestId = stop.getIdDemande();
+                if (requestId != null && requestId.length() > 1) {
+                    sb.append(requestId.substring(1));
+                }
+            }
+            
+            if (i < route.size() - 1) {
+                sb.append(" → ");
+            }
+        }
+        
+        return sb.toString();
+    }
 }

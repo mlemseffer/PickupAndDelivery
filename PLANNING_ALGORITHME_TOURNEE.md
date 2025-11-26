@@ -950,14 +950,17 @@ public class Stop {
   - [x] Tests avec 1-2 demandes
   - [x] Tests unitaires (9 tests - 100% success)
 
-- [ ] **Phase 4: 2-opt**
+- [ ] **Phase 4: 2-opt** ⏸️ **REPORTÉE**
   - [ ] `twoOptImprove()`
   - [ ] Tests d'amélioration
+  - [ ] Note: Implémentation prévue dans une version ultérieure
 
-- [ ] **Phase 5: Intégration**
-  - [ ] `calculateOptimalTours()`
-  - [ ] Créer classe `Tour`
-  - [ ] `buildTour()`
+- [x] **Phase 5: Intégration** ✅ **COMPLÉTÉ**
+  - [x] `calculateOptimalTours()`
+  - [x] Créer classe `Tour`
+  - [x] `buildTour()`
+  - [x] Tests unitaires (9 tests - 100% success)
+  - [x] Test d'intégration complet
 
 - [ ] **Phase 6: API**
   - [ ] `TourController.java`
