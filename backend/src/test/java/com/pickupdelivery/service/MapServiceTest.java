@@ -11,6 +11,8 @@ import org.mockito.Mock;
 import org.mockito.MockitoAnnotations;
 import org.springframework.mock.web.MockMultipartFile;
 
+import org.springframework.core.io.ClassPathResource;
+
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
@@ -30,6 +32,13 @@ class MapServiceTest {
     @BeforeEach
     void setUp() {
         MockitoAnnotations.openMocks(this);
+    }
+
+    @Test
+    void parseMapFromXML_WhenFileIsNull_ShouldThrowException() {
+        assertThrows(IllegalArgumentException.class, () -> {
+            mapService.parseMapFromXML(null);
+        });
     }
 
     @Test
@@ -113,4 +122,68 @@ class MapServiceTest {
         assertFalse(mapService.hasMap());
         assertNull(mapService.getCurrentMap());
     }
+
+    @Test
+    void parseMapFromXML_ShouldStoreCurrentMap() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", "content".getBytes());
+
+        CityMap mockMap = new CityMap();
+        mockMap.getNodes().add(new Node("1", 10, 20));
+
+        when(mapXmlParser.parseMapFromXML(any())).thenReturn(mockMap);
+
+        // Act
+        mapService.parseMapFromXML(file);
+
+        // Assert
+        assertEquals(mockMap, mapService.getCurrentMap());
+    }
+
+    @Test
+    void clearMap_WhenNoMapLoaded_ShouldNotThrow() {
+        assertDoesNotThrow(() -> mapService.clearMap());
+        assertFalse(mapService.hasMap());
+    }
+
+    @Test
+    void parseMapFromXML_WhenParserThrowsException_ShouldThrow() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile("file", "test.xml", "text/xml", "content".getBytes());
+
+        when(mapXmlParser.parseMapFromXML(any())).thenThrow(new RuntimeException("Parsing error"));
+
+        // Assert
+        assertThrows(RuntimeException.class, () -> mapService.parseMapFromXML(file));
+    }
+
+
+/* 
+    // Test intégration : on teste tout le cheminement : parsage d'un vrai fichier puis vérif
+    @Test
+    void parseMapFromXML_ShouldParseAllNodesAndSegments() throws Exception {
+        // Arrange : Charger le fichier XML de /resources
+        ClassPathResource resource = new ClassPathResource("petitPlan.xml");
+
+        assertTrue(resource.exists(), "Le fichier petitPlan.xml n'existe pas dans les ressources !");
+
+System.out.println("resource = " + resource);
+System.out.println("InputStream = " + resource.getInputStream());
+
+        MockMultipartFile file = new MockMultipartFile(
+                "file",
+                "petitPlan.xml",
+                "text/xml",
+                resource.getInputStream()
+        );
+
+        // Act : parser réel
+        CityMap map = mapXmlParser.parseMapFromXML(file);
+
+        // Assert : Vérification complète
+        assertNotNull(map);
+
+        assertEquals(308, map.getNodes().size(), "308 noeuds dans petitPlan.xml");
+        assertEquals(615, map.getSegments().size(), "615 segments dans petitPlan.xml");
+    } */
 }
