@@ -17,5 +17,5 @@ public class Graph {
     private Stop stopDepart; // Le warehouse
     private double cout;
     // Map contenant pour chaque stop, la distance vers tous les autres stops
-    private Map<Stop, Map<Stop, Trajet>> distancesMatrix = new HashMap<>();
+    private Map<Stop, Map<Stop, Trajet>> distancesMatrix;
 }
