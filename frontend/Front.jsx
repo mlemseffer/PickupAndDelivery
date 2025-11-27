@@ -11,6 +11,97 @@ import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
 /**
+ * Convertit une couleur HSL en format hexadécimal
+ */
+function hslToHex(h, s, l) {
+  s /= 100;
+  l /= 100;
+  
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
+  const m = l - c / 2;
+  
+  let r = 0, g = 0, b = 0;
+  
+  if (0 <= h && h < 60) {
+    r = c; g = x; b = 0;
+  } else if (60 <= h && h < 120) {
+    r = x; g = c; b = 0;
+  } else if (120 <= h && h < 180) {
+    r = 0; g = c; b = x;
+  } else if (180 <= h && h < 240) {
+    r = 0; g = x; b = c;
+  } else if (240 <= h && h < 300) {
+    r = x; g = 0; b = c;
+  } else if (300 <= h && h < 360) {
+    r = c; g = 0; b = x;
+  }
+  
+  // Convertir en valeurs RGB (0-255)
+  r = Math.round((r + m) * 255);
+  g = Math.round((g + m) * 255);
+  b = Math.round((b + m) * 255);
+  
+  // Convertir en hexadécimal
+  const toHex = (n) => {
+    const hex = n.toString(16);
+    return hex.length === 1 ? '0' + hex : hex;
+  };
+  
+  return `#${toHex(r)}${toHex(g)}${toHex(b)}`.toUpperCase();
+}
+
+/**
+ * Génère 50 couleurs vives et distinctes en utilisant l'espace HSL
+ * et les retourne dans l'ordre: 5e, 10e, 15e, ..., 45e, puis 6e, 11e, ..., 46e, etc.
+ */
+function generateColorPalette() {
+  const totalColors = 50;
+  
+  // Générer 50 couleurs en HSL avec saturation et luminosité optimales
+  const baseColors = [];
+  for (let i = 0; i < totalColors; i++) {
+    const hue = (360 * i) / totalColors; // Répartition uniforme sur la roue chromatique (0-360°)
+    const saturation = 75; // Saturation élevée pour des couleurs vives (75%)
+    const lightness = 55; // Luminosité moyenne pour une bonne visibilité (55%)
+    
+    const hexColor = hslToHex(hue, saturation, lightness);
+    baseColors.push(hexColor);
+  }
+  
+  // Réorganiser selon la séquence demandée: prendre de 5 en 5
+  // 5e (index 4), 10e (index 9), 15e (index 14), ..., 45e (index 44)
+  // puis 6e (index 5), 11e (index 10), ..., 46e (index 45)
+  // puis 7e (index 6), 12e (index 11), ..., 47e (index 46)
+  // etc.
+  const reorderedColors = [];
+  for (let offset = 4; offset < totalColors; offset++) {
+    for (let i = offset; i < totalColors; i += 5) {
+      reorderedColors.push(baseColors[i]);
+    }
+  }
+  
+  // Ajouter les couleurs restantes (indices 0-3)
+  for (let i = 0; i < 4; i++) {
+    if (i < totalColors) {
+      reorderedColors.push(baseColors[i]);
+    }
+  }
+  
+  return reorderedColors;
+}
+
+// Palette de couleurs générée
+const COLOR_PALETTE = generateColorPalette();
+
+/**
+ * Obtient une couleur de la palette en utilisant un modulo
+ */
+function getColorFromPalette(index) {
+  return COLOR_PALETTE[index % COLOR_PALETTE.length];
+}
+
+/**
  * Composant principal de l'application Pickup & Delivery
  * Gère l'état global et la navigation entre les différentes vues
  * Communique avec le backend via apiService
@@ -72,7 +163,16 @@ export default function PickupDeliveryUI() {
 
   // Gestion du chargement des demandes de livraison
   const handleDeliveryRequestsLoaded = (requestSet) => {
-    setDeliveryRequestSet(requestSet);
+    // Assigner des couleurs à chaque demande en utilisant la palette
+    const demandsWithColors = requestSet.demands.map((demand, index) => ({
+      ...demand,
+      color: getColorFromPalette(index)
+    }));
+    
+    setDeliveryRequestSet({
+      ...requestSet,
+      demands: demandsWithColors
+    });
     setTourData(null); // Réinitialiser la tournée si on charge de nouvelles demandes
     setShowDeliveryUpload(false);
   };
@@ -148,14 +248,16 @@ export default function PickupDeliveryUI() {
 
   // Gestion de l'ajout manuel d'une demande
   const handleManualDemandAdd = (demand) => {
+    // Obtenir l'index de la nouvelle demande
+    const currentDemandCount = deliveryRequestSet?.demands?.length || 0;
+    
     // Créer ou mettre à jour le DeliveryRequestSet
     const newDemand = {
       id: Date.now().toString(),
       ...demand,
-      status: 'NON_TRAITEE',
       courierId: null,
-      // Assigner une couleur aléatoire
-      color: '#' + Math.floor(Math.random()*16777215).toString(16)
+      // Assigner une couleur depuis la palette
+      color: getColorFromPalette(currentDemandCount)
     };
 
     if (!deliveryRequestSet) {

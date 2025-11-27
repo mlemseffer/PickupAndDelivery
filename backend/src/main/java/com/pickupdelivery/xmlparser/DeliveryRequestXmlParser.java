@@ -129,7 +129,6 @@ public class DeliveryRequestXmlParser {
                     );
                 }
                 
-                demand.setStatus(DemandStatus.NON_TRAITEE);
                 demand.setCourierId(null);
                 
                 // Assigner une couleur cyclique
