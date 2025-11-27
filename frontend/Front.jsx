@@ -5,6 +5,8 @@ import MapViewer from './src/components/MapViewer';
 import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
+import TourTable from './src/components/TourTable';
+import TourActions from './src/components/TourActions';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -98,16 +100,25 @@ export default function PickupDeliveryUI() {
       if (result.success && result.data && result.data.length > 0) {
         const tour = result.data[0]; // Premier tour (pour 1 livreur)
         console.log('✅ Tournée calculée avec succès:', tour);
+        console.log('🔍 Structure du tour:', {
+          keys: Object.keys(tour),
+          trajets: tour.trajets,
+          stops: tour.stops,
+          totalDistance: tour.totalDistance
+        });
         
         // Créer un objet tourData pour le MapViewer
         const tourData = {
-          tour: tour.trajets,  // Liste des trajets
+          tour: tour.trajets || tour.segments || tour.path || [],  // Liste des trajets
           metrics: {
-            stopCount: tour.stops.length,
-            totalDistance: tour.totalDistance,
-            segmentCount: tour.trajets.length
+            stopCount: tour.stops?.length || 0,
+            totalDistance: tour.totalDistance || 0,
+            segmentCount: (tour.trajets || tour.segments || tour.path || []).length
           }
         };
+        
+        console.log('📊 tourData créé:', tourData);
+        console.log('📊 tour.length:', tourData.tour.length);
         
         setTourData(tourData);
         alert(`✅ Tournée calculée avec succès !\n\n` +
@@ -229,7 +240,7 @@ export default function PickupDeliveryUI() {
         {mapData && activeTab === 'map' && !showDeliveryUpload && (
           <div className="flex-1 flex flex-col gap-4 overflow-hidden">
             {/* Ligne principale : Carte + Panneau d'informations */}
-            <div className="flex-1 flex gap-4 min-h-0 p-4 pt-2">
+            <div className="flex-1 flex gap-4 p-4 pt-2" style={{ maxHeight: 'calc(100vh - 120px)' }}>
               {/* Carte sur la gauche - plus grande */}
               <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
                 <MapViewer 
@@ -241,46 +252,78 @@ export default function PickupDeliveryUI() {
               </div>
               
               {/* Panneau droit avec informations et boutons */}
-              <div className="flex-1 flex flex-col gap-4">
-                {/* Espace pour les tableaux */}
-                <div className="flex-1 bg-gray-700 rounded-lg p-6">
-                  <h3 className="text-xl font-semibold mb-4">Informations</h3>
+              <div className="flex-1 flex flex-col gap-4" style={{ maxHeight: '100%' }}>
+                {/* Tableau de tournée avec hauteur fixe */}
+                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 overflow-hidden">
+                  <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
+                    {tourData ? 'Tournée Calculée' : 'Informations'}
+                  </h3>
+                  <div className="flex-1 overflow-auto min-h-0">
+                    {tourData ? (
+                      <TourTable 
+                        tourData={tourData}
+                        deliveryRequestSet={deliveryRequestSet}
+                      />
+                    ) : (
+                      <div className="text-gray-400 text-center py-8">
+                        Chargez des demandes et calculez une tournée
+                      </div>
+                    )}
+                  </div>
                 </div>
                 
-                {/* Boutons d'action en bas à droite */}
-                <div className="bg-gray-700 rounded-lg p-4">
-                  <div className="flex gap-3 justify-center">
-                    {/* Bouton Nombre de livreurs */}
-                    <button 
-                      onClick={() => setShowCourierModal(true)}
-                      disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0}
-                      className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                               text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                      title="Choisir le nombre de livreurs"
-                    >
-                      Nombre de livreurs {deliveryRequestSet?.demands?.length > 0 && `(${courierCount})`}
-                    </button>
-                    
-                    {/* Bouton Ajouter Pickup&Delivery (manuel) */}
-                    <button 
-                      onClick={handleAddDeliveryManually}
-                      className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                      title="Ajouter manuellement une demande de livraison"
-                    >
-                      Ajouter Pickup&Delivery
-                    </button>
-                    
-                    {/* Bouton Calculer tournée */}
-                    <button 
-                      onClick={handleCalculateTour}
-                      disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
-                      className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                               text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                      title="Calculer la tournée optimale"
-                    >
-                      {isCalculatingTour ? 'Calcul en cours...' : 'Calculer tournée'}
-                    </button>
-                  </div>
+                {/* Boutons d'action */}
+                <div className="bg-gray-700 rounded-lg p-4 flex-shrink-0" style={{ minHeight: '80px', maxHeight: '120px' }}>
+                  {!tourData ? (
+                    // Boutons avant calcul de tournée
+                    <div className="flex gap-3 justify-center">
+                      {/* Bouton Nombre de livreurs */}
+                      <button 
+                        onClick={() => setShowCourierModal(true)}
+                        disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0}
+                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                                 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                        title="Choisir le nombre de livreurs"
+                      >
+                        Nombre de livreurs {deliveryRequestSet?.demands?.length > 0 && `(${courierCount})`}
+                      </button>
+                      
+                      {/* Bouton Ajouter Pickup&Delivery (manuel) */}
+                      <button 
+                        onClick={handleAddDeliveryManually}
+                        className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                        title="Ajouter manuellement une demande de livraison"
+                      >
+                        Ajouter Pickup&Delivery
+                      </button>
+                      
+                      {/* Bouton Calculer tournée */}
+                      <button 
+                        onClick={handleCalculateTour}
+                        disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
+                        className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                                 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                        title="Calculer la tournée optimale"
+                      >
+                        {isCalculatingTour ? 'Calcul en cours...' : 'Calculer tournée'}
+                      </button>
+                    </div>
+                  ) : (
+                    // Boutons après calcul de tournée
+                    <TourActions 
+                      tourData={tourData}
+                      onModify={() => {
+                        // TODO: Implémenter la modification de tournée
+                        alert('Fonctionnalité de modification à implémenter');
+                      }}
+                      onSaveItinerary={() => {
+                        console.log('Itinéraire sauvegardé');
+                      }}
+                      onSaveTour={() => {
+                        console.log('Tournée sauvegardée');
+                      }}
+                    />
+                  )}
                 </div>
               </div>
             </div>
