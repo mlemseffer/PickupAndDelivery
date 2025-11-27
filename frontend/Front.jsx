@@ -176,7 +176,7 @@ export default function PickupDeliveryUI() {
   };
 
   return (
-    <div className="h-screen bg-gray-800 text-white flex flex-col">
+    <div className="h-screen bg-gray-800 text-white flex flex-col overflow-hidden">
       {/* Navigation Bar avec titre intégré */}
       <Navigation 
         activeTab={activeTab}
@@ -187,7 +187,7 @@ export default function PickupDeliveryUI() {
       />
 
       {/* Main Content */}
-      <main className="flex-1 flex flex-col">
+      <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Home View */}
         {activeTab === 'home' && !showMapUpload && (
           <div className="p-8 mt-20">
@@ -238,9 +238,9 @@ export default function PickupDeliveryUI() {
 
         {/* Map View */}
         {mapData && activeTab === 'map' && !showDeliveryUpload && (
-          <div className="flex-1 flex flex-col gap-4 overflow-hidden">
+          <div className="flex-1 flex flex-col overflow-hidden p-4 gap-4 min-h-0">
             {/* Ligne principale : Carte + Panneau d'informations */}
-            <div className="flex-1 flex gap-4 p-4 pt-2" style={{ maxHeight: 'calc(100vh - 120px)' }}>
+            <div className="flex-1 flex gap-4 min-h-0">
               {/* Carte sur la gauche - plus grande */}
               <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
                 <MapViewer 
@@ -252,9 +252,9 @@ export default function PickupDeliveryUI() {
               </div>
               
               {/* Panneau droit avec informations et boutons */}
-              <div className="flex-1 flex flex-col gap-4" style={{ maxHeight: '100%' }}>
-                {/* Tableau de tournée avec hauteur fixe */}
-                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 overflow-hidden">
+              <div className="flex-1 flex flex-col gap-4 min-h-0">
+                {/* Tableau de tournée */}
+                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 overflow-hidden">
                   <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
                     {tourData ? 'Tournée Calculée' : 'Informations'}
                   </h3>
@@ -273,7 +273,7 @@ export default function PickupDeliveryUI() {
                 </div>
                 
                 {/* Boutons d'action */}
-                <div className="bg-gray-700 rounded-lg p-4 flex-shrink-0" style={{ minHeight: '80px', maxHeight: '120px' }}>
+                <div className="bg-gray-700 rounded-lg p-4 flex-shrink-0">
                   {!tourData ? (
                     // Boutons avant calcul de tournée
                     <div className="flex gap-3 justify-center">
