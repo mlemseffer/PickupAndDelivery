@@ -15,6 +15,15 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
 
   // Créer la liste des stops avec leurs informations
   const stops = [];
+  let currentTimeMinutes = 0; // Temps cumulé en minutes depuis le départ
+  
+  // Parser l'heure de départ de l'entrepôt
+  if (deliveryRequestSet?.warehouse?.departureTime) {
+    const [hours, minutes] = deliveryRequestSet.warehouse.departureTime.split(':').map(Number);
+    currentTimeMinutes = hours * 60 + minutes;
+  } else {
+    currentTimeMinutes = 8 * 60; // 8h00 par défaut
+  }
   
   // Ajouter l'entrepôt au début
   if (deliveryRequestSet?.warehouse) {
@@ -22,38 +31,45 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
       order: 1,
       type: 'E',
       icon: '🏢',
-      time: deliveryRequestSet.warehouse.departureTime || '8h00',
+      time: formatTime(currentTimeMinutes),
       nodeId: deliveryRequestSet.warehouse.nodeId,
       demandId: null,
-      color: '#9CA3AF'
+      color: '#9CA3AF',
+      durationSec: 0
     });
   }
 
-  // TODO: Analyser les trajets pour extraire les pickups et deliveries dans l'ordre
-  // Pour l'instant, on affiche un exemple basé sur les demandes
+  // TODO: Analyser les trajets pour extraire les pickups et deliveries dans l'ordre réel
+  // Pour l'instant, on affiche basé sur les demandes
   if (deliveryRequestSet?.demands) {
     deliveryRequestSet.demands.forEach((demand, index) => {
-      // Pickup
+      // Pickup avec sa vraie durée
+      const pickupDurationMin = Math.round((demand.pickupDurationSec || 0) / 60);
       stops.push({
         order: stops.length + 1,
         type: 'P',
         icon: '📦',
-        time: calculateTime(stops.length, 5), // Estimation
+        time: formatTimeRange(currentTimeMinutes, pickupDurationMin),
         nodeId: demand.pickupNodeId,
         demandId: demand.id,
-        color: demand.color || '#3B82F6'
+        color: demand.color || '#3B82F6',
+        durationSec: demand.pickupDurationSec || 0
       });
+      currentTimeMinutes += pickupDurationMin;
       
-      // Delivery
+      // Delivery avec sa vraie durée
+      const deliveryDurationMin = Math.round((demand.deliveryDurationSec || 0) / 60);
       stops.push({
         order: stops.length + 1,
         type: 'D',
         icon: '📍',
-        time: calculateTime(stops.length, 5), // Estimation
+        time: formatTimeRange(currentTimeMinutes, deliveryDurationMin),
         nodeId: demand.deliveryNodeId,
         demandId: demand.id,
-        color: demand.color || '#3B82F6'
+        color: demand.color || '#3B82F6',
+        durationSec: demand.deliveryDurationSec || 0
       });
+      currentTimeMinutes += deliveryDurationMin;
     });
   }
 
@@ -63,10 +79,11 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
       order: stops.length + 1,
       type: 'E',
       icon: '🏢',
-      time: calculateTime(stops.length, 5),
+      time: formatTime(currentTimeMinutes),
       nodeId: deliveryRequestSet.warehouse.nodeId,
       demandId: null,
-      color: '#9CA3AF'
+      color: '#9CA3AF',
+      durationSec: 0
     });
   }
 
@@ -133,19 +150,26 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
 }
 
 /**
- * Calcule une heure estimée basée sur l'ordre et la durée moyenne
+ * Formate une heure en minutes en format HHhMM
  */
-function calculateTime(order, avgMinutesPerStop) {
-  const startHour = 8; // 8h00
-  const startMinute = 0;
+function formatTime(totalMinutes) {
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${hours}h${minutes.toString().padStart(2, '0')}`;
+}
+
+/**
+ * Formate une plage horaire avec l'heure de début et de fin
+ * @param {number} startMinutes - Heure de début en minutes depuis minuit
+ * @param {number} durationMinutes - Durée de l'activité en minutes
+ */
+function formatTimeRange(startMinutes, durationMinutes) {
+  const startHours = Math.floor(startMinutes / 60);
+  const startMins = startMinutes % 60;
   
-  const totalMinutes = order * avgMinutesPerStop;
-  const hours = startHour + Math.floor(totalMinutes / 60);
-  const minutes = (startMinute + totalMinutes) % 60;
+  const endMinutes = startMinutes + durationMinutes;
+  const endHours = Math.floor(endMinutes / 60);
+  const endMins = endMinutes % 60;
   
-  // Format: 8h05-8h10
-  const endHours = hours + Math.floor((minutes + avgMinutesPerStop) / 60);
-  const endMinutes = (minutes + avgMinutesPerStop) % 60;
-  
-  return `${hours}h${minutes.toString().padStart(2, '0')}-${endHours}h${endMinutes.toString().padStart(2, '0')}`;
+  return `${startHours}h${startMins.toString().padStart(2, '0')}-${endHours}h${endMins.toString().padStart(2, '0')}`;
 }
