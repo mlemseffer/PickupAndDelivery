@@ -705,7 +705,6 @@ public class Demand {
     private String deliveryNodeId;       // FK → Node
     private int pickupDurationSec;
     private int deliveryDurationSec;
-    private DemandStatus status;         // NON_TRAITEE, AFFECTEE, TRAITEE, REJETEE
     private String courierId;            // FK → Courier (nullable)
     private String color;                // Couleur hex (#FF6B6B)
 }
@@ -745,7 +744,6 @@ const [showManualForm, setShowManualForm] = useState(false);
       deliveryNodeId, 
       pickupDurationSec, 
       deliveryDurationSec,
-      status,
       color 
     },
     ...

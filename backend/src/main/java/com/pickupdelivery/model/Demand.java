@@ -17,7 +17,6 @@ public class Demand {
     private String deliveryNodeId;    // idDelivery : FK→Noeud
     private int pickupDurationSec;    // dureePickupSec : int
     private int deliveryDurationSec;  // dureeDeliverySec : int
-    private DemandStatus status;      // statut : StatutDemande
     private String courierId;         // idCourier : FK→Courier (nullable)
     private String color;             // Couleur pour l'affichage sur la carte
 }

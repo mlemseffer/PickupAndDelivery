@@ -107,8 +107,7 @@ export default function DeliveryMarkers({ requestSet, nodesById }) {
                       📦 Pickup #{index + 1}
                     </strong><br />
                     <strong>Durée:</strong> {demand.pickupDurationSec} sec<br />
-                    <strong>Nœud:</strong> {demand.pickupNodeId}<br />
-                    <strong>Statut:</strong> {demand.status}
+                    <strong>Nœud:</strong> {demand.pickupNodeId}
                   </div>
                 </Popup>
               </Marker>
@@ -126,8 +125,7 @@ export default function DeliveryMarkers({ requestSet, nodesById }) {
                       📍 Delivery #{index + 1}
                     </strong><br />
                     <strong>Durée:</strong> {demand.deliveryDurationSec} sec<br />
-                    <strong>Nœud:</strong> {demand.deliveryNodeId}<br />
-                    <strong>Statut:</strong> {demand.status}
+                    <strong>Nœud:</strong> {demand.deliveryNodeId}
                   </div>
                 </Popup>
               </Marker>

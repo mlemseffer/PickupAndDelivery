@@ -152,7 +152,6 @@ export default function PickupDeliveryUI() {
     const newDemand = {
       id: Date.now().toString(),
       ...demand,
-      status: 'NON_TRAITEE',
       courierId: null,
       // Assigner une couleur aléatoire
       color: '#' + Math.floor(Math.random()*16777215).toString(16)
