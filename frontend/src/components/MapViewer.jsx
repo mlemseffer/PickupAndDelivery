@@ -6,19 +6,47 @@ import TourSegments from './TourSegments';
 import 'leaflet/dist/leaflet.css';
 
 /**
- * Composant pour forcer le redimensionnement de la carte
+ * Composant pour forcer le redimensionnement automatique de la carte
+ * S'adapte aux données affichées (nœuds, demandes, tournée)
  */
-function MapResizer() {
+function MapResizer({ mapData, deliveryRequestSet, tourData }) {
   const map = useMap();
   
   useEffect(() => {
     // Forcer le redimensionnement après un court délai
     const timer = setTimeout(() => {
       map.invalidateSize();
+      
+      // Calculer les bounds pour ajuster la vue
+      const bounds = [];
+      
+      // Ajouter tous les nœuds aux bounds
+      if (mapData?.nodes) {
+        mapData.nodes.forEach(node => {
+          bounds.push([node.latitude, node.longitude]);
+        });
+      }
+      
+      // Ajouter les points de pickup et delivery si disponibles
+      if (deliveryRequestSet?.demands) {
+        deliveryRequestSet.demands.forEach(demand => {
+          // Trouver les nœuds correspondants
+          const pickupNode = mapData?.nodes?.find(n => n.id === demand.pickupNodeId);
+          const deliveryNode = mapData?.nodes?.find(n => n.id === demand.deliveryNodeId);
+          
+          if (pickupNode) bounds.push([pickupNode.latitude, pickupNode.longitude]);
+          if (deliveryNode) bounds.push([deliveryNode.latitude, deliveryNode.longitude]);
+        });
+      }
+      
+      // Si on a des bounds, ajuster la vue
+      if (bounds.length > 0) {
+        map.fitBounds(bounds, { padding: [50, 50] });
+      }
     }, 100);
     
     return () => clearTimeout(timer);
-  }, [map]);
+  }, [map, mapData, deliveryRequestSet, tourData]);
   
   return null;
 }
@@ -138,7 +166,11 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tou
             }, 100);
           }}
         >
-          <MapResizer />
+          <MapResizer 
+            mapData={mapData}
+            deliveryRequestSet={deliveryRequestSet}
+            tourData={tourData}
+          />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
