@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
-import TourPolylines from './TourPolylines';
+import TourSegments from './TourSegments';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -184,9 +184,9 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tou
             />
           )}
 
-          {/* Affichage de la tournée calculée */}
+          {/* Affichage de la tournée calculée (segments jaunes numérotés) */}
           {tourData && (
-            <TourPolylines 
+            <TourSegments 
               tourData={tourData}
               nodesById={nodesById}
             />

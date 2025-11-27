@@ -38,10 +38,10 @@ public class MapXmlParser {
 
             // Vérifier que c'est bien un fichier de plan (carte)
             String rootElement = document.getDocumentElement().getNodeName();
-            if (!"reseau".equals(rootElement) && !"plan".equals(rootElement)) {
+            if (!"reseau".equals(rootElement)) {
                 throw new IllegalArgumentException(
                     "❌ Format XML incorrect : le fichier doit être un plan de ville.\n\n" +
-                    "Format attendu : <reseau> ou <plan>\n" +
+                    "Format attendu : <reseau>\n" +
                     "Format détecté : <" + rootElement + ">\n\n" +
                     "💡 Astuce : Vous avez peut-être chargé une demande de livraison au lieu d'un plan.\n" +
                     "   • Pour charger un plan : utilisez l'icône 🏠 (Charger Plan)\n" +
