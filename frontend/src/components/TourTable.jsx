@@ -22,7 +22,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
     const [hours, minutes] = deliveryRequestSet.warehouse.departureTime.split(':').map(Number);
     currentTimeMinutes = hours * 60 + minutes;
   } else {
-    currentTimeMinutes = 8 * 60; // 8h00 par défaut
+    currentTimeMinutes = 8 * 60; 
   }
   
   // Ajouter l'entrepôt au début
