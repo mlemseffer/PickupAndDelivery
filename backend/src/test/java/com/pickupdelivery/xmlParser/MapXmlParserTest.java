@@ -2,7 +2,6 @@ package com.pickupdelivery.xmlparser;
 
 import com.pickupdelivery.model.CityMap;
 import org.junit.jupiter.api.Test;
-import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,8 +17,10 @@ class MapXmlParserTest {
     @Test
     void testParseGrandPlan() throws Exception {
         // Arrange
-        ClassPathResource resource = new ClassPathResource("fichiersXMLPickupDelivery/grandPlan.xml");
-        byte[] content = resource.getInputStream().readAllBytes();
+        ClassLoader classLoader = getClass().getClassLoader();
+        java.io.InputStream inputStream = classLoader.getResourceAsStream("grandPlan.xml");
+        assertNotNull(inputStream, "Le fichier grandPlan.xml doit être présent dans src/test/resources");
+        byte[] content = inputStream.readAllBytes();
         MultipartFile file = new MockMultipartFile(
             "file",
             "grandPlan.xml",
@@ -36,7 +37,6 @@ class MapXmlParserTest {
         assertNotNull(map.getSegments());
         assertTrue(map.getNodes().size() > 0, "La carte doit contenir des nœuds");
         assertTrue(map.getSegments().size() > 0, "La carte doit contenir des segments");
-        
         System.out.println("✅ Nombre de nœuds : " + map.getNodes().size());
         System.out.println("✅ Nombre de segments : " + map.getSegments().size());
     }
@@ -44,8 +44,10 @@ class MapXmlParserTest {
     @Test
     void testParsePetitPlan() throws Exception {
         // Arrange
-        ClassPathResource resource = new ClassPathResource("fichiersXMLPickupDelivery/petitPlan.xml");
-        byte[] content = resource.getInputStream().readAllBytes();
+        ClassLoader classLoader = getClass().getClassLoader();
+        java.io.InputStream inputStream = classLoader.getResourceAsStream("petitPlan.xml");
+        assertNotNull(inputStream, "Le fichier petitPlan.xml doit être présent dans src/test/resources");
+        byte[] content = inputStream.readAllBytes();
         MultipartFile file = new MockMultipartFile(
             "file",
             "petitPlan.xml",
