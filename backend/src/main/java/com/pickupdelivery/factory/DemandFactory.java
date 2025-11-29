@@ -38,17 +38,6 @@ public class DemandFactory {
     }
     
     /**
-     * Crée une demande sans couleur (sera assignée par défaut)
-     */
-    public static Demand createDemand(String id, String pickupNodeId, String deliveryNodeId,
-                                     int pickupDurationSec, int deliveryDurationSec,
-                                     String courierId) {
-        return createDemand(id, pickupNodeId, deliveryNodeId, 
-                          pickupDurationSec, deliveryDurationSec, 
-                          courierId);
-    }
-    
-    /**
      * Valide l'identifiant de la demande
      * 
      * @param id L'identifiant à valider

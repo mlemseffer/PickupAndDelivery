@@ -19,13 +19,12 @@ class DemandFactoryTest {
         int pickupDuration = 300;
         int deliveryDuration = 480;
         String courierId = "courier-1";
-        String color = "#FF6B6B";
 
         // Act
         Demand demand = DemandFactory.createDemand(
             id, pickupNodeId, deliveryNodeId, 
             pickupDuration, deliveryDuration, 
-            courierId, color
+            courierId
         );
 
         // Assert
@@ -36,19 +35,6 @@ class DemandFactoryTest {
         assertEquals(pickupDuration, demand.getPickupDurationSec());
         assertEquals(deliveryDuration, demand.getDeliveryDurationSec());
         assertEquals(courierId, demand.getCourierId());
-        assertEquals(color, demand.getColor());
-    }
-
-    @Test
-    void testCreateDemand_WithoutColor_UsesDefault() {
-        // Act
-        Demand demand = DemandFactory.createDemand(
-            "demand-1", "node-1", "node-2", 300, 480, null
-        );
-
-        // Assert
-        assertNotNull(demand);
-        assertEquals("#FF6B6B", demand.getColor());
     }
 
     @Test
@@ -56,7 +42,7 @@ class DemandFactoryTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> DemandFactory.createDemand(null, "n1", "n2", 300, 480, null, "#FF6B6B")
+            () -> DemandFactory.createDemand(null, "n1", "n2", 300, 480, null)
         );
         assertTrue(exception.getMessage().contains("identifiant"));
     }
@@ -66,7 +52,7 @@ class DemandFactoryTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", null, "n2", 300, 480, null, "#FF6B6B")
+            () -> DemandFactory.createDemand("d1", null, "n2", 300, 480, null)
         );
         assertTrue(exception.getMessage().contains("pickup"));
     }
@@ -76,7 +62,7 @@ class DemandFactoryTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", "n1", null, 300, 480, null, "#FF6B6B")
+            () -> DemandFactory.createDemand("d1", "n1", null, 300, 480, null)
         );
         assertTrue(exception.getMessage().contains("delivery"));
     }
@@ -86,7 +72,7 @@ class DemandFactoryTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", "n1", "n1", 300, 480, null, "#FF6B6B")
+            () -> DemandFactory.createDemand("d1", "n1", "n1", 300, 480, null)
         );
         assertTrue(exception.getMessage().contains("différents"));
     }
@@ -96,7 +82,7 @@ class DemandFactoryTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", "n1", "n2", -100, 480, null, "#FF6B6B")
+            () -> DemandFactory.createDemand("d1", "n1", "n2", -100, 480, null)
         );
         assertTrue(exception.getMessage().contains("pickup"));
         assertTrue(exception.getMessage().contains("négative"));
@@ -106,7 +92,7 @@ class DemandFactoryTest {
     void testCreateDemand_ZeroPickupDuration_IsValid() {
         // La durée peut être 0 (pas d'attente)
         // Act
-        Demand demand = DemandFactory.createDemand("d1", "n1", "n2", 0, 480, null, "#FF6B6B");
+        Demand demand = DemandFactory.createDemand("d1", "n1", "n2", 0, 480, null);
         
         // Assert
         assertNotNull(demand);
@@ -118,7 +104,7 @@ class DemandFactoryTest {
         // Act & Assert
         IllegalArgumentException exception = assertThrows(
             IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", "n1", "n2", 300, -480, null, "#FF6B6B")
+            () -> DemandFactory.createDemand("d1", "n1", "n2", 300, -480, null)
         );
         assertTrue(exception.getMessage().contains("delivery"));
         assertTrue(exception.getMessage().contains("négative"));
@@ -128,7 +114,7 @@ class DemandFactoryTest {
     void testCreateDemand_ZeroDeliveryDuration_IsValid() {
         // La durée peut être 0 (pas d'attente)
         // Act
-        Demand demand = DemandFactory.createDemand("d1", "n1", "n2", 300, 0, null, "#FF6B6B");
+        Demand demand = DemandFactory.createDemand("d1", "n1", "n2", 300, 0, null);
         
         // Assert
         assertNotNull(demand);
@@ -136,47 +122,10 @@ class DemandFactoryTest {
     }
 
     @Test
-    void testCreateDemand_InvalidColorFormat_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", "n1", "n2", 300, 480, null, "FF6B6B")
-        );
-        assertTrue(exception.getMessage().contains("couleur"));
-    }
-
-    @Test
-    void testCreateDemand_InvalidColorFormat_ShortHex_ThrowsException() {
-        // Act & Assert
-        IllegalArgumentException exception = assertThrows(
-            IllegalArgumentException.class,
-            () -> DemandFactory.createDemand("d1", "n1", "n2", 300, 480, null, "#FFF")
-        );
-        assertTrue(exception.getMessage().contains("couleur"));
-    }
-
-    @Test
-    void testCreateDemand_ValidColorFormats() {
-        // Test various valid color formats
-        assertDoesNotThrow(() -> 
-            DemandFactory.createDemand("d1", "n1", "n2", 300, 480, null, "#FF6B6B")
-        );
-        assertDoesNotThrow(() -> 
-            DemandFactory.createDemand("d2", "n1", "n2", 300, 480, null, "#000000")
-        );
-        assertDoesNotThrow(() -> 
-            DemandFactory.createDemand("d3", "n1", "n2", 300, 480, null, "#FFFFFF")
-        );
-        assertDoesNotThrow(() -> 
-            DemandFactory.createDemand("d4", "n1", "n2", 300, 480, null, "#AbCdEf")
-        );
-    }
-
-    @Test
     void testCreateDemand_NullCourier_IsValid() {
         // Le courierId peut être null
         Demand demand = DemandFactory.createDemand(
-            "d1", "n1", "n2", 300, 480, null, "#FF6B6B"
+            "d1", "n1", "n2", 300, 480, null
         );
         assertNull(demand.getCourierId());
     }

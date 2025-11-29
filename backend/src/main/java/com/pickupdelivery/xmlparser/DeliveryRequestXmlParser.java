@@ -23,14 +23,6 @@ import java.util.UUID;
 @Component
 public class DeliveryRequestXmlParser {
 
-    // Palette de couleurs pour différencier les demandes
-    private static final String[] COLORS = {
-        "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
-        "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B739", "#52B788",
-        "#E63946", "#A8DADC", "#457B9D", "#F4A261", "#2A9D8F",
-        "#E76F51", "#264653", "#E9C46A", "#F4A259", "#BC4B51"
-    };
-
     /**
      * Parse un fichier XML contenant les demandes de livraison
      * @param file Le fichier XML uploadé
