@@ -1,5 +1,7 @@
 package com.pickupdelivery.xmlparser;
 
+import com.pickupdelivery.factory.DemandFactory;
+import com.pickupdelivery.factory.WarehouseFactory;
 import com.pickupdelivery.model.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -20,14 +22,6 @@ import java.util.UUID;
  */
 @Component
 public class DeliveryRequestXmlParser {
-
-    // Palette de couleurs pour différencier les demandes
-    private static final String[] COLORS = {
-        "#FF6B6B", "#4ECDC4", "#45B7D1", "#FFA07A", "#98D8C8",
-        "#F7DC6F", "#BB8FCE", "#85C1E2", "#F8B739", "#52B788",
-        "#E63946", "#A8DADC", "#457B9D", "#F4A261", "#2A9D8F",
-        "#E76F51", "#264653", "#E9C46A", "#F4A259", "#BC4B51"
-    };
 
     /**
      * Parse un fichier XML contenant les demandes de livraison
@@ -75,11 +69,24 @@ public class DeliveryRequestXmlParser {
                 );
             }
             
-            Warehouse warehouse = new Warehouse();
-            warehouse.setId(UUID.randomUUID().toString());
-            warehouse.setNodeId(adresseEntrepot);
-            warehouse.setDepartureTime(entrepotElement.getAttribute("heureDepart"));
-            requestSet.setWarehouse(warehouse);
+            // Utilisation de WarehouseFactory pour créer et valider l'entrepôt
+            String heureDepart = entrepotElement.getAttribute("heureDepart");
+            if (heureDepart == null || heureDepart.isEmpty()) {
+                heureDepart = "8:0:0"; // Valeur par défaut
+            }
+            
+            try {
+                Warehouse warehouse = WarehouseFactory.createWarehouse(
+                    UUID.randomUUID().toString(),
+                    adresseEntrepot,
+                    heureDepart
+                );
+                requestSet.setWarehouse(warehouse);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                    "❌ Validation de l'entrepôt échouée : " + e.getMessage()
+                );
+            }
 
             // Parser les demandes de livraison
             NodeList livraisonList = document.getElementsByTagName("livraison");
@@ -114,27 +121,30 @@ public class DeliveryRequestXmlParser {
                     );
                 }
                 
-                Demand demand = new Demand();
-                demand.setId(UUID.randomUUID().toString());
-                demand.setPickupNodeId(adresseEnlevement);
-                demand.setDeliveryNodeId(adresseLivraison);
-                
                 try {
-                    demand.setPickupDurationSec(Integer.parseInt(dureeEnlevement));
-                    demand.setDeliveryDurationSec(Integer.parseInt(dureeLivraison));
+                    int pickupDuration = Integer.parseInt(dureeEnlevement);
+                    int deliveryDuration = Integer.parseInt(dureeLivraison);
+                    
+                    Demand demand = DemandFactory.createDemand(
+                        UUID.randomUUID().toString(),
+                        adresseEnlevement,
+                        adresseLivraison,
+                        pickupDuration,
+                        deliveryDuration,
+                        null // courierId
+                    );
+                    
+                    demands.add(demand);
                 } catch (NumberFormatException e) {
                     throw new IllegalArgumentException(
                         "❌ Format XML incorrect : les durées de la livraison #" + (i + 1) + 
                         " doivent être des nombres entiers."
                     );
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                        "❌ Validation de la livraison #" + (i + 1) + " échouée : " + e.getMessage()
+                    );
                 }
-                
-                demand.setCourierId(null);
-                
-                // Assigner une couleur cyclique
-                demand.setColor(COLORS[i % COLORS.length]);
-                
-                demands.add(demand);
             }
             
             requestSet.setDemands(demands);

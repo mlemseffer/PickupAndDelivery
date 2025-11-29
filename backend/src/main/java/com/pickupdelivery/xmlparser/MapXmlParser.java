@@ -1,5 +1,7 @@
 package com.pickupdelivery.xmlparser;
 
+import com.pickupdelivery.factory.NodeFactory;
+import com.pickupdelivery.factory.SegmentFactory;
 import com.pickupdelivery.model.CityMap;
 import com.pickupdelivery.model.Node;
 import com.pickupdelivery.model.Segment;
@@ -81,11 +83,17 @@ public class MapXmlParser {
                 try {
                     double latitude = Double.parseDouble(latStr);
                     double longitude = Double.parseDouble(lonStr);
-                    map.getNodes().add(new Node(id, latitude, longitude));
+                    // Utilisation de NodeFactory pour créer et valider le nœud
+                    Node node = NodeFactory.createNode(id, latitude, longitude);
+                    map.getNodes().add(node);
                 } catch (NumberFormatException e) {
                     throw new IllegalArgumentException(
                         "❌ Format XML incorrect : les coordonnées du nœud #" + (i + 1) + 
                         " doivent être des nombres décimaux."
+                    );
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                        "❌ Validation du nœud #" + (i + 1) + " échouée : " + e.getMessage()
                     );
                 }
             }
@@ -113,12 +121,18 @@ public class MapXmlParser {
                 
                 try {
                     double length = Double.parseDouble(lengthStr);
-                    map.getSegments().add(new Segment(origin, destination, length, name));
+                    // Utilisation de SegmentFactory pour créer et valider le segment
+                    Segment segment = SegmentFactory.createSegment(origin, destination, length, name);
+                    map.getSegments().add(segment);
                 } catch (NumberFormatException e) {
                     throw new IllegalArgumentException(
                         "❌ Format XML incorrect : la longueur du tronçon #" + (i + 1) + 
                         " doit être un nombre décimal."
                     );
+                } catch (IllegalArgumentException e) {
+                    // Ignorer les segments invalides (ex: origine = destination)
+                    // et continuer le parsing
+                    System.err.println("⚠️  Segment #" + (i + 1) + " ignoré : " + e.getMessage());
                 }
             }
         }

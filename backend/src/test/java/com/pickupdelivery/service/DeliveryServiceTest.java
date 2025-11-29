@@ -143,7 +143,6 @@ class DeliveryServiceTest {
         demand1.setDeliveryNodeId("3");
         demand1.setPickupDurationSec(300);
         demand1.setDeliveryDurationSec(240);
-        demand1.setColor("#FF6B6B");
         demands.add(demand1);
         mockRequestSet.setDemands(demands);
 
