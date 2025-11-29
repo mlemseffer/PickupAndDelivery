@@ -1,5 +1,7 @@
 package com.pickupdelivery.xmlparser;
 
+import com.pickupdelivery.factory.DemandFactory;
+import com.pickupdelivery.factory.WarehouseFactory;
 import com.pickupdelivery.model.*;
 import org.springframework.stereotype.Component;
 import org.springframework.web.multipart.MultipartFile;
@@ -75,11 +77,24 @@ public class DeliveryRequestXmlParser {
                 );
             }
             
-            Warehouse warehouse = new Warehouse();
-            warehouse.setId(UUID.randomUUID().toString());
-            warehouse.setNodeId(adresseEntrepot);
-            warehouse.setDepartureTime(entrepotElement.getAttribute("heureDepart"));
-            requestSet.setWarehouse(warehouse);
+            // Utilisation de WarehouseFactory pour créer et valider l'entrepôt
+            String heureDepart = entrepotElement.getAttribute("heureDepart");
+            if (heureDepart == null || heureDepart.isEmpty()) {
+                heureDepart = "8:0:0"; // Valeur par défaut
+            }
+            
+            try {
+                Warehouse warehouse = WarehouseFactory.createWarehouse(
+                    UUID.randomUUID().toString(),
+                    adresseEntrepot,
+                    heureDepart
+                );
+                requestSet.setWarehouse(warehouse);
+            } catch (IllegalArgumentException e) {
+                throw new IllegalArgumentException(
+                    "❌ Validation de l'entrepôt échouée : " + e.getMessage()
+                );
+            }
 
             // Parser les demandes de livraison
             NodeList livraisonList = document.getElementsByTagName("livraison");
@@ -114,27 +129,30 @@ public class DeliveryRequestXmlParser {
                     );
                 }
                 
-                Demand demand = new Demand();
-                demand.setId(UUID.randomUUID().toString());
-                demand.setPickupNodeId(adresseEnlevement);
-                demand.setDeliveryNodeId(adresseLivraison);
-                
                 try {
-                    demand.setPickupDurationSec(Integer.parseInt(dureeEnlevement));
-                    demand.setDeliveryDurationSec(Integer.parseInt(dureeLivraison));
+                    int pickupDuration = Integer.parseInt(dureeEnlevement);
+                    int deliveryDuration = Integer.parseInt(dureeLivraison);
+                    
+                    Demand demand = DemandFactory.createDemand(
+                        UUID.randomUUID().toString(),
+                        adresseEnlevement,
+                        adresseLivraison,
+                        pickupDuration,
+                        deliveryDuration,
+                        null // courierId
+                    );
+                    
+                    demands.add(demand);
                 } catch (NumberFormatException e) {
                     throw new IllegalArgumentException(
                         "❌ Format XML incorrect : les durées de la livraison #" + (i + 1) + 
                         " doivent être des nombres entiers."
                     );
+                } catch (IllegalArgumentException e) {
+                    throw new IllegalArgumentException(
+                        "❌ Validation de la livraison #" + (i + 1) + " échouée : " + e.getMessage()
+                    );
                 }
-                
-                demand.setCourierId(null);
-                
-                // Assigner une couleur cyclique
-                demand.setColor(COLORS[i % COLORS.length]);
-                
-                demands.add(demand);
             }
             
             requestSet.setDemands(demands);

@@ -18,5 +18,4 @@ public class Demand {
     private int pickupDurationSec;    // dureePickupSec : int
     private int deliveryDurationSec;  // dureeDeliverySec : int
     private String courierId;         // idCourier : FK→Courier (nullable)
-    private String color;             // Couleur pour l'affichage sur la carte
 }
