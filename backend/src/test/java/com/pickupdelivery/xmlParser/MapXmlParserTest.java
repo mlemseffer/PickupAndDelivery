@@ -2,11 +2,9 @@ package com.pickupdelivery.xmlparser;
 
 import com.pickupdelivery.model.CityMap;
 import org.junit.jupiter.api.Test;
+import org.springframework.core.io.ClassPathResource;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.web.multipart.MultipartFile;
-
-import java.nio.file.Files;
-import java.nio.file.Paths;
 
 import static org.junit.jupiter.api.Assertions.*;
 
@@ -20,8 +18,8 @@ class MapXmlParserTest {
     @Test
     void testParseGrandPlan() throws Exception {
         // Arrange
-        String filePath = "c:\\Users\\Vostro 15 3000\\Desktop\\4IF\\AGILE\\moi\\PickupAndDelivery\\fichiersXMLPickupDelivery\\grandPlan.xml";
-        byte[] content = Files.readAllBytes(Paths.get(filePath));
+        ClassPathResource resource = new ClassPathResource("fichiersXMLPickupDelivery/grandPlan.xml");
+        byte[] content = resource.getInputStream().readAllBytes();
         MultipartFile file = new MockMultipartFile(
             "file",
             "grandPlan.xml",
@@ -46,8 +44,8 @@ class MapXmlParserTest {
     @Test
     void testParsePetitPlan() throws Exception {
         // Arrange
-        String filePath = "c:\\Users\\Vostro 15 3000\\Desktop\\4IF\\AGILE\\moi\\PickupAndDelivery\\fichiersXMLPickupDelivery\\petitPlan.xml";
-        byte[] content = Files.readAllBytes(Paths.get(filePath));
+        ClassPathResource resource = new ClassPathResource("fichiersXMLPickupDelivery/petitPlan.xml");
+        byte[] content = resource.getInputStream().readAllBytes();
         MultipartFile file = new MockMultipartFile(
             "file",
             "petitPlan.xml",
