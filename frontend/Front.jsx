@@ -285,13 +285,28 @@ export default function PickupDeliveryUI() {
       });
       // Rafraîchit la liste depuis le backend pour récupérer l'id et l'état à jour
       const requestSet = await apiService.getCurrentRequestSet();
-      setDeliveryRequestSet(requestSet);
+      
+      // Réassigner les couleurs dans le bon ordre
+      if (requestSet?.demands) {
+        const demandsWithColors = requestSet.demands.map((demand, index) => ({
+          ...demand,
+          color: getColorFromPalette(index)
+        }));
+        
+        setDeliveryRequestSet({
+          ...requestSet,
+          demands: demandsWithColors
+        });
+      } else {
+        setDeliveryRequestSet(requestSet);
+      }
     } catch (err) {
-      alert('Erreur lors de l’ajout manuel : ' + err.message);
+      alert('Erreur lors de l\'ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
     setSelectedNodeId(null);
     setMapSelectionType(null);
+    setSavedFormData(null);
   };
 
   // Gestion du démarrage de la sélection sur la carte

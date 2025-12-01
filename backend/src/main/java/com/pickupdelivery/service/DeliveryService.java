@@ -135,11 +135,8 @@ public class DeliveryService {
         throw new IllegalStateException("Livraison introuvable : " + deliveryId);
     }
 
-    // Supprimer les couleurs de toutes les demandes restantes
-    // Le frontend réattribuera les couleurs dans le bon ordre
-    for (com.pickupdelivery.model.Demand d : currentRequestSet.getDemands()) {
-        d.setColor(null);
-    }
+    // Note: Les couleurs sont gérées uniquement dans le frontend
+    // Le frontend réattribuera automatiquement les couleurs dans le bon ordre
 
     return currentRequestSet;
 }
