@@ -44,15 +44,30 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
   // Parser les trajets pour respecter l'ordre de passage réel
   if (tourData?.tour && tourData.tour.length > 0) {
     tourData.tour.forEach((trajet, index) => {
+      console.log(`📍 Trajet ${index + 1}:`, trajet);
+      console.log(`  - longueurTotale: ${trajet.longueurTotale} m`);
+      console.log(`  - segments: ${trajet.segments?.length || 0}`);
+      
+      // Calculer la longueur totale du trajet en additionnant tous les segments
+      let totalDistance = 0;
+      if (trajet.segments && trajet.segments.length > 0) {
+        totalDistance = trajet.segments.reduce((sum, segment) => sum + (segment.length || 0), 0);
+        console.log(`  - distance calculée depuis segments: ${totalDistance} m`);
+      } else if (trajet.longueurTotale) {
+        totalDistance = trajet.longueurTotale;
+      }
+      
       // Ajouter le temps de déplacement vers ce stop
-      if (trajet.longueurTotale) {
-        const travelTimeMinutes = trajet.longueurTotale / COURIER_SPEED_M_PER_MIN;
+      if (totalDistance > 0) {
+        const travelTimeMinutes = totalDistance / COURIER_SPEED_M_PER_MIN;
+        console.log(`  - temps de trajet: ${travelTimeMinutes.toFixed(2)} min`);
         currentTimeMinutes += travelTimeMinutes;
       }
       
       // Identifier le type de stop (pickup ou delivery)
       const stopNode = trajet.stopArrivee?.idNode;
       const stopType = trajet.stopArrivee?.typeStop;
+      console.log(`  - stopType: ${stopType}, stopNode: ${stopNode}`);
       
       if (stopType === 'PICKUP') {
         // Trouver la demande correspondante
@@ -168,8 +183,9 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
  * Formate une heure en minutes en format HHhMM
  */
 function formatTime(totalMinutes) {
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const roundedMinutes = Math.round(totalMinutes);
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
   return `${hours}h${minutes.toString().padStart(2, '0')}`;
 }
 
@@ -179,12 +195,13 @@ function formatTime(totalMinutes) {
  * @param {number} durationMinutes - Durée de l'activité en minutes
  */
 function formatTimeRange(startMinutes, durationMinutes) {
-  const startHours = Math.floor(startMinutes / 60);
-  const startMins = startMinutes % 60;
+  const roundedStartMinutes = Math.round(startMinutes);
+  const startHours = Math.floor(roundedStartMinutes / 60);
+  const startMins = roundedStartMinutes % 60;
   
-  const endMinutes = startMinutes + durationMinutes;
-  const endHours = Math.floor(endMinutes / 60);
-  const endMins = endMinutes % 60;
+  const roundedEndMinutes = Math.round(startMinutes + durationMinutes);
+  const endHours = Math.floor(roundedEndMinutes / 60);
+  const endMins = roundedEndMinutes % 60;
   
   return `${startHours}h${startMins.toString().padStart(2, '0')}-${endHours}h${endMins.toString().padStart(2, '0')}`;
 }
