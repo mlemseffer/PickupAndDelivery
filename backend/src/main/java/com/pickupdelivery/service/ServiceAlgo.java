@@ -230,6 +230,9 @@ public class ServiceAlgo {
 
     /**
      * Construit une liste d'adjacence à partir des segments de la carte
+     * 
+     * IMPORTANT: Le graphe est NON-DIRIGÉ (bidirectionnel)
+     * Chaque segment du XML représente une rue qui peut être empruntée dans les deux sens
      *
      * @param cityMap La carte de la ville
      * @return Une map où chaque nœud est associé à la liste de ses voisins avec les segments correspondants
@@ -238,8 +241,13 @@ public class ServiceAlgo {
         Map<String, List<SegmentInfo>> adjacencyList = new HashMap<>();
 
         for (Segment segment : cityMap.getSegments()) {
+            // Direction origine → destination
             adjacencyList.computeIfAbsent(segment.getOrigin(), k -> new ArrayList<>())
                     .add(new SegmentInfo(segment.getDestination(), segment));
+            
+            // Direction inverse: destination → origine (graphe non-dirigé)
+            adjacencyList.computeIfAbsent(segment.getDestination(), k -> new ArrayList<>())
+                    .add(new SegmentInfo(segment.getOrigin(), segment));
         }
 
         return adjacencyList;
@@ -763,20 +771,119 @@ public class ServiceAlgo {
     }
 
     // =========================================================================
+    // PHASE 4: OPTIMISATION 2-OPT
+    // =========================================================================
+
+    /**
+     * Optimise une tournée en utilisant l'algorithme 2-opt
+     * 
+     * L'algorithme 2-opt tente d'améliorer la tournée en éliminant les croisements:
+     * - Pour chaque paire de segments (i, i+1) et (k, k+1)
+     * - Teste si inverser le segment entre i+1 et k réduit la distance totale
+     * - Continue jusqu'à ce qu'aucune amélioration ne soit possible
+     * 
+     * CONTRAINTES:
+     * - Le premier et dernier stop (warehouse) ne sont jamais déplacés
+     * - Les contraintes de précédence (pickup avant delivery) doivent être respectées
+     * 
+     * @param route La tournée initiale à optimiser
+     * @param graph Le graphe contenant les distances
+     * @param pickupsByRequestId Map des pickups organisés par ID de demande
+     * @param deliveryByRequestId Map des deliveries organisés par ID de demande
+     * @return La tournée optimisée
+     */
+    private List<Stop> optimizeWith2Opt(
+            List<Stop> route,
+            Graph graph,
+            Map<String, List<Stop>> pickupsByRequestId,
+            Map<String, Stop> deliveryByRequestId
+    ) {
+        if (route == null || route.size() <= 3) {
+            // Une route avec 3 stops ou moins ne peut pas être optimisée par 2-opt
+            // (warehouse → stop → warehouse)
+            return route;
+        }
+
+        System.out.println("\n🔧 Phase 4: Optimisation 2-opt...");
+        
+        List<Stop> bestRoute = new ArrayList<>(route);
+        double bestDistance = computeRouteDistance(bestRoute, graph);
+        
+        System.out.println("   📏 Distance initiale: " + String.format("%.2f", bestDistance) + " m");
+        
+        boolean improved = true;
+        int iteration = 0;
+        int totalImprovements = 0;
+        
+        // Répéter jusqu'à ce qu'aucune amélioration ne soit trouvée
+        while (improved) {
+            improved = false;
+            iteration++;
+            
+            // Essayer toutes les paires de segments possibles
+            // Note: on ne touche pas au premier (0) et dernier stop (size-1) qui sont le warehouse
+            for (int i = 1; i < bestRoute.size() - 2; i++) {
+                for (int k = i + 1; k < bestRoute.size() - 1; k++) {
+                    // Tester le swap 2-opt
+                    List<Stop> newRoute = twoOptSwap(bestRoute, i, k);
+                    
+                    // Vérifier les contraintes de précédence
+                    if (!respectsPrecedence(newRoute, pickupsByRequestId, deliveryByRequestId)) {
+                        continue; // Ce swap viole les contraintes, on passe au suivant
+                    }
+                    
+                    // Calculer la nouvelle distance
+                    double newDistance = computeRouteDistance(newRoute, graph);
+                    
+                    // Si c'est mieux, on garde cette solution
+                    if (newDistance < bestDistance) {
+                        bestRoute = newRoute;
+                        bestDistance = newDistance;
+                        improved = true;
+                        totalImprovements++;
+                        
+                        System.out.println("   ✓ Amélioration trouvée (itération " + iteration + 
+                                         ", swap [" + i + ", " + k + "]): " + 
+                                         String.format("%.2f", newDistance) + " m " +
+                                         "(" + String.format("%.2f", (bestDistance - newDistance)) + " m gagnés)");
+                    }
+                }
+            }
+        }
+        
+        if (totalImprovements > 0) {
+            System.out.println("   ✓ Optimisation terminée après " + iteration + " itérations");
+            System.out.println("   ✓ Nombre total d'améliorations: " + totalImprovements);
+            System.out.println("   📏 Distance finale: " + String.format("%.2f", bestDistance) + " m");
+            
+            double initialDistance = computeRouteDistance(route, graph);
+            double gain = initialDistance - bestDistance;
+            double gainPercent = (gain / initialDistance) * 100;
+            
+            System.out.println("   🎯 Gain total: " + String.format("%.2f", gain) + " m " +
+                             "(" + String.format("%.1f", gainPercent) + "%)");
+        } else {
+            System.out.println("   ✓ Aucune amélioration trouvée (tournée déjà optimale)");
+        }
+        
+        return bestRoute;
+    }
+
+    // =========================================================================
     // PHASE 5: INTÉGRATION - MÉTHODE PRINCIPALE DE CALCUL DE TOURNÉE
     // =========================================================================
 
     /**
      * Calcule les tournées optimales pour un nombre donné de livreurs
      * 
-     * IMPLÉMENTATION ACTUELLE: Algorithme glouton uniquement (1 livreur)
+     * IMPLÉMENTATION ACTUELLE: Algorithme glouton + optimisation 2-opt (1 livreur)
      * - Utilise l'algorithme du plus proche voisin pour construire une tournée initiale
+     * - Applique l'optimisation 2-opt pour améliorer la solution
      * - Respecte les contraintes de précédence (pickup avant delivery)
      * - Retourne une liste contenant une seule tournée
      * 
      * AMÉLIORATIONS FUTURES:
      * - Support multi-livreurs (clustering des demandes)
-     * - Optimisation 2-opt pour améliorer la qualité de la solution
      * - Fenêtres horaires et autres contraintes
      * 
      * @param graph Le graphe contenant les distances et chemins entre tous les stops
@@ -807,7 +914,7 @@ public class ServiceAlgo {
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
-        System.out.println("║     CALCUL DE TOURNÉE OPTIMALE - ALGORITHME GLOUTON           ║");
+        System.out.println("║     CALCUL DE TOURNÉE OPTIMALE - GLOUTON + 2-OPT             ║");
         System.out.println("╚════════════════════════════════════════════════════════════════╝");
         
         System.out.println("\n📊 Phase 1: Préparation des données...");
@@ -842,34 +949,45 @@ public class ServiceAlgo {
         System.out.println("   ✓ Tournée construite en " + elapsedTime + " ms");
         System.out.println("   ✓ Nombre de stops dans la tournée: " + initialRoute.size());
         System.out.println("   ✓ Ordre de visite: " + formatRouteForLog(initialRoute));
-
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 4️⃣ VALIDATION ET CALCUL DE DISTANCE (PHASE 2)
-        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        
-        System.out.println("\n✅ Phase 2: Validation et calcul de distance...");
         
         double initialDistance = computeRouteDistance(initialRoute, graph);
-        boolean isValid = respectsPrecedence(initialRoute, pickupsByRequestId, deliveryByRequestId);
+        System.out.println("   📏 Distance de la tournée gloutonne: " + String.format("%.2f", initialDistance) + " m");
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 4️⃣ OPTIMISATION 2-OPT (PHASE 4)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        List<Stop> optimizedRoute = optimizeWith2Opt(initialRoute, graph, pickupsByRequestId, deliveryByRequestId);
+        
+        System.out.println("   ✓ Ordre de visite après optimisation: " + formatRouteForLog(optimizedRoute));
+
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 5️⃣ VALIDATION ET CALCUL DE DISTANCE FINALE (PHASE 2)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n✅ Phase 5: Validation finale et calcul de distance...");
+        
+        double finalDistance = computeRouteDistance(optimizedRoute, graph);
+        boolean isValid = respectsPrecedence(optimizedRoute, pickupsByRequestId, deliveryByRequestId);
         
         if (!isValid) {
             throw new AlgorithmException(
                 AlgorithmException.ErrorType.PRECEDENCE_VIOLATION,
-                "La tournée construite ne respecte pas les contraintes de précédence. " +
+                "La tournée optimisée ne respecte pas les contraintes de précédence. " +
                 "Une delivery a été placée avant son pickup correspondant."
             );
         }
         
-        System.out.println("   ✓ Distance totale: " + String.format("%.2f", initialDistance) + " m");
+        System.out.println("   ✓ Distance totale: " + String.format("%.2f", finalDistance) + " m");
         System.out.println("   ✓ Contraintes de précédence: RESPECTÉES");
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 5️⃣ CONSTRUCTION DE L'OBJET TOUR
+        // 6️⃣ CONSTRUCTION DE L'OBJET TOUR
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
-        System.out.println("\n📦 Phase 5: Construction de l'objet Tour...");
+        System.out.println("\n📦 Phase 6: Construction de l'objet Tour...");
         
-        com.pickupdelivery.model.AlgorithmModel.Tour tour = buildTour(initialRoute, initialDistance, graph);
+        com.pickupdelivery.model.AlgorithmModel.Tour tour = buildTour(optimizedRoute, finalDistance, graph);
         tour.setCourierId(DEFAULT_COURIER_ID);
         
         System.out.println("   ✓ Tour créé avec succès");
@@ -877,17 +995,26 @@ public class ServiceAlgo {
         System.out.println("   ✓ Nombre de trajets: " + tour.getTrajets().size());
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-        // 6️⃣ RÉSUMÉ ET RETOUR
+        // 7️⃣ RÉSUMÉ ET RETOUR
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        long totalTime = System.currentTimeMillis() - startTime;
         
         System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
         System.out.println("║                    RÉSULTAT DU CALCUL                          ║");
         System.out.println("╠════════════════════════════════════════════════════════════════╣");
-        System.out.println("║  Distance totale : " + String.format("%10.2f", initialDistance) + " m                          ║");
-        System.out.println("║  Nombre de stops : " + String.format("%10d", initialRoute.size()) + "                                ║");
-        System.out.println("║  Demandes        : " + String.format("%10d", pickupsByRequestId.size()) + "                                ║");
-        System.out.println("║  Temps de calcul : " + String.format("%10d", elapsedTime) + " ms                             ║");
-        System.out.println("║  Algorithme      : Glouton (plus proche voisin)              ║");
+        System.out.println("║  Distance initiale (glouton) : " + String.format("%10.2f", initialDistance) + " m              ║");
+        System.out.println("║  Distance finale (2-opt)     : " + String.format("%10.2f", finalDistance) + " m              ║");
+        
+        double gain = initialDistance - finalDistance;
+        double gainPercent = (gain / initialDistance) * 100;
+        
+        System.out.println("║  Gain d'optimisation         : " + String.format("%10.2f", gain) + " m              ║");
+        System.out.println("║  Amélioration                : " + String.format("%9.1f", gainPercent) + " %                ║");
+        System.out.println("║  Nombre de stops             : " + String.format("%10d", optimizedRoute.size()) + "                    ║");
+        System.out.println("║  Demandes                    : " + String.format("%10d", pickupsByRequestId.size()) + "                    ║");
+        System.out.println("║  Temps de calcul total       : " + String.format("%10d", totalTime) + " ms                 ║");
+        System.out.println("║  Algorithme                  : Glouton + 2-opt                ║");
         System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
         
         return Arrays.asList(tour);
