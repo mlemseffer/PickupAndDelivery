@@ -193,7 +193,7 @@ export default function PickupDeliveryUI() {
   };
 
   // Gestion de la mise à jour des demandes (suppression, etc.)
-  const handleDeliveryRequestSetUpdated = (updatedSet) => {
+  const handleDeliveryRequestSetUpdated = async (updatedSet) => {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
     
     // Réassigner les couleurs dans le bon ordre après modification
@@ -207,8 +207,41 @@ export default function PickupDeliveryUI() {
         ...updatedSet,
         demands: demandsWithColors
       });
+
+      // ✅ Recalculer automatiquement si une tournée était déjà calculée
+      if (tourData && demandsWithColors.length > 0) {
+        console.log('🔄 Recalcul automatique de la tournée après modification des demandes...');
+        setIsCalculatingTour(true);
+        
+        try {
+          const result = await apiService.calculateTour(courierCount);
+          
+          if (result.success && result.data && result.data.length > 0) {
+            const tour = result.data[0];
+            const newTourData = {
+              tour: tour.trajets || tour.segments || tour.path || [],
+              metrics: {
+                stopCount: tour.stops?.length || 0,
+                totalDistance: tour.totalDistance || 0,
+                segmentCount: (tour.trajets || tour.segments || tour.path || []).length
+              }
+            };
+            
+            setTourData(newTourData);
+            console.log('✅ Tournée recalculée automatiquement');
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors du recalcul automatique:', error);
+        } finally {
+          setIsCalculatingTour(false);
+        }
+      }
     } else {
       setDeliveryRequestSet(updatedSet);
+      // Si plus aucune demande, réinitialiser la tournée
+      if (tourData) {
+        setTourData(null);
+      }
     }
   };
 
