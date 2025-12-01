@@ -118,6 +118,12 @@ export default function PickupDeliveryUI() {
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null);
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
+  
+  // États pour la sélection sur la carte
+  const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
+  const [mapSelectionType, setMapSelectionType] = useState(null); // 'pickup' ou 'delivery'
+  const [selectedNodeId, setSelectedNodeId] = useState(null);
+  const [savedFormData, setSavedFormData] = useState(null); // Pour sauvegarder les données du formulaire
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -164,7 +170,21 @@ export default function PickupDeliveryUI() {
   // Gestion de la mise à jour des demandes (suppression, etc.)
   const handleDeliveryRequestSetUpdated = (updatedSet) => {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
-    setDeliveryRequestSet(updatedSet);
+    
+    // Réassigner les couleurs dans le bon ordre après modification
+    if (updatedSet?.demands) {
+      const demandsWithColors = updatedSet.demands.map((demand, index) => ({
+        ...demand,
+        color: getColorFromPalette(index)
+      }));
+      
+      setDeliveryRequestSet({
+        ...updatedSet,
+        demands: demandsWithColors
+      });
+    } else {
+      setDeliveryRequestSet(updatedSet);
+    }
   };
 
   // Gestion du chargement des demandes de livraison
@@ -270,18 +290,39 @@ export default function PickupDeliveryUI() {
       alert('Erreur lors de l’ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
+    setSelectedNodeId(null);
+    setMapSelectionType(null);
+  };
+
+  // Gestion du démarrage de la sélection sur la carte
+  const handleStartMapSelection = (type, formData) => {
+    setSavedFormData(formData); // Sauvegarder les données du formulaire
+    setMapSelectionType(type);
+    setIsMapSelectionActive(true);
+    setShowManualForm(false); // Fermer le formulaire
+  };
+
+  // Gestion du clic sur un segment de la carte
+  const handleMapSegmentClick = (nodeId) => {
+    if (isMapSelectionActive) {
+      setSelectedNodeId(nodeId);
+      setIsMapSelectionActive(false);
+      setShowManualForm(true); // Rouvrir le formulaire
+    }
   };
 
   return (
     <div className="h-screen bg-gray-800 text-white flex flex-col overflow-hidden">
       {/* Navigation Bar avec titre intégré */}
-      <Navigation 
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        showMapMessage={showMessage}
-        hasMap={mapData !== null}
-        onLoadDeliveryRequests={() => setShowDeliveryUpload(true)}
-      />
+      <div className={isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}>
+        <Navigation 
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          showMapMessage={showMessage}
+          hasMap={mapData !== null}
+          onLoadDeliveryRequests={() => setShowDeliveryUpload(true)}
+        />
+      </div>
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -317,8 +358,17 @@ export default function PickupDeliveryUI() {
         {showManualForm && mapData && (
           <ManualDeliveryForm 
             onAdd={handleManualDemandAdd}
-            onCancel={() => setShowManualForm(false)}
+            onCancel={() => {
+              setShowManualForm(false);
+              setSelectedNodeId(null);
+              setMapSelectionType(null);
+              setSavedFormData(null);
+            }}
             availableNodes={mapData.nodes}
+            onStartMapSelection={handleStartMapSelection}
+            selectedNodeId={selectedNodeId}
+            mapSelectionType={mapSelectionType}
+            savedFormData={savedFormData}
           />
         )}
 
@@ -346,11 +396,13 @@ export default function PickupDeliveryUI() {
                   deliveryRequestSet={deliveryRequestSet}
                   onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
                   tourData={tourData}
+                  onSegmentClick={handleMapSegmentClick}
+                  isMapSelectionActive={isMapSelectionActive}
                 />
               </div>
               
               {/* Panneau droit avec informations et boutons */}
-              <div className="flex-1 flex flex-col gap-4 min-h-0">
+              <div className={`flex-1 flex flex-col gap-4 min-h-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
                 {/* Tableau de tournée */}
                 <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 overflow-hidden">
                   <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
@@ -389,8 +441,9 @@ export default function PickupDeliveryUI() {
                       {/* Bouton Ajouter Pickup&Delivery (manuel) */}
                       <button 
                         onClick={handleAddDeliveryManually}
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                        title="Ajouter manuellement une demande de livraison"
+                        disabled={!deliveryRequestSet}
+                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                        title={!deliveryRequestSet ? "Chargez d'abord des demandes de livraison" : "Ajouter manuellement une demande de livraison"}
                       >
                         Ajouter Pickup&Delivery
                       </button>

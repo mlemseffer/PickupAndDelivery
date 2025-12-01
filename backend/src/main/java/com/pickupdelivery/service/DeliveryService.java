@@ -113,6 +113,7 @@ public class DeliveryService {
 
     /**
      * Supprime une demande de livraison par son id
+     * Supprime également les couleurs de toutes les demandes
      * @param deliveryId L'id de la demande à supprimer
      * @return L'ensemble des demandes mis à jour
      * @throws IllegalStateException Si la demande n'existe pas
@@ -132,6 +133,12 @@ public class DeliveryService {
 
     if (!removed) {
         throw new IllegalStateException("Livraison introuvable : " + deliveryId);
+    }
+
+    // Supprimer les couleurs de toutes les demandes restantes
+    // Le frontend réattribuera les couleurs dans le bon ordre
+    for (com.pickupdelivery.model.Demand d : currentRequestSet.getDemands()) {
+        d.setColor(null);
     }
 
     return currentRequestSet;
