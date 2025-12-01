@@ -35,7 +35,8 @@ export default function MapViewer({
   tourData, 
   onDeliveryRequestSetUpdated,
   onSegmentClick,
-  isMapSelectionActive 
+  isMapSelectionActive,
+  isAddingManually 
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTour, setCurrentTour] = useState(null);
@@ -144,16 +145,20 @@ export default function MapViewer({
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {isFullscreen ? "Réduire" : "Plein écran"}
             </button>
-            <ModifyTourButton 
-              tourData={currentTour}
-              mapData={mapData}
-              deliveries={deliveries}
-              onTourUpdated={setCurrentTour}
-              onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
-            />
+            <div className={isAddingManually ? 'pointer-events-none opacity-50' : ''}>
+              <ModifyTourButton 
+                tourData={currentTour}
+                mapData={mapData}
+                deliveries={deliveries}
+                onTourUpdated={setCurrentTour}
+                onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
+              />
+            </div>
             <button
               onClick={onClearMap}
-              className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"
+              disabled={isAddingManually}
+              className="bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-1 rounded text-sm transition-colors"
+              title={isAddingManually ? "Terminez d'abord l'ajout en cours" : "Nouvelle carte"}
             >
               Nouvelle carte
             </button>

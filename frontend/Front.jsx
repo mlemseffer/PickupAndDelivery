@@ -125,6 +125,9 @@ export default function PickupDeliveryUI() {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [savedFormData, setSavedFormData] = useState(null); // Pour sauvegarder les données du formulaire
 
+  // État pour savoir si on est en mode ajout manuel (formulaire ouvert ou sélection active)
+  const isAddingManually = showManualForm || isMapSelectionActive;
+
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -413,6 +416,7 @@ export default function PickupDeliveryUI() {
                   tourData={tourData}
                   onSegmentClick={handleMapSegmentClick}
                   isMapSelectionActive={isMapSelectionActive}
+                  isAddingManually={isAddingManually}
                 />
               </div>
               
