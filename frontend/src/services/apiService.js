@@ -135,20 +135,35 @@ class ApiService {
   }
 
   /**
-   * Calcule une tournée optimisée
-   * @param {string} warehouseAddress - L'adresse de l'entrepôt
-   * @returns {Promise} La tournée optimisée
+   * Calcule une tournée optimisée pour un nombre de livreurs donné
+   * @param {number} courierCount - Nombre de livreurs (actuellement seul 1 est supporté)
+   * @returns {Promise} La tournée calculée avec tous les trajets
    */
-  async calculateTour(warehouseAddress) {
+  async calculateTour(courierCount = 1) {
     const response = await fetch(
-      `${API_BASE_URL}/tours/calculate?warehouseAddress=${encodeURIComponent(warehouseAddress)}`,
+      `${API_BASE_URL}/tours/calculate?courierCount=${courierCount}`,
       {
         method: 'POST',
       }
     );
 
     if (!response.ok) {
-      throw new Error('Erreur lors du calcul de la tournée');
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Erreur lors du calcul de la tournée');
+    }
+
+    return response.json();
+  }
+
+  /**
+   * Vérifie le statut de disponibilité pour calculer une tournée
+   * @returns {Promise} Le statut (ready, mapLoaded, requestsLoaded, stopCount)
+   */
+  async getTourStatus() {
+    const response = await fetch(`${API_BASE_URL}/tours/status`);
+    
+    if (!response.ok) {
+      throw new Error('Erreur lors de la vérification du statut');
     }
 
     return response.json();

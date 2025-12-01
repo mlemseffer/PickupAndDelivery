@@ -25,6 +25,10 @@ public class MapService {
      * @throws Exception Si le parsing échoue
      */
     public CityMap parseMapFromXML(MultipartFile file) throws Exception {
+        if (file == null) {
+            throw new IllegalArgumentException("File cannot be null");
+        }
+
         // Déléguer le parsing au MapXmlParser
         CityMap map = mapXmlParser.parseMapFromXML(file);
         this.currentMap = map;

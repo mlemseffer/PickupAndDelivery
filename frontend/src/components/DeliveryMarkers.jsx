@@ -80,10 +80,10 @@ export default function DeliveryMarkers({ requestSet, nodesById }) {
           icon={warehouseIcon}
         >
           <Popup>
-            <div className="text-gray-900">
+            <div style={{ color: '#1a202c' }}>
               <strong className="text-lg">🏢 Entrepôt</strong><br />
-              <strong>Heure de départ:</strong> {warehouse.departureTime}<br />
-              <strong>Nœud:</strong> {warehouse.nodeId}
+              <strong style={{ color: '#ffffff' }}>Heure de départ:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.departureTime}</strong><br />
+              <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.nodeId}</strong>
             </div>
           </Popup>
         </Marker>
@@ -104,13 +104,12 @@ export default function DeliveryMarkers({ requestSet, nodesById }) {
                 icon={createPickupIcon(color)}
               >
                 <Popup>
-                  <div className="text-gray-900">
+                  <div style={{ color: '#1a202c' }}>
                     <strong className="text-lg" style={{ color }}>
                       📦 Pickup #{index + 1}
                     </strong><br />
-                    <strong>Durée:</strong> {demand.pickupDurationSec} sec<br />
-                    <strong>Nœud:</strong> {demand.pickupNodeId}<br />
-                    <strong>Statut:</strong> {demand.status}
+                    <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupDurationSec} sec</strong><br />
+                    <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupNodeId}</strong>
                   </div>
                 </Popup>
               </Marker>
@@ -123,13 +122,12 @@ export default function DeliveryMarkers({ requestSet, nodesById }) {
                 icon={createDeliveryIcon(color)}
               >
                 <Popup>
-                  <div className="text-gray-900">
+                  <div style={{ color: '#1a202c' }}>
                     <strong className="text-lg" style={{ color }}>
                       📍 Delivery #{index + 1}
                     </strong><br />
-                    <strong>Durée:</strong> {demand.deliveryDurationSec} sec<br />
-                    <strong>Nœud:</strong> {demand.deliveryNodeId}<br />
-                    <strong>Statut:</strong> {demand.status}
+                    <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryDurationSec} sec</strong><br />
+                    <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryNodeId}</strong>
                   </div>
                 </Popup>
               </Marker>

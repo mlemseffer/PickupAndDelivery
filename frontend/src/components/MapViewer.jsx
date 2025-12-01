@@ -3,6 +3,7 @@ import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet'
 import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
 import ModifyTourButton from './ModifyTourButton';
+import TourSegments from './TourSegments';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -26,7 +27,8 @@ function MapResizer() {
 /**
  * Composant pour afficher la carte avec Leaflet
  */
-export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, onDeliveryRequestSetUpdated }) {
+
+export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tourData, onDeliveryRequestSetUpdated }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTour, setCurrentTour] = useState(null);
   const mapContainerRef = useRef(null);
@@ -103,9 +105,16 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, onD
     <div ref={mapContainerRef} className="flex-1 flex flex-col bg-gray-700">
       <div className="p-3 bg-gray-600 border-b border-gray-500">
         <div className="flex justify-between items-center">
-          <h3 className="text-sm font-semibold">
-            {mapData.nodes?.length || 0} intersections, {mapData.segments?.length || 0} tronçons
-          </h3>
+          <div>
+            <h3 className="text-sm font-semibold">
+              {mapData.nodes?.length || 0} intersections, {mapData.segments?.length || 0} tronçons
+            </h3>
+            {tourData && tourData.metrics && (
+              <p className="text-xs text-green-400 mt-1">
+                🚴 Tournée: {tourData.metrics.stopCount} stops, {tourData.metrics.totalDistance.toFixed(2)} m
+              </p>
+            )}
+          </div>
           <div className="flex gap-2">
             <button
               onClick={toggleFullscreen}
@@ -188,6 +197,14 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, onD
           {deliveryRequestSet && (
             <DeliveryMarkers 
               requestSet={deliveryRequestSet} 
+              nodesById={nodesById}
+            />
+          )}
+
+          {/* Affichage de la tournée calculée (segments jaunes numérotés) */}
+          {tourData && (
+            <TourSegments 
+              tourData={tourData}
               nodesById={nodesById}
             />
           )}

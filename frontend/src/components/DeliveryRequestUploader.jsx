@@ -127,7 +127,7 @@ export default function DeliveryRequestUploader({ onRequestsLoaded, onCancel }) 
         {/* Message d'erreur */}
         {error && (
           <div className="mt-4 bg-red-900/30 border border-red-500 rounded p-4 text-red-200">
-            {error}
+            <div className="whitespace-pre-line">{error}</div>
           </div>
         )}
 
