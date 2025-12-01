@@ -71,9 +71,7 @@ public class DeliveryService {
             demand.setDeliveryNodeId(request.getDeliveryAddress());
             demand.setPickupDurationSec(request.getPickupDuration());
             demand.setDeliveryDurationSec(request.getDeliveryDuration());
-            demand.setStatus(com.pickupdelivery.model.DemandStatus.NON_TRAITEE);
             demand.setCourierId(null);
-            demand.setColor("#" + Integer.toHexString((int)(Math.random()*16777215)));
             currentRequestSet.getDemands().add(demand);
         }
     }

@@ -1,7 +1,6 @@
 package com.pickupdelivery.controller;
 
 import com.pickupdelivery.dto.*;
-import com.pickupdelivery.model.Tour;
 import com.pickupdelivery.service.TourService;
 import com.pickupdelivery.dto.ApiResponse;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
@@ -38,6 +37,9 @@ public class TourController {
 
     @Autowired
     private MapService mapService;
+
+    @Autowired
+    private TourService tourService;
 
     /**
      * Calcule une tournée optimisée pour un nombre donné de livreurs
@@ -296,9 +298,9 @@ public class TourController {
      * @return La tournée du coursier
      */
     @GetMapping("/{courierId}")
-    public ResponseEntity<ApiResponse<Tour>> getTourByCourier(@PathVariable String courierId) {
+    public ResponseEntity<ApiResponse<com.pickupdelivery.model.Tour>> getTourByCourier(@PathVariable String courierId) {
         try {
-            Tour tour = tourService.getTourByCourier(courierId);
+            com.pickupdelivery.model.Tour tour = tourService.getTourByCourier(courierId);
             if (tour != null) {
                 return ResponseEntity.ok(ApiResponse.success("Tournée récupérée", tour));
             } else {
@@ -321,7 +323,7 @@ public class TourController {
     @PostMapping("/save/{courierId}")
     public ResponseEntity<ApiResponse<Void>> saveTour(
             @PathVariable String courierId,
-            @RequestBody Tour tour) {
+            @RequestBody com.pickupdelivery.model.Tour tour) {
         try {
             tourService.saveTour(courierId, tour);
             return ResponseEntity.ok(ApiResponse.success("Tournée sauvegardée avec succès", null));
