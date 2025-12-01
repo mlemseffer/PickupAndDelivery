@@ -11,6 +11,28 @@ import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
 /**
+ * Génère le contenu texte de l'itinéraire
+ */
+function generateItineraryText(tourData) {
+  let content = '=== ITINÉRAIRE DE LIVRAISON ===\n\n';
+  content += `Nombre de segments: ${tourData.tour?.length || 0}\n`;
+  content += `Distance totale: ${tourData.metrics?.totalDistance?.toFixed(2) || 0} m\n`;
+  content += `Nombre de stops: ${tourData.metrics?.stopCount || 0}\n\n`;
+  content += '=== TRAJETS ===\n\n';
+
+  if (tourData.tour && Array.isArray(tourData.tour)) {
+    tourData.tour.forEach((trajet, index) => {
+      content += `${index + 1}. ${trajet.nomRue || 'Segment'}\n`;
+      content += `   De: ${trajet.origine || 'N/A'}\n`;
+      content += `   À: ${trajet.destination || 'N/A'}\n`;
+      content += `   Longueur: ${(trajet.longueur || 0).toFixed(2)} m\n\n`;
+    });
+  }
+
+  return content;
+}
+
+/**
  * Convertit une couleur HSL en format hexadécimal
  */
 function hslToHex(h, s, l) {
@@ -479,20 +501,78 @@ export default function PickupDeliveryUI() {
                       </button>
                     </div>
                   ) : (
-                    // Boutons après calcul de tournée
-                    <TourActions 
-                      tourData={tourData}
-                      onModify={() => {
-                        // TODO: Implémenter la modification de tournée
-                        alert('Fonctionnalité de modification à implémenter');
-                      }}
-                      onSaveItinerary={() => {
-                        console.log('Itinéraire sauvegardé');
-                      }}
-                      onSaveTour={() => {
-                        console.log('Tournée sauvegardée');
-                      }}
-                    />
+                    // Boutons après calcul de tournée (4 boutons sur 2 lignes)
+                    <div className="flex flex-col gap-3">
+                      {/* Première ligne : Ajouter et Calculer tournée */}
+                      <div className="flex gap-3">
+                        <button 
+                          onClick={handleAddDeliveryManually}
+                          className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                                   flex items-center justify-center gap-2"
+                          title="Ajouter une nouvelle demande de livraison"
+                        >
+                          ➕ Ajouter Pickup&Delivery
+                        </button>
+
+                        <button
+                          onClick={handleCalculateTour}
+                          disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                                   flex items-center justify-center gap-2"
+                          title="Calculer la tournée optimale"
+                        >
+                          {isCalculatingTour ? 'Calcul en cours...' : '🧮 Calculer tournée'}
+                        </button>
+                      </div>
+                      
+                      {/* Deuxième ligne : Sauvegarder */}
+                      <div className="flex gap-3">
+                        <button
+                          onClick={() => {
+                            const content = generateItineraryText(tourData);
+                            const blob = new Blob([content], { type: 'text/plain' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `itineraire_${new Date().toISOString().split('T')[0]}.txt`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          }}
+                          disabled={!tourData}
+                          className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                                   flex items-center justify-center gap-2"
+                          title="Sauvegarder l'itinéraire en fichier texte"
+                        >
+                          📄 Sauvegarder itinéraire
+                        </button>
+
+                        <button
+                          onClick={() => {
+                            const tourJson = JSON.stringify(tourData, null, 2);
+                            const blob = new Blob([tourJson], { type: 'application/json' });
+                            const url = URL.createObjectURL(blob);
+                            const link = document.createElement('a');
+                            link.href = url;
+                            link.download = `tournee_${new Date().toISOString().split('T')[0]}.json`;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                            URL.revokeObjectURL(url);
+                          }}
+                          disabled={!tourData}
+                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                                   flex items-center justify-center gap-2"
+                          title="Sauvegarder la tournée complète (JSON)"
+                        >
+                          💾 Sauvegarder Tournée
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
               </div>
