@@ -16,6 +16,8 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
   // Créer la liste des stops avec leurs informations
   const stops = [];
   let currentTimeMinutes = 0; // Temps cumulé en minutes depuis le départ
+  const COURIER_SPEED_KMH = 15; // Vitesse constante du livreur en km/h
+  const COURIER_SPEED_M_PER_MIN = (COURIER_SPEED_KMH * 1000) / 60; // Conversion en mètres par minute
   
   // Parser l'heure de départ de l'entrepôt
   if (deliveryRequestSet?.warehouse?.departureTime) {
@@ -24,7 +26,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
   } else {
     currentTimeMinutes = 8 * 60; 
   }
-  
+
   // Ajouter l'entrepôt au début
   if (deliveryRequestSet?.warehouse) {
     stops.push({
@@ -39,55 +41,68 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
     });
   }
 
-  // TODO: Analyser les trajets pour extraire les pickups et deliveries dans l'ordre réel
-  // Pour l'instant, on affiche basé sur les demandes
-  if (deliveryRequestSet?.demands) {
-    deliveryRequestSet.demands.forEach((demand, index) => {
-      // Pickup avec sa vraie durée
-      const pickupDurationMin = Math.round((demand.pickupDurationSec || 0) / 60);
-      stops.push({
-        order: stops.length + 1,
-        type: 'P',
-        icon: '📦',
-        time: formatTimeRange(currentTimeMinutes, pickupDurationMin),
-        nodeId: demand.pickupNodeId,
-        demandId: demand.id,
-        color: demand.color || '#3B82F6',
-        durationSec: demand.pickupDurationSec || 0
-      });
-      currentTimeMinutes += pickupDurationMin;
+  // Parser les trajets pour respecter l'ordre de passage réel
+  if (tourData?.tour && tourData.tour.length > 0) {
+    tourData.tour.forEach((trajet, index) => {
+      // Ajouter le temps de déplacement vers ce stop
+      if (trajet.longueurTotale) {
+        const travelTimeMinutes = trajet.longueurTotale / COURIER_SPEED_M_PER_MIN;
+        currentTimeMinutes += travelTimeMinutes;
+      }
       
-      // Delivery avec sa vraie durée
-      const deliveryDurationMin = Math.round((demand.deliveryDurationSec || 0) / 60);
-      stops.push({
-        order: stops.length + 1,
-        type: 'D',
-        icon: '📍',
-        time: formatTimeRange(currentTimeMinutes, deliveryDurationMin),
-        nodeId: demand.deliveryNodeId,
-        demandId: demand.id,
-        color: demand.color || '#3B82F6',
-        durationSec: demand.deliveryDurationSec || 0
-      });
-      currentTimeMinutes += deliveryDurationMin;
+      // Identifier le type de stop (pickup ou delivery)
+      const stopNode = trajet.stopArrivee?.idNode;
+      const stopType = trajet.stopArrivee?.typeStop;
+      
+      if (stopType === 'PICKUP') {
+        // Trouver la demande correspondante
+        const demand = deliveryRequestSet?.demands?.find(d => d.pickupNodeId === stopNode);
+        if (demand) {
+          const pickupDurationMin = (demand.pickupDurationSec || 0) / 60;
+          stops.push({
+            order: stops.length + 1,
+            type: 'P',
+            icon: '📦',
+            time: formatTimeRange(currentTimeMinutes, pickupDurationMin),
+            nodeId: stopNode,
+            demandId: demand.id,
+            color: demand.color || '#3B82F6',
+            durationSec: demand.pickupDurationSec || 0
+          });
+          currentTimeMinutes += pickupDurationMin;
+        }
+      } else if (stopType === 'DELIVERY') {
+        // Trouver la demande correspondante
+        const demand = deliveryRequestSet?.demands?.find(d => d.deliveryNodeId === stopNode);
+        if (demand) {
+          const deliveryDurationMin = (demand.deliveryDurationSec || 0) / 60;
+          stops.push({
+            order: stops.length + 1,
+            type: 'D',
+            icon: '📍',
+            time: formatTimeRange(currentTimeMinutes, deliveryDurationMin),
+            nodeId: stopNode,
+            demandId: demand.id,
+            color: demand.color || '#3B82F6',
+            durationSec: demand.deliveryDurationSec || 0
+          });
+          currentTimeMinutes += deliveryDurationMin;
+        }
+      } else if (stopType === 'WAREHOUSE' && index === tourData.tour.length - 1) {
+        // Retour à l'entrepôt (dernier trajet)
+        stops.push({
+          order: stops.length + 1,
+          type: 'E',
+          icon: '🏢',
+          time: formatTime(currentTimeMinutes),
+          nodeId: stopNode,
+          demandId: null,
+          color: '#9CA3AF',
+          durationSec: 0
+        });
+      }
     });
-  }
-
-  // Retour à l'entrepôt
-  if (deliveryRequestSet?.warehouse) {
-    stops.push({
-      order: stops.length + 1,
-      type: 'E',
-      icon: '🏢',
-      time: formatTime(currentTimeMinutes),
-      nodeId: deliveryRequestSet.warehouse.nodeId,
-      demandId: null,
-      color: '#9CA3AF',
-      durationSec: 0
-    });
-  }
-
-  return (
+  }  return (
     <div>
       <table className="w-full text-sm">
         <thead className="bg-gray-600 sticky top-0 z-10">

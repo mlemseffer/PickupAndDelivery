@@ -28,7 +28,15 @@ function MapResizer() {
  * Composant pour afficher la carte avec Leaflet
  */
 
-export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tourData, onDeliveryRequestSetUpdated }) {
+export default function MapViewer({ 
+  mapData, 
+  onClearMap, 
+  deliveryRequestSet, 
+  tourData, 
+  onDeliveryRequestSetUpdated,
+  onSegmentClick,
+  isMapSelectionActive 
+}) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [currentTour, setCurrentTour] = useState(null);
   const mapContainerRef = useRef(null);
@@ -103,6 +111,13 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tou
 
   return (
     <div ref={mapContainerRef} className="flex-1 flex flex-col bg-gray-700">
+      {/* Bannière de mode sélection */}
+      {isMapSelectionActive && (
+        <div className="bg-green-600 text-white p-3 text-center font-semibold animate-pulse">
+          📍 Mode sélection actif - Cliquez sur un segment de la carte pour sélectionner un nœud
+        </div>
+      )}
+      
       <div className="p-3 bg-gray-600 border-b border-gray-500">
         <div className="flex justify-between items-center">
           <div>
@@ -112,6 +127,11 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tou
             {tourData && tourData.metrics && (
               <p className="text-xs text-green-400 mt-1">
                 🚴 Tournée: {tourData.metrics.stopCount} stops, {tourData.metrics.totalDistance.toFixed(2)} m
+              </p>
+            )}
+            {isMapSelectionActive && (
+              <p className="text-xs text-green-300 mt-1 font-semibold">
+                ✨ Cliquez sur un segment vert pour le sélectionner
               </p>
             )}
           </div>
@@ -168,6 +188,14 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tou
             
             // Si les deux nœuds existent, dessiner le tronçon
             if (originNode && destinationNode) {
+              const handleSegmentClick = () => {
+                if (isMapSelectionActive && onSegmentClick) {
+                  // Calculer le nœud le plus proche du centre du segment
+                  // Pour simplifier, on prend le nœud d'origine
+                  onSegmentClick(segment.origin);
+                }
+              };
+
               return (
                 <Polyline
                   key={`segment-${index}`}
@@ -175,19 +203,14 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, tou
                     [originNode.latitude, originNode.longitude],
                     [destinationNode.latitude, destinationNode.longitude]
                   ]}
-                  color="#3b82f6"
-                  weight={3}
-                  opacity={0.7}
-                >
-                  <Popup>
-                    <div>
-                      <strong>Rue:</strong> {segment.name}<br />
-                      <strong>Longueur:</strong> {segment.length.toFixed(2)} m<br />
-                      <strong>De:</strong> {segment.origin}<br />
-                      <strong>À:</strong> {segment.destination}
-                    </div>
-                  </Popup>
-                </Polyline>
+                  color={isMapSelectionActive ? "#10b981" : "#3b82f6"}
+                  weight={isMapSelectionActive ? 5 : 3}
+                  opacity={isMapSelectionActive ? 1 : 0.7}
+                  eventHandlers={{
+                    click: handleSegmentClick
+                  }}
+                  className={isMapSelectionActive ? "cursor-pointer" : ""}
+                />
               );
             }
             return null;

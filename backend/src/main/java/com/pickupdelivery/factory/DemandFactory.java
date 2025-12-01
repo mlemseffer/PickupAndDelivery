@@ -32,6 +32,7 @@ public class DemandFactory {
         validatePickupDuration(pickupDurationSec);
         validateDeliveryDuration(deliveryDurationSec);
         
+        // Les couleurs sont gérées uniquement dans le frontend
         return new Demand(id, pickupNodeId, deliveryNodeId, 
                          pickupDurationSec, deliveryDurationSec, 
                          courierId);
