@@ -178,6 +178,7 @@ public class DeliveryRequestXmlParser {
                 int deliveryDuration = Integer.parseInt(element.getAttribute("dureeLivraison"));
                 
                 deliveryRequests.add(new DeliveryRequest(
+                    UUID.randomUUID().toString(),
                     pickupAddress, 
                     deliveryAddress, 
                     pickupDuration, 

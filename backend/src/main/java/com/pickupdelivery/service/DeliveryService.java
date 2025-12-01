@@ -2,6 +2,7 @@ package com.pickupdelivery.service;
 
 import com.pickupdelivery.model.DeliveryRequest;
 import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.Demand;
 import com.pickupdelivery.xmlparser.DeliveryRequestXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
@@ -55,7 +56,24 @@ public class DeliveryService {
      * @param request La demande à ajouter
      */
     public void addDeliveryRequest(DeliveryRequest request) {
+        // Ajout à la liste simple
         currentRequests.add(request);
+        // Ajout à la tournée courante (currentRequestSet)
+        if (currentRequestSet != null) {
+            // Génère un id UUID si absent
+            if (request.getId() == null || request.getId().isEmpty()) {
+                request.setId(java.util.UUID.randomUUID().toString());
+            }
+            // Convertit en Demand si besoin
+            com.pickupdelivery.model.Demand demand = new com.pickupdelivery.model.Demand();
+            demand.setId(request.getId());
+            demand.setPickupNodeId(request.getPickupAddress());
+            demand.setDeliveryNodeId(request.getDeliveryAddress());
+            demand.setPickupDurationSec(request.getPickupDuration());
+            demand.setDeliveryDurationSec(request.getDeliveryDuration());
+            demand.setCourierId(null);
+            currentRequestSet.getDemands().add(demand);
+        }
     }
 
     /**
@@ -92,4 +110,31 @@ public class DeliveryService {
     public DeliveryRequestSet getCurrentRequestSet() {
         return currentRequestSet;
     }
+
+    /**
+     * Supprime une demande de livraison par son id
+     * @param deliveryId L'id de la demande à supprimer
+     * @return L'ensemble des demandes mis à jour
+     * @throws IllegalStateException Si la demande n'existe pas
+     */
+    public DeliveryRequestSet removeDemand(String deliveryId) {
+    if (currentRequestSet == null || currentRequestSet.getDemands() == null) {
+        throw new IllegalStateException("Aucune demande à supprimer");
+    }
+
+    System.out.println("[SUPPRESSION] id reçu: " + deliveryId);
+    System.out.println("[SUPPRESSION] ids présents: ");
+    for (com.pickupdelivery.model.Demand d : currentRequestSet.getDemands()) {
+        System.out.println("  - " + d.getId());
+    }
+
+    boolean removed = currentRequestSet.getDemands().removeIf(d -> d.getId().equals(deliveryId));
+
+    if (!removed) {
+        throw new IllegalStateException("Livraison introuvable : " + deliveryId);
+    }
+
+    return currentRequestSet;
+}
+
 }

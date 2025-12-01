@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class DeliveryRequest {
+    private String id;
     private String pickupAddress;
     private String deliveryAddress;
     private int pickupDuration;

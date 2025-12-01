@@ -18,7 +18,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/deliveries")
-@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:3000"})
+@CrossOrigin(origins = {"http://localhost:5173", "http://localhost:5174", "http://localhost:3000"})
 public class DeliveryController {
 
     @Autowired
@@ -133,4 +133,26 @@ public class DeliveryController {
         }
         return ResponseEntity.ok(ApiResponse.success(requestSet));
     }
+
+    /**
+     * Supprime une demande de livraison par son index
+     * DELETE /api/deliveries/{index}
+     * @param index L'index de la demande à supprimer
+     * @return L'ensemble des demandes mis à jour
+     */
+    @DeleteMapping("/{deliveryId}")
+
+    public ResponseEntity<ApiResponse<DeliveryRequestSet>> removeDemand(@PathVariable String deliveryId) {
+    try {
+        DeliveryRequestSet requestSet = deliveryService.removeDemand(deliveryId);
+        return ResponseEntity.ok(ApiResponse.success("Demande supprimée avec succès", requestSet));
+    } catch (IllegalStateException e) {
+        return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+    } catch (Exception e) {
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .body(ApiResponse.error("Erreur lors de la suppression: " + e.getMessage()));
+    }
+}
+
+
 }

@@ -61,10 +61,12 @@ const createDeliveryIcon = (color) => new L.DivIcon({
  */
 export default function DeliveryMarkers({ requestSet, nodesById }) {
   if (!requestSet || !requestSet.warehouse || !requestSet.demands) {
+    console.warn('DeliveryMarkers: requestSet incomplet', { requestSet, nodesById });
     return null;
   }
 
   const { warehouse, demands } = requestSet;
+  console.log('DeliveryMarkers: affichage de', demands.length, 'demandes', demands);
 
   // Récupérer le nœud de l'entrepôt
   const warehouseNode = nodesById[warehouse.nodeId];

@@ -54,6 +54,7 @@ export default function DeliveryRequestUploader({ onRequestsLoaded, onCancel }) 
 
     try {
       const requestSet = await apiService.loadDeliveryRequests(file);
+      // Les ids sont désormais attribués par le backend
       onRequestsLoaded(requestSet);
     } catch (err) {
       setError(err.message || 'Erreur lors du chargement des demandes');
