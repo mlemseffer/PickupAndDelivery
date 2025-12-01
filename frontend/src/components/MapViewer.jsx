@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
+import ModifyTourButton from './ModifyTourButton';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -25,9 +26,17 @@ function MapResizer() {
 /**
  * Composant pour afficher la carte avec Leaflet
  */
-export default function MapViewer({ mapData, onClearMap, deliveryRequestSet }) {
+export default function MapViewer({ mapData, onClearMap, deliveryRequestSet, onDeliveryRequestSetUpdated }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [currentTour, setCurrentTour] = useState(null);
   const mapContainerRef = useRef(null);
+
+  // Extraire la liste des demandes de livraison
+  const deliveries = deliveryRequestSet?.demands || [];
+  
+  // Debug logs
+  console.log('MapViewer reçoit deliveryRequestSet:', deliveryRequestSet);
+  console.log('MapViewer deliveries:', deliveries);
 
   // Gérer le plein écran
   const toggleFullscreen = () => {
@@ -106,6 +115,13 @@ export default function MapViewer({ mapData, onClearMap, deliveryRequestSet }) {
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {isFullscreen ? "Réduire" : "Plein écran"}
             </button>
+            <ModifyTourButton 
+              tourData={currentTour}
+              mapData={mapData}
+              deliveries={deliveries}
+              onTourUpdated={setCurrentTour}
+              onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
+            />
             <button
               onClick={onClearMap}
               className="bg-red-600 hover:bg-red-700 text-white px-3 py-1 rounded text-sm transition-colors"

@@ -14,6 +14,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 public class Tour {
+    private String courierId;              // ID du coursier assigné à cette tournée
     private String warehouseAddress;
     private List<DeliveryRequest> deliveryRequests = new ArrayList<>();
     private List<String> route = new ArrayList<>();

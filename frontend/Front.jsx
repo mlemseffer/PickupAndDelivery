@@ -65,11 +65,20 @@ export default function PickupDeliveryUI() {
     }
   };
 
+  // Gestion de la mise à jour des demandes (suppression, etc.)
+  const handleDeliveryRequestSetUpdated = (updatedSet) => {
+    console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
+    setDeliveryRequestSet(updatedSet);
+  };
+
   // Gestion du chargement des demandes de livraison
-  const handleDeliveryRequestsLoaded = (requestSet) => {
+  const handleDeliveryRequestsLoaded =(requestSet) => {
+     // Utilise directement le requestSet reçu (avec tous les ids)
+    console.log('handleDeliveryRequestsLoaded reçoit:', requestSet);
     setDeliveryRequestSet(requestSet);
     setShowDeliveryUpload(false);
-  };
+};
+
 
   // Gestion de l'annulation du chargement des demandes
   const handleCancelDeliveryUpload = () => {
@@ -86,31 +95,21 @@ export default function PickupDeliveryUI() {
   };
 
   // Gestion de l'ajout manuel d'une demande
-  const handleManualDemandAdd = (demand) => {
-    // Créer ou mettre à jour le DeliveryRequestSet
-    const newDemand = {
-      id: Date.now().toString(),
-      ...demand,
-      status: 'NON_TRAITEE',
-      courierId: null,
-      // Assigner une couleur aléatoire
-      color: '#' + Math.floor(Math.random()*16777215).toString(16)
-    };
-
-    if (!deliveryRequestSet) {
-      // Créer un nouveau set avec juste cette demande
-      setDeliveryRequestSet({
-        warehouse: null,
-        demands: [newDemand]
+  const handleManualDemandAdd = async (demand) => {
+    try {
+      // Enregistre la demande dans le backend
+      await apiService.addDeliveryRequest({
+        pickupAddress: demand.pickupNodeId,
+        deliveryAddress: demand.deliveryNodeId,
+        pickupDuration: demand.pickupDurationSec,
+        deliveryDuration: demand.deliveryDurationSec
       });
-    } else {
-      // Ajouter à la liste existante
-      setDeliveryRequestSet({
-        ...deliveryRequestSet,
-        demands: [...deliveryRequestSet.demands, newDemand]
-      });
+      // Rafraîchit la liste depuis le backend pour récupérer l'id et l'état à jour
+      const requestSet = await apiService.getCurrentRequestSet();
+      setDeliveryRequestSet(requestSet);
+    } catch (err) {
+      alert('Erreur lors de l’ajout manuel : ' + err.message);
     }
-
     setShowManualForm(false);
   };
 
@@ -186,6 +185,7 @@ export default function PickupDeliveryUI() {
                   mapData={mapData}
                   onClearMap={handleClearMap}
                   deliveryRequestSet={deliveryRequestSet}
+                  onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
                 />
               </div>
               
