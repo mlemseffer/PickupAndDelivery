@@ -3,7 +3,7 @@ import { Polyline, Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 
 /**
- * Composant pour afficher les segments de la tournée en jaune avec numérotation
+ * Composant pour afficher les segments de la tournée en jaune avec numérotation et flèches
  */
 export default function TourSegments({ tourData, nodesById }) {
   console.log('🔍 TourSegments - tourData:', tourData);
@@ -16,20 +16,6 @@ export default function TourSegments({ tourData, nodesById }) {
   
   console.log('✅ TourSegments: Affichage de', tourData.tour.length, 'trajets');
   
-  // Créer une icône discrète pour les segments (petit point invisible)
-  const createSegmentIcon = () => {
-    return L.divIcon({
-      html: `<div style="
-        width: 8px;
-        height: 8px;
-        background-color: transparent;
-      "></div>`,
-      className: 'tour-segment-marker',
-      iconSize: [8, 8],
-      iconAnchor: [4, 4]
-    });
-  };
-
   // Aplatir tous les segments de tous les trajets
   let segmentCounter = 0;
   const allSegmentsWithNumbers = [];
@@ -53,6 +39,34 @@ export default function TourSegments({ tourData, nodesById }) {
   });
   
   console.log(`📊 Total de ${segmentCounter} segments à afficher`);
+
+  // Créer une icône de flèche personnalisée (petite et simple)
+  const createArrowIcon = (rotation) => {
+    return L.divIcon({
+      html: `
+        <div style="
+          width: 0;
+          height: 0;
+          border-left: 5px solid transparent;
+          border-right: 5px solid transparent;
+          border-bottom: 10px solid #FCD34D;
+          transform: rotate(${rotation}deg);
+          filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));
+        "></div>
+      `,
+      className: 'arrow-icon',
+      iconSize: [10, 10],
+      iconAnchor: [5, 5]
+    });
+  };
+
+  // Calculer l'angle de rotation pour la flèche
+  const calculateRotation = (lat1, lng1, lat2, lng2) => {
+    const dLng = lng2 - lng1;
+    const dLat = lat2 - lat1;
+    const angle = Math.atan2(dLng, dLat) * (180 / Math.PI);
+    return angle;
+  };
 
   return (
     <>
@@ -100,21 +114,24 @@ export default function TourSegments({ tourData, nodesById }) {
               </Tooltip>
             </Polyline>
 
-            {/* Marqueur invisible au milieu pour interaction */}
+            {/* Flèche au milieu du segment */}
             <Marker
               position={[midLat, midLng]}
-              icon={createSegmentIcon()}
-              zIndexOffset={1000}
-              eventHandlers={{
-                click: () => {
-                  // Le tooltip s'affiche automatiquement au clic
-                }
-              }}
+              icon={createArrowIcon(
+                calculateRotation(
+                  originNode.latitude,
+                  originNode.longitude,
+                  destinationNode.latitude,
+                  destinationNode.longitude
+                )
+              )}
+              zIndexOffset={2000}
             >
-              <Tooltip direction="top" offset={[0, -5]} permanent={false}>
-                <div className="text-center">
-                  <strong className="text-lg">#{number}</strong><br />
-                  <span className="text-xs">{segment.name}</span>
+              <Tooltip direction="top" offset={[0, -8]} permanent={false}>
+                <div className="text-sm">
+                  <strong>🔢 Segment {number}</strong><br />
+                  <strong>📍 Rue:</strong> {segment.name}<br />
+                  <strong>📏 Longueur:</strong> {segment.length.toFixed(2)} m
                 </div>
               </Tooltip>
             </Marker>
