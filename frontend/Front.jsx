@@ -7,7 +7,6 @@ import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
-import SaveModal from './src/components/SaveModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -141,10 +140,7 @@ export default function PickupDeliveryUI() {
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null);
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
-  const [showItinModalFront, setShowItinModalFront] = useState(false);
-  const [itinFilenameFront, setItinFilenameFront] = useState('');
-  const [showJsonModalFront, setShowJsonModalFront] = useState(false);
-  const [jsonFilenameFront, setJsonFilenameFront] = useState('');
+  // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
   const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
@@ -294,35 +290,8 @@ export default function PickupDeliveryUI() {
     }
   };
 
-  const performItinSaveFront = (filename) => {
-    if (!filename) return;
-    const content = generateItineraryText(tourData);
-    const blob = new Blob([content], { type: 'text/plain' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${filename}.txt`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    setShowItinModalFront(false);
-  };
-
-  const performJsonSaveFront = (filename) => {
-    if (!filename) return;
-    const tourJson = JSON.stringify(tourData, null, 2);
-    const blob = new Blob([tourJson], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `${filename}.json`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
-    setShowJsonModalFront(false);
-  };
+  
+  
 
   
 
@@ -564,37 +533,14 @@ export default function PickupDeliveryUI() {
                         </button>
                       </div>
                       
-                      {/* Deuxième ligne : Sauvegarder */}
+                      {/* Centralized TourActions (Modifier / Sauvegarder itinéraire / Sauvegarder tournée) */}
                       <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            const defaultName = `itineraire_${new Date().toISOString().split('T')[0]}`;
-                            setItinFilenameFront(defaultName);
-                            setShowItinModalFront(true);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder l'itinéraire en fichier texte"
-                        >
-                          📄 Sauvegarder itinéraire (.txt)
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const defaultName = `tournee_${new Date().toISOString().split('T')[0]}`;
-                            setJsonFilenameFront(defaultName);
-                            setShowJsonModalFront(true);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder la tournée complète (JSON)"
-                        >
-                          💾 Sauvegarder Tournée (.json)
-                        </button>
+                        <TourActions
+                          tourData={tourData}
+                          onModify={handleAddDeliveryManually}
+                          onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
+                          onSaveTour={() => console.log('Tournée sauvegardée')}
+                        />
                       </div>
                     </div>
                   )}
@@ -627,28 +573,7 @@ export default function PickupDeliveryUI() {
             </p>
           </div>
         )}
-        {/* Modals front (global placement so they render on top) */}
-        <SaveModal
-          isOpen={showItinModalFront}
-          title="Sauvegarder l'itinéraire"
-          description="Entrez le nom du fichier texte :"
-          defaultName={itinFilenameFront}
-          placeholder="nom_du_fichier"
-          confirmLabel="Sauvegarder"
-          onCancel={() => setShowItinModalFront(false)}
-          onConfirm={performItinSaveFront}
-        />
-
-        <SaveModal
-          isOpen={showJsonModalFront}
-          title="Sauvegarder la tournée"
-          description="Entrez le nom du fichier JSON :"
-          defaultName={jsonFilenameFront}
-          placeholder="nom_du_fichier"
-          confirmLabel="Sauvegarder"
-          onCancel={() => setShowJsonModalFront(false)}
-          onConfirm={performJsonSaveFront}
-        />
+        {/* Save modals are centralized inside TourActions */}
 
       </main>
     </div>

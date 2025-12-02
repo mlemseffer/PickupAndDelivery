@@ -38,17 +38,28 @@ export default function TourActions({ tourData, onModify, onSaveItinerary, onSav
     if (!filename) return;
     // Générer le contenu du fichier texte
     let content = '=== ITINÉRAIRE DE LIVRAISON ===\n\n';
-    content += `Nombre de segments: ${tourData.tour.length}\n`;
-    content += `Distance totale: ${tourData.metrics?.totalDistance?.toFixed(2) || 0} m\n`;
+    const segmentCount = Array.isArray(tourData.tour) ? tourData.tour.length : 0;
+    content += `Nombre de segments: ${segmentCount}\n`;
+    const totalDistance = tourData.metrics && typeof tourData.metrics.totalDistance === 'number'
+      ? tourData.metrics.totalDistance.toFixed(2)
+      : '0.00';
+    content += `Distance totale: ${totalDistance} m\n`;
     content += `Nombre de stops: ${tourData.metrics?.stopCount || 0}\n\n`;
     content += '=== TRAJETS ===\n\n';
 
-    tourData.tour.forEach((trajet, index) => {
-      content += `${index + 1}. ${trajet.nomRue}\n`;
-      content += `   De: ${trajet.origine}\n`;
-      content += `   À: ${trajet.destination}\n`;
-      content += `   Longueur: ${trajet.longueur.toFixed(2)} m\n\n`;
-    });
+    if (Array.isArray(tourData.tour)) {
+      tourData.tour.forEach((trajet, index) => {
+        const nomRue = trajet?.nomRue || 'Segment';
+        const origine = trajet?.origine || 'N/A';
+        const destination = trajet?.destination || 'N/A';
+        const longueur = Number(trajet?.longueur || 0).toFixed(2);
+
+        content += `${index + 1}. ${nomRue}\n`;
+        content += `   De: ${origine}\n`;
+        content += `   À: ${destination}\n`;
+        content += `   Longueur: ${longueur} m\n\n`;
+      });
+    }
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
