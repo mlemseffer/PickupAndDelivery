@@ -7,6 +7,7 @@ import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
+import SaveModal from './src/components/SaveModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -140,6 +141,10 @@ export default function PickupDeliveryUI() {
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null);
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
+  const [showItinModalFront, setShowItinModalFront] = useState(false);
+  const [itinFilenameFront, setItinFilenameFront] = useState('');
+  const [showJsonModalFront, setShowJsonModalFront] = useState(false);
+  const [jsonFilenameFront, setJsonFilenameFront] = useState('');
   
   // États pour la sélection sur la carte
   const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
@@ -289,6 +294,38 @@ export default function PickupDeliveryUI() {
     }
   };
 
+  const performItinSaveFront = (filename) => {
+    if (!filename) return;
+    const content = generateItineraryText(tourData);
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setShowItinModalFront(false);
+  };
+
+  const performJsonSaveFront = (filename) => {
+    if (!filename) return;
+    const tourJson = JSON.stringify(tourData, null, 2);
+    const blob = new Blob([tourJson], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${filename}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    setShowJsonModalFront(false);
+  };
+
+  
+
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
@@ -380,6 +417,7 @@ export default function PickupDeliveryUI() {
 
         {/* Map Upload View */}
         {showMapUpload && !mapData && (
+
           <MapUploader 
             onMapLoaded={handleMapLoaded}
             onCancel={handleCancelUpload}
@@ -530,16 +568,9 @@ export default function PickupDeliveryUI() {
                       <div className="flex gap-3">
                         <button
                           onClick={() => {
-                            const content = generateItineraryText(tourData);
-                            const blob = new Blob([content], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `itineraire_${new Date().toISOString().split('T')[0]}.txt`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
+                            const defaultName = `itineraire_${new Date().toISOString().split('T')[0]}`;
+                            setItinFilenameFront(defaultName);
+                            setShowItinModalFront(true);
                           }}
                           disabled={!tourData}
                           className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
@@ -547,21 +578,14 @@ export default function PickupDeliveryUI() {
                                    flex items-center justify-center gap-2"
                           title="Sauvegarder l'itinéraire en fichier texte"
                         >
-                          📄 Sauvegarder itinéraire
+                          📄 Sauvegarder itinéraire (.txt)
                         </button>
 
                         <button
                           onClick={() => {
-                            const tourJson = JSON.stringify(tourData, null, 2);
-                            const blob = new Blob([tourJson], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `tournee_${new Date().toISOString().split('T')[0]}.json`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
+                            const defaultName = `tournee_${new Date().toISOString().split('T')[0]}`;
+                            setJsonFilenameFront(defaultName);
+                            setShowJsonModalFront(true);
                           }}
                           disabled={!tourData}
                           className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
@@ -569,7 +593,7 @@ export default function PickupDeliveryUI() {
                                    flex items-center justify-center gap-2"
                           title="Sauvegarder la tournée complète (JSON)"
                         >
-                          💾 Sauvegarder Tournée
+                          💾 Sauvegarder Tournée (.json)
                         </button>
                       </div>
                     </div>
@@ -592,7 +616,7 @@ export default function PickupDeliveryUI() {
           </div>
         )}
 
-        {/* Tours View - À implémenter */}
+  {/* Tours View - À implémenter */}
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
             <h2 className="text-2xl font-bold text-center">
@@ -603,6 +627,29 @@ export default function PickupDeliveryUI() {
             </p>
           </div>
         )}
+        {/* Modals front (global placement so they render on top) */}
+        <SaveModal
+          isOpen={showItinModalFront}
+          title="Sauvegarder l'itinéraire"
+          description="Entrez le nom du fichier texte :"
+          defaultName={itinFilenameFront}
+          placeholder="nom_du_fichier"
+          confirmLabel="Sauvegarder"
+          onCancel={() => setShowItinModalFront(false)}
+          onConfirm={performItinSaveFront}
+        />
+
+        <SaveModal
+          isOpen={showJsonModalFront}
+          title="Sauvegarder la tournée"
+          description="Entrez le nom du fichier JSON :"
+          defaultName={jsonFilenameFront}
+          placeholder="nom_du_fichier"
+          confirmLabel="Sauvegarder"
+          onCancel={() => setShowJsonModalFront(false)}
+          onConfirm={performJsonSaveFront}
+        />
+
       </main>
     </div>
   );
