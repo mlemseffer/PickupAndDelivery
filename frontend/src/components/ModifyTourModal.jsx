@@ -158,18 +158,6 @@ const handleRemoveDelivery = async (deliveryIndex) => {
           </button>
         </div>
 
-        {error && (
-          <div className="alert alert-error">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="alert alert-success">
-            {success}
-          </div>
-        )}
-
         <div className="modal-tabs">
           <button 
             className={`tab ${activeTab === 'remove' ? 'active' : ''}`}
@@ -275,6 +263,19 @@ const handleRemoveDelivery = async (deliveryIndex) => {
             </div>
           )}
         </div>
+
+        {/* Messages de succès/erreur en bas */}
+        {error && (
+          <div className="alert alert-error alert-bottom">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="alert alert-success alert-bottom">
+            {success}
+          </div>
+        )}
       </div>
     </div>
   );

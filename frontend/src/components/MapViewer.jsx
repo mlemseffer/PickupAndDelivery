@@ -6,19 +6,22 @@ import TourSegments from './TourSegments';
 import 'leaflet/dist/leaflet.css';
 
 /**
- * Composant pour forcer le redimensionnement de la carte
+ * Composant pour forcer le redimensionnement et le centrage de la carte
  */
-function MapResizer() {
+function MapResizer({ center }) {
   const map = useMap();
   
   useEffect(() => {
-    // Forcer le redimensionnement après un court délai
+    // Petit délai pour s'assurer que la carte est complètement montée
     const timer = setTimeout(() => {
       map.invalidateSize();
-    }, 100);
+      if (center && center.length === 2) {
+        map.setView(center, map.getZoom(), { animate: false });
+      }
+    }, 50);
     
     return () => clearTimeout(timer);
-  }, [map]);
+  }, [map, center]);
   
   return null;
 }
@@ -88,8 +91,8 @@ export default function MapViewer({
     };
   }, []);
   
-  // Calculer le centre de la carte basé sur les nœuds
-  const getMapCenter = () => {
+  // Calculer et mémoriser le centre de la carte basé sur les nœuds
+  const mapCenter = React.useMemo(() => {
     if (!mapData || !mapData.nodes || mapData.nodes.length === 0) {
       return [45.75, 4.85];
     }
@@ -98,7 +101,7 @@ export default function MapViewer({
     const avgLng = mapData.nodes.reduce((sum, node) => sum + node.longitude, 0) / mapData.nodes.length;
     
     return [avgLat, avgLng];
-  };
+  }, [mapData?.nodes]);
 
   // Créer un index des nœuds par ID pour un accès rapide
   const nodesById = React.useMemo(() => {
@@ -159,18 +162,13 @@ export default function MapViewer({
       <div className="flex-1 relative">
         <MapContainer
           key={`map-${mapData?.nodes?.length || 0}`}
-          center={getMapCenter()}
+          center={mapCenter}
           zoom={13}
           style={{ height: '100%', width: '100%', position: 'absolute', top: 0, left: 0 }}
           scrollWheelZoom={true}
-          whenReady={() => {
-            // Force un redimensionnement quand la carte est prête
-            setTimeout(() => {
-              window.dispatchEvent(new Event('resize'));
-            }, 100);
-          }}
+          preferCanvas={true}
         >
-          <MapResizer />
+          <MapResizer center={mapCenter} />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
