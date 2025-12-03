@@ -96,7 +96,9 @@ const handleRemoveDelivery = async (deliveryIndex) => {
         onTourUpdated(updatedRequestSet);
       }
       
-      setTimeout(() => onClose(), 1500);
+      // Ne pas fermer la modal automatiquement pour permettre d'autres suppressions
+      // L'utilisateur peut fermer manuellement quand il a terminé
+      setTimeout(() => setSuccess(null), 2000); // Effacer le message de succès après 2s
     } else {
       console.error('Erreur réponse backend:', response);
       setError(response.message || 'Erreur lors de la suppression');

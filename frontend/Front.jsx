@@ -7,6 +7,7 @@ import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
+import CustomAlert from './src/components/CustomAlert';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -147,8 +148,20 @@ export default function PickupDeliveryUI() {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [savedFormData, setSavedFormData] = useState(null); // Pour sauvegarder les données du formulaire
 
+  // États pour CustomAlert
+  const [alertConfig, setAlertConfig] = useState(null);
+
   // État pour savoir si on est en mode ajout manuel (formulaire ouvert ou sélection active)
   const isAddingManually = showManualForm || isMapSelectionActive;
+
+  // Fonction helper pour afficher une alerte personnalisée
+  const showAlert = (type, title, message, autoClose = false) => {
+    setAlertConfig({ type, title, message, autoClose });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig(null);
+  };
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -280,7 +293,7 @@ export default function PickupDeliveryUI() {
   // Gestion du calcul de la tournée
   const handleCalculateTour = async () => {
     if (!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0) {
-      alert('Veuillez d\'abord charger des demandes de livraison');
+      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger des demandes de livraison');
       return;
     }
 
@@ -316,17 +329,19 @@ export default function PickupDeliveryUI() {
         console.log('📊 tour.length:', tourData.tour.length);
         
         setTourData(tourData);
-        alert(`✅ Tournée calculée avec succès !\n\n` +
-              `📍 Stops: ${tourData.metrics.stopCount}\n` +
-              `📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n` +
-              `🛣️  Segments: ${tourData.metrics.segmentCount}`);
+        showAlert(
+          'success',
+          '✅ Tournée calculée avec succès !',
+          `📍 Stops: ${tourData.metrics.stopCount}\n📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n🛣️  Segments: ${tourData.metrics.segmentCount}`,
+          true
+        );
       } else {
         console.error('❌ Réponse invalide:', result);
-        alert(`Erreur: ${result.message || 'Réponse invalide du serveur'}`);
+        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
       console.error('💥 Erreur lors du calcul de la tournée:', error);
-      alert(`Erreur: ${error.message}`);
+      showAlert('error', '❌ Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -335,7 +350,7 @@ export default function PickupDeliveryUI() {
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
-      alert('Veuillez d\'abord charger une carte');
+      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger une carte');
       return;
     }
     setShowManualForm(true);
@@ -368,8 +383,14 @@ export default function PickupDeliveryUI() {
       } else {
         setDeliveryRequestSet(requestSet);
       }
+
+      // Réinitialiser la tournée car la liste des demandes a changé
+      if (tourData) {
+        console.log('🔄 Réinitialisation de la tournée après ajout manuel');
+        setTourData(null);
+      }
     } catch (err) {
-      alert('Erreur lors de l\'ajout manuel : ' + err.message);
+      showAlert('error', '❌ Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
     setSelectedNodeId(null);
@@ -647,6 +668,17 @@ export default function PickupDeliveryUI() {
           </div>
         )}
       </main>
+
+      {/* CustomAlert */}
+      {alertConfig && (
+        <CustomAlert
+          type={alertConfig.type}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          autoClose={alertConfig.autoClose}
+          onClose={closeAlert}
+        />
+      )}
     </div>
   );
 }
