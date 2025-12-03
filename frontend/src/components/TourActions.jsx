@@ -150,7 +150,17 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
 
   const performJsonSave = (filename) => {
     if (!filename) return;
-    const tourJson = JSON.stringify(tourData, null, 2);
+    
+    console.log('💾 Sauvegarde de la tournée:', tourData);
+
+    // Nettoyer et sérialiser la tournée pour ne garder que les données essentielles
+    const cleanedTourData = {
+      tour: tourData.tour || [],
+      metrics: tourData.metrics || {},
+      savedAt: new Date().toISOString()
+    };
+
+    const tourJson = JSON.stringify(cleanedTourData, null, 2);
     const blob = new Blob([tourJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
@@ -162,13 +172,15 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
+    console.log('✅ Tournée sauvegardée avec', cleanedTourData.tour.length, 'trajets');
+
     setShowJsonModal(false);
     if (onSaveTour) onSaveTour();
   };
 
   return (
     <>
-      <div className="flex gap-2 justify-center">
+      <div className="flex gap-3">
 
         {/* Sauvegarder itinéraire (.txt) */}
         <button
