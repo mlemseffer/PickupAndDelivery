@@ -8,6 +8,7 @@ import CourierCountModal from './src/components/CourierCountModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
 import CustomAlert from './src/components/CustomAlert';
+import ModifyTourModal from './src/components/ModifyTourModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -141,6 +142,7 @@ export default function PickupDeliveryUI() {
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null);
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
+  const [showModifyTourModal, setShowModifyTourModal] = useState(false);
   // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
@@ -574,7 +576,7 @@ export default function PickupDeliveryUI() {
                   ) : (
                     // Boutons après calcul de tournée (4 boutons sur 2 lignes)
                     <div className="flex flex-col gap-3">
-                      {/* Première ligne : Ajouter et Calculer tournée */}
+                      {/* Première ligne : Ajouter et Modifier tournée */}
                       <div className="flex gap-3">
                         <button 
                           onClick={handleAddDeliveryManually}
@@ -586,14 +588,12 @@ export default function PickupDeliveryUI() {
                         </button>
 
                         <button
-                          onClick={handleCalculateTour}
-                          disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                          onClick={() => setShowModifyTourModal(true)}
+                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
                                    flex items-center justify-center gap-2"
-                          title="Calculer la tournée optimale"
+                          title="Modifier la tournée calculée"
                         >
-                          {isCalculatingTour ? 'Calcul en cours...' : '🧮 Calculer tournée'}
+                          ✏️ Modifier Tournée
                         </button>
                       </div>
                       
@@ -647,6 +647,20 @@ export default function PickupDeliveryUI() {
           message={alertConfig.message}
           autoClose={alertConfig.autoClose}
           onClose={closeAlert}
+        />
+      )}
+
+      {/* ModifyTourModal */}
+      {showModifyTourModal && (
+        <ModifyTourModal
+          tourData={tourData}
+          mapData={mapData}
+          deliveries={deliveryRequestSet?.demands || []}
+          onClose={() => setShowModifyTourModal(false)}
+          onTourUpdated={(updatedTour) => {
+            setTourData(updatedTour);
+          }}
+          onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
         />
       )}
     </div>

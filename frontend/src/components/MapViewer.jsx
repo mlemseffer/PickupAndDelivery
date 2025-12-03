@@ -2,7 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
 import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
-import ModifyTourButton from './ModifyTourButton';
 import TourSegments from './TourSegments';
 import 'leaflet/dist/leaflet.css';
 
@@ -145,15 +144,6 @@ export default function MapViewer({
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {isFullscreen ? "Réduire" : "Plein écran"}
             </button>
-            <div className={isAddingManually ? 'pointer-events-none opacity-50' : ''}>
-              <ModifyTourButton 
-                tourData={currentTour}
-                mapData={mapData}
-                deliveries={deliveries}
-                onTourUpdated={setCurrentTour}
-                onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
-              />
-            </div>
             <button
               onClick={onClearMap}
               disabled={isAddingManually}
