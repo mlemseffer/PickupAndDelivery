@@ -48,8 +48,17 @@ export default function TourActions({ tourData, onModify, onSaveItinerary, onSav
       return;
     }
 
+    console.log('💾 Sauvegarde de la tournée:', tourData);
+
+    // Nettoyer et sérialiser la tournée pour ne garder que les données essentielles
+    const cleanedTourData = {
+      tour: tourData.tour || [],
+      metrics: tourData.metrics || {},
+      savedAt: new Date().toISOString()
+    };
+
     // Générer le fichier JSON de la tournée
-    const tourJson = JSON.stringify(tourData, null, 2);
+    const tourJson = JSON.stringify(cleanedTourData, null, 2);
     const blob = new Blob([tourJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -59,6 +68,8 @@ export default function TourActions({ tourData, onModify, onSaveItinerary, onSav
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+
+    console.log('✅ Tournée sauvegardée avec', cleanedTourData.tour.length, 'trajets');
 
     if (onSaveTour) onSaveTour();
   };

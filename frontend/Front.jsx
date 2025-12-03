@@ -197,7 +197,7 @@ export default function PickupDeliveryUI() {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
     
     // Réassigner les couleurs dans le bon ordre après modification
-    if (updatedSet?.demands) {
+    if (updatedSet?.demands && updatedSet.demands.length > 0) {
       const demandsWithColors = updatedSet.demands.map((demand, index) => ({
         ...demand,
         color: getColorFromPalette(index)
@@ -209,15 +209,20 @@ export default function PickupDeliveryUI() {
       });
 
       // ✅ Recalculer automatiquement si une tournée était déjà calculée
-      if (tourData && demandsWithColors.length > 0) {
+      if (tourData) {
         console.log('🔄 Recalcul automatique de la tournée après modification des demandes...');
+        console.log('📊 Nombre de demandes après modification:', demandsWithColors.length);
         setIsCalculatingTour(true);
         
         try {
           const result = await apiService.calculateTour(courierCount);
+          console.log('📦 Résultat du recalcul:', result);
           
           if (result.success && result.data && result.data.length > 0) {
             const tour = result.data[0];
+            console.log('✅ Tour recalculé:', tour);
+            console.log('📍 Stops dans le nouveau tour:', tour.stops?.length || 0);
+            
             const newTourData = {
               tour: tour.trajets || tour.segments || tour.path || [],
               metrics: {
@@ -227,21 +232,26 @@ export default function PickupDeliveryUI() {
               }
             };
             
+            console.log('📊 Nouveau tourData créé:', newTourData);
+            console.log('🛣️  Nombre de trajets:', newTourData.tour.length);
             setTourData(newTourData);
-            console.log('✅ Tournée recalculée automatiquement');
+            console.log('✅ Tournée recalculée automatiquement avec', newTourData.tour.length, 'trajets');
+          } else {
+            console.warn('⚠️ Pas de données valides dans le résultat du recalcul');
+            setTourData(null);
           }
         } catch (error) {
           console.error('❌ Erreur lors du recalcul automatique:', error);
+          setTourData(null);
         } finally {
           setIsCalculatingTour(false);
         }
       }
     } else {
-      setDeliveryRequestSet(updatedSet);
-      // Si plus aucune demande, réinitialiser la tournée
-      if (tourData) {
-        setTourData(null);
-      }
+      // Si plus aucune demande, réinitialiser la tournée ET le deliveryRequestSet
+      console.log('⚠️ Aucune demande restante, réinitialisation de la tournée');
+      setDeliveryRequestSet(updatedSet || null);
+      setTourData(null);
     }
   };
 
