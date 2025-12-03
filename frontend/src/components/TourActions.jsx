@@ -148,12 +148,9 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     if (onSaveItinerary) onSaveItinerary();
   };
 
-  const handleSaveTour = () => {
-    if (!tourData) {
-      alert('Aucune tournée à sauvegarder');
-      return;
-    }
-
+  const performJsonSave = (filename) => {
+    if (!filename) return;
+    
     console.log('💾 Sauvegarde de la tournée:', tourData);
 
     // Nettoyer et sérialiser la tournée pour ne garder que les données essentielles
@@ -163,8 +160,6 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
       savedAt: new Date().toISOString()
     };
 
-  const performJsonSave = (filename) => {
-    if (!filename) return;
     const tourJson = JSON.stringify(cleanedTourData, null, 2);
     const blob = new Blob([tourJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
