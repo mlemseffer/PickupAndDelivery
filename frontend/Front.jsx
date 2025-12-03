@@ -141,6 +141,7 @@ export default function PickupDeliveryUI() {
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null);
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
+  // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
   const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
@@ -347,6 +348,11 @@ export default function PickupDeliveryUI() {
     }
   };
 
+  
+  
+
+  
+
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
@@ -444,6 +450,7 @@ export default function PickupDeliveryUI() {
 
         {/* Map Upload View */}
         {showMapUpload && !mapData && (
+
           <MapUploader 
             onMapLoaded={handleMapLoaded}
             onCancel={handleCancelUpload}
@@ -590,51 +597,14 @@ export default function PickupDeliveryUI() {
                         </button>
                       </div>
                       
-                      {/* Deuxième ligne : Sauvegarder */}
+                      {/* Centralized TourActions (Modifier / Sauvegarder itinéraire / Sauvegarder tournée) */}
                       <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            const content = generateItineraryText(tourData);
-                            const blob = new Blob([content], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `itineraire_${new Date().toISOString().split('T')[0]}.txt`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder l'itinéraire en fichier texte"
-                        >
-                          📄 Sauvegarder itinéraire
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const tourJson = JSON.stringify(tourData, null, 2);
-                            const blob = new Blob([tourJson], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `tournee_${new Date().toISOString().split('T')[0]}.json`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder la tournée complète (JSON)"
-                        >
-                          💾 Sauvegarder Tournée
-                        </button>
+                        <TourActions
+                          tourData={tourData}
+                          deliveryRequestSet={deliveryRequestSet}
+                          onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
+                          onSaveTour={() => console.log('Tournée sauvegardée')}
+                        />
                       </div>
                     </div>
                   )}
@@ -656,7 +626,7 @@ export default function PickupDeliveryUI() {
           </div>
         )}
 
-        {/* Tours View - À implémenter */}
+  {/* Tours View - À implémenter */}
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
             <h2 className="text-2xl font-bold text-center">
@@ -667,6 +637,8 @@ export default function PickupDeliveryUI() {
             </p>
           </div>
         )}
+        {/* Save modals are centralized inside TourActions */}
+
       </main>
 
       {/* CustomAlert */}
