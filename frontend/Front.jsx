@@ -537,7 +537,7 @@ export default function PickupDeliveryUI() {
                       <div className="flex gap-3">
                         <TourActions
                           tourData={tourData}
-                          onModify={handleAddDeliveryManually}
+                          deliveryRequestSet={deliveryRequestSet}
                           onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
                           onSaveTour={() => console.log('Tournée sauvegardée')}
                         />

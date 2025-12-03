@@ -8,7 +8,7 @@ import SaveModal from './SaveModal';
  * - Sauvegarder itinéraire (.txt)
  * - Sauvegarder Tournée
  */
-export default function TourActions({ tourData, onModify, onSaveItinerary, onSaveTour }) {
+export default function TourActions({ tourData, onSaveItinerary, onSaveTour, deliveryRequestSet }) {
   const [showItinModal, setShowItinModal] = useState(false);
   const [itinDefaultName, setItinDefaultName] = useState('');
   const [showJsonModal, setShowJsonModal] = useState(false);
@@ -36,28 +36,101 @@ export default function TourActions({ tourData, onModify, onSaveItinerary, onSav
 
   const performItinSave = (filename) => {
     if (!filename) return;
-    // Générer le contenu du fichier texte
+    // Générer le contenu du fichier texte en s'inspirant de TourTable.jsx
     let content = '=== ITINÉRAIRE DE LIVRAISON ===\n\n';
-    const segmentCount = Array.isArray(tourData.tour) ? tourData.tour.length : 0;
+
+    const segmentCount = Array.isArray(tourData?.tour) ? tourData.tour.length : 0;
     content += `Nombre de segments: ${segmentCount}\n`;
-    const totalDistance = tourData.metrics && typeof tourData.metrics.totalDistance === 'number'
-      ? tourData.metrics.totalDistance.toFixed(2)
+    const totalDistance = tourData?.metrics && typeof tourData.metrics.totalDistance === 'number'
+      ? Number(tourData.metrics.totalDistance).toFixed(2)
       : '0.00';
     content += `Distance totale: ${totalDistance} m\n`;
-    content += `Nombre de stops: ${tourData.metrics?.stopCount || 0}\n\n`;
-    content += '=== TRAJETS ===\n\n';
+    content += `Nombre de stops: ${tourData?.metrics?.stopCount || 0}\n\n`;
 
-    if (Array.isArray(tourData.tour)) {
+    content += '=== DÉTAIL DES TRAJETS ET STOPS ===\n\n';
+
+    // Time calculation constants (copied from TourTable logic)
+    const COURIER_SPEED_KMH = 15;
+    const COURIER_SPEED_M_PER_MIN = (COURIER_SPEED_KMH * 1000) / 60;
+
+    // Déterminer l'heure de départ (en minutes depuis minuit)
+    let currentTimeMinutes = 8 * 60; // fallback 08:00
+    if (deliveryRequestSet?.warehouse?.departureTime) {
+      const parts = deliveryRequestSet.warehouse.departureTime.split(':').map(Number);
+      if (parts.length === 2) currentTimeMinutes = parts[0] * 60 + parts[1];
+    }
+
+    // Helper formatters (reuse small versions from TourTable)
+    const formatTime = (totalMinutes) => {
+      const rounded = Math.round(totalMinutes);
+      const hours = Math.floor(rounded / 60);
+      const minutes = rounded % 60;
+      return `${hours}h${minutes.toString().padStart(2, '0')}`;
+    };
+    const formatTimeRange = (startMinutes, durationMinutes) => {
+      const s = Math.round(startMinutes);
+      const e = Math.round(startMinutes + durationMinutes);
+      const sh = Math.floor(s / 60); const sm = s % 60;
+      const eh = Math.floor(e / 60); const em = e % 60;
+      return `${sh}h${sm.toString().padStart(2, '0')}-${eh}h${em.toString().padStart(2, '0')}`;
+    };
+
+    // If warehouse exists, print it as start
+    if (deliveryRequestSet?.warehouse) {
+      content += `Départ Entrepôt (${deliveryRequestSet.warehouse.nodeId || 'N/A'}) - départ: ${formatTime(currentTimeMinutes)}\n\n`;
+    }
+
+    if (Array.isArray(tourData?.tour)) {
       tourData.tour.forEach((trajet, index) => {
-        const nomRue = trajet?.nomRue || 'Segment';
-        const origine = trajet?.origine || 'N/A';
-        const destination = trajet?.destination || 'N/A';
-        const longueur = Number(trajet?.longueur || 0).toFixed(2);
+        // compute total distance for this trajet
+        let totalDistanceTrajet = 0;
+        if (Array.isArray(trajet.segments) && trajet.segments.length > 0) {
+          totalDistanceTrajet = trajet.segments.reduce((sum, s) => sum + (s.length || s.longueur || 0), 0);
+        } else if (trajet.longueurTotale) {
+          totalDistanceTrajet = trajet.longueurTotale;
+        } else if (trajet.distance) {
+          totalDistanceTrajet = trajet.distance;
+        }
 
-        content += `${index + 1}. ${nomRue}\n`;
-        content += `   De: ${origine}\n`;
-        content += `   À: ${destination}\n`;
-        content += `   Longueur: ${longueur} m\n\n`;
+        // travel time
+        const travelTimeMinutes = totalDistanceTrajet > 0 ? totalDistanceTrajet / COURIER_SPEED_M_PER_MIN : 0;
+        // list streets involved
+        let streets = [];
+        if (Array.isArray(trajet.segments) && trajet.segments.length > 0) {
+          streets = trajet.segments.map(s => s.name || s.nomRue || s.street || s.streetName || 'Rue inconnue');
+        }
+
+        // arrival stop info
+        const stopNode = trajet.stopArrivee?.idNode || trajet.stopArrivee || 'N/A';
+        const stopType = trajet.stopArrivee?.typeStop || trajet.stopArrivee?.type || null;
+
+        // advance current time by travel time
+        if (travelTimeMinutes > 0) {
+          currentTimeMinutes += travelTimeMinutes;
+        }
+
+        content += `Trajet ${index + 1}: De ${trajet.stopDepart?.idNode || 'N/A'} à ${stopNode} — ${totalDistanceTrajet.toFixed(2)} m — temps trajet ~ ${travelTimeMinutes.toFixed(2)} min\n`;
+        if (streets.length > 0) {
+          content += `\tRues à parcourir: \n${[...new Set(streets)].join('\n\t')}\n`;
+        }
+
+        // If it's a pickup or delivery, find the demand to get durations
+        if (stopType === 'PICKUP') {
+          const demand = deliveryRequestSet?.demands?.find(d => d.pickupNodeId === stopNode);
+          const pickupDurMin = demand ? (demand.pickupDurationSec || 0) / 60 : 0;
+          content += `  → PICKUP (node ${stopNode}) — heure estimée: ${formatTimeRange(currentTimeMinutes, pickupDurMin)} — durée: ${pickupDurMin.toFixed(2)} min\n\n`;
+          currentTimeMinutes += pickupDurMin;
+        } else if (stopType === 'DELIVERY') {
+          const demand = deliveryRequestSet?.demands?.find(d => d.deliveryNodeId === stopNode);
+          const deliveryDurMin = demand ? (demand.deliveryDurationSec || 0) / 60 : 0;
+          content += `  → DELIVERY (node ${stopNode}) — heure estimée: ${formatTimeRange(currentTimeMinutes, deliveryDurMin)} — durée: ${deliveryDurMin.toFixed(2)} min\n\n`;
+          currentTimeMinutes += deliveryDurMin;
+        } else if (stopType === 'WAREHOUSE' && index === tourData.tour.length - 1) {
+          content += `  → Retour Entrepôt (${stopNode}) — arrivée approximative: ${formatTime(currentTimeMinutes)}\n\n`;
+        } else {
+          // unknown stop type - just print arrival time
+          content += `  → Arrivée approximative: ${formatTime(currentTimeMinutes)}\n\n`;
+        }
       });
     }
 
@@ -96,18 +169,6 @@ export default function TourActions({ tourData, onModify, onSaveItinerary, onSav
   return (
     <>
       <div className="flex gap-2 justify-center">
-        {/* Modifier Tournée */}
-        <button
-          onClick={onModify}
-          disabled={!tourData}
-          className="flex-1 bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                   flex items-center justify-center gap-2"
-          title="Modifier la tournée calculée"
-        >
-          <Edit size={18} />
-          Modifier Tournée
-        </button>
 
         {/* Sauvegarder itinéraire (.txt) */}
         <button
