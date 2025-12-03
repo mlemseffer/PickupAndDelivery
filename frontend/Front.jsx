@@ -597,15 +597,13 @@ export default function PickupDeliveryUI() {
                         </button>
                       </div>
                       
-                      {/* Centralized TourActions (Modifier / Sauvegarder itinéraire / Sauvegarder tournée) */}
-                      <div className="flex gap-3">
-                        <TourActions
-                          tourData={tourData}
-                          deliveryRequestSet={deliveryRequestSet}
-                          onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
-                          onSaveTour={() => console.log('Tournée sauvegardée')}
-                        />
-                      </div>
+                      {/* Deuxième ligne : Sauvegarder itinéraire et Sauvegarder tournée */}
+                      <TourActions
+                        tourData={tourData}
+                        deliveryRequestSet={deliveryRequestSet}
+                        onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
+                        onSaveTour={() => console.log('Tournée sauvegardée')}
+                      />
                     </div>
                   )}
                 </div>

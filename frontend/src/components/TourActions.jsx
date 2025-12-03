@@ -180,7 +180,7 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
 
   return (
     <>
-      <div className="flex gap-2 justify-center">
+      <div className="flex gap-3">
 
         {/* Sauvegarder itinéraire (.txt) */}
         <button
