@@ -5,6 +5,7 @@ import MapViewer from './src/components/MapViewer';
 import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
+import RestoreTourModal from './src/components/RestoreTourModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
 import CustomAlert from './src/components/CustomAlert';
@@ -137,6 +138,7 @@ export default function PickupDeliveryUI() {
   const [showDeliveryUpload, setShowDeliveryUpload] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [showCourierModal, setShowCourierModal] = useState(false);
+  const [showRestoreTourModal, setShowRestoreTourModal] = useState(false);
   const [mapData, setMapData] = useState(null);
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
   const [courierCount, setCourierCount] = useState(1);
@@ -367,36 +369,39 @@ export default function PickupDeliveryUI() {
   // Gestion de l'ajout manuel d'une demande
   const handleManualDemandAdd = async (demand) => {
     try {
-      // Enregistre la demande dans le backend
-      await apiService.addDeliveryRequest({
+      // Ajouter la demande au backend
+      const response = await apiService.addDeliveryRequest({
         pickupAddress: demand.pickupNodeId,
         deliveryAddress: demand.deliveryNodeId,
         pickupDuration: demand.pickupDurationSec,
         deliveryDuration: demand.deliveryDurationSec
       });
-      // Rafraîchit la liste depuis le backend pour récupérer l'id et l'état à jour
-      const requestSet = await apiService.getCurrentRequestSet();
-      
-      // Réassigner les couleurs dans le bon ordre
-      if (requestSet?.demands) {
-        const demandsWithColors = requestSet.demands.map((demand, index) => ({
-          ...demand,
-          color: getColorFromPalette(index)
-        }));
-        
-        setDeliveryRequestSet({
-          ...requestSet,
-          demands: demandsWithColors
-        });
-      } else {
-        setDeliveryRequestSet(requestSet);
-      }
 
-      // Réinitialiser la tournée car la liste des demandes a changé
-      if (tourData) {
-        console.log('🔄 Réinitialisation de la tournée après ajout manuel');
-        setTourData(null);
-      }
+      // Extraire l'ID correctement selon la structure de réponse
+      const addedDemandId = response.data?.id || response.id;
+
+      const newDemand = {
+        id: addedDemandId || `demand_${Date.now()}`,
+        pickupNodeId: demand.pickupNodeId,
+        deliveryNodeId: demand.deliveryNodeId,
+        pickupDurationSec: demand.pickupDurationSec,
+        deliveryDurationSec: demand.deliveryDurationSec
+      };
+
+      // Ajouter à la liste existante
+      const updatedDemands = [...(deliveryRequestSet?.demands || []), newDemand];
+      const demandsWithColors = updatedDemands.map((d, index) => ({
+        ...d,
+        color: getColorFromPalette(index)
+      }));
+
+      const updatedRequestSet = {
+        warehouse: deliveryRequestSet?.warehouse || null,
+        demands: demandsWithColors
+      };
+
+      // Appeler le callback pour mettre à jour le state et recalculer si besoin
+      handleDeliveryRequestSetUpdated(updatedRequestSet);
     } catch (err) {
       showAlert('error', '❌ Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
@@ -423,6 +428,102 @@ export default function PickupDeliveryUI() {
     }
   };
 
+  // Gestion de la restauration d'une tournée depuis un fichier JSON
+  const handleRestoreTour = async (restoredTourData, demands = []) => {
+    if (!mapData) {
+      alert('Veuillez d\'abord charger une carte');
+      return;
+    }
+
+    try {
+      console.log('🔄 Restauration de tournée avec', demands.length, 'demandes');
+
+      // Ajouter les demandes au backend et récupérer les IDs générés
+      const addedDemandsWithIds = [];
+      
+      for (const demand of demands) {
+        const response = await apiService.addDeliveryRequest({
+          pickupAddress: demand.pickupNodeId,
+          deliveryAddress: demand.deliveryNodeId,
+          pickupDuration: demand.pickupDurationSec,
+          deliveryDuration: demand.deliveryDurationSec
+        });
+        
+        // Récupérer l'ID retourné par le backend
+        const backendId = response.data?.id || response.id;
+        
+        addedDemandsWithIds.push({
+          ...demand,
+          id: backendId || demand.id // Utiliser l'ID du backend, sinon l'ancien ID
+        });
+      }
+
+      console.log('✅ Toutes les demandes ont été ajoutées au backend');
+
+      // Utiliser les demandes avec les IDs du backend
+      if (addedDemandsWithIds && addedDemandsWithIds.length > 0) {
+        console.log(`📊 ${addedDemandsWithIds.length} demandes avec IDs backend`);
+        
+        // Trouver le warehouse (premier nœud du premier segment)
+        const firstSegment = restoredTourData.tour[0]?.segments[0];
+        const warehouseNodeId = firstSegment?.origin || (mapData.nodes?.[0]?.id);
+        
+        const demandsWithColors = addedDemandsWithIds.map((demand, index) => ({
+          ...demand,
+          color: getColorFromPalette(index)
+        }));
+        
+        setDeliveryRequestSet({
+          warehouse: {
+            nodeId: warehouseNodeId,
+            departureTime: '08:00'
+          },
+          demands: demandsWithColors
+        });
+
+        console.log('✅ DeliveryRequestSet défini avec IDs du backend');
+        
+        // 🔄 Recalculer la tournée automatiquement pour avoir la bonne structure
+        setIsCalculatingTour(true);
+        try {
+          const result = await apiService.calculateTour(courierCount);
+          
+          if (result.success && result.data && result.data.length > 0) {
+            const tour = result.data[0];
+            const newTourData = {
+              tour: tour.trajets || tour.segments || tour.path || [],
+              metrics: {
+                stopCount: tour.stops?.length || 0,
+                totalDistance: tour.totalDistance || 0,
+                segmentCount: (tour.trajets || tour.segments || tour.path || []).length
+              }
+            };
+            
+            setTourData(newTourData);
+            console.log('✅ Tournée recalculée après restauration');
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors du recalcul:', error);
+          // En cas d'erreur, garder la tournée restaurée
+          setTourData(restoredTourData);
+        } finally {
+          setIsCalculatingTour(false);
+        }
+      }
+
+      setActiveTab('map');
+      
+      alert(`Tournée restaurée avec succès !\n\n` +
+            `📍 Stops: ${restoredTourData.metrics.stopCount}\n` +
+            `📏 Distance: ${restoredTourData.metrics.totalDistance.toFixed(2)} m\n` +
+            `🛣️  Segments: ${restoredTourData.metrics.segmentCount}\n` +
+            `📦 Demandes: ${addedDemandsWithIds.length}`);
+    } catch (error) {
+      console.error('❌ Erreur lors de la restauration de la tournée:', error);
+      alert(`Erreur lors de la restauration : ${error.message}`);
+    }
+  };
+
   return (
     <div className="h-screen bg-gray-800 text-white flex flex-col overflow-hidden">
       {/* Navigation Bar avec titre intégré */}
@@ -433,8 +534,16 @@ export default function PickupDeliveryUI() {
           showMapMessage={showMessage}
           hasMap={mapData !== null}
           onLoadDeliveryRequests={() => setShowDeliveryUpload(true)}
+          onRestoreTour={() => setShowRestoreTourModal(true)}
         />
       </div>
+
+      {/* Restore Tour Modal */}
+      <RestoreTourModal
+        isOpen={showRestoreTourModal}
+        onClose={() => setShowRestoreTourModal(false)}
+        onRestore={handleRestoreTour}
+      />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">

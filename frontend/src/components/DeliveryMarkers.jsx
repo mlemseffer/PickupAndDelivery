@@ -66,7 +66,7 @@ export default function DeliveryMarkers({ requestSet, nodesById }) {
   }
 
   const { warehouse, demands } = requestSet;
-  console.log('DeliveryMarkers: affichage de', demands.length, 'demandes', demands);
+
 
   // Récupérer le nœud de l'entrepôt
   const warehouseNode = nodesById[warehouse.nodeId];

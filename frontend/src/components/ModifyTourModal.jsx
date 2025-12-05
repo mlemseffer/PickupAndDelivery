@@ -10,7 +10,7 @@ import './ModifyTourModal.css';
  * - Supprimer une livraison
  * - Changer le coursier assigné
  */
-export default function ModifyTourModal({ tourData, mapData, deliveries, onClose, onTourUpdated, onDeliveryRequestSetUpdated }) {
+export default function ModifyTourModal({ tourData, mapData, deliveries, warehouse, onClose, onTourUpdated, onDeliveryRequestSetUpdated }) {
   const [activeTab, setActiveTab] = useState('remove'); // Défaut: 'remove'
   
   // État pour la suppression
@@ -60,10 +60,8 @@ export default function ModifyTourModal({ tourData, mapData, deliveries, onClose
   
  */
 const handleRemoveDelivery = async (deliveryIndex) => {
-  const deliveryId = deliveriesList[deliveryIndex]?.id;
-
-  console.log("Delivery à supprimer:", deliveriesList[deliveryIndex]);
-  console.log("ID transmis au backend:", deliveryId);
+  const delivery = deliveriesList[deliveryIndex];
+  const deliveryId = delivery?.id;
 
   if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette livraison ?')) {
     return;
@@ -74,26 +72,25 @@ const handleRemoveDelivery = async (deliveryIndex) => {
   setSuccess(null);
 
   try {
-    // Appel API avec l'id string
+    // 1. Appel API avec l'id string
     const response = await apiService.removeDemand(deliveryId);
     console.log('Réponse de removeDemand:', response);
 
     if (response.success) {
       setSuccess('Livraison supprimée avec succès');
       
-      // Récupère la liste mise à jour depuis le backend
-      // pour synchroniser le frontend avec l'état du backend
-      const updatedRequestSet = await apiService.getCurrentRequestSet();
-      console.log('updatedRequestSet après suppression:', updatedRequestSet);
+      // 2. Créer localement le nouvel état sans cette livraison
+      // (car le backend retourne null, donc on le fait en frontend)
+      const updatedDemands = deliveriesList.filter((_, idx) => idx !== deliveryIndex);
       
-      // Appelle le callback pour mettre à jour deliveryRequestSet dans Front.jsx
-      // getCurrentRequestSet() retourne déjà {warehouse, demands}, pas ApiResponse
-      if (onDeliveryRequestSetUpdated && updatedRequestSet) {
+      const updatedRequestSet = {
+        warehouse: warehouse || null,
+        demands: updatedDemands
+      };
+      
+      // 3. Appelle le callback pour mettre à jour deliveryRequestSet dans Front.jsx
+      if (onDeliveryRequestSetUpdated) {
         onDeliveryRequestSetUpdated(updatedRequestSet);
-      }
-      // Aussi met à jour currentTour si besoin
-      if (onTourUpdated) {
-        onTourUpdated(updatedRequestSet);
       }
       
       // Ne pas fermer la modal automatiquement pour permettre d'autres suppressions
