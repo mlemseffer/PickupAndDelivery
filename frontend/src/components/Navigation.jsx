@@ -4,7 +4,7 @@ import { Home, MapPin, Bike, Route } from 'lucide-react';
 /**
  * Composant de navigation principal
  */
-export default function Navigation({ activeTab, onTabChange, showMapMessage, hasMap, onLoadDeliveryRequests }) {
+export default function Navigation({ activeTab, onTabChange, showMapMessage, hasMap, onLoadDeliveryRequests, onRestoreTour }) {
   return (
     <nav className="bg-gray-700 border-b border-gray-600">
       <div className="flex items-center justify-between px-6">
@@ -57,10 +57,11 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage, has
           )}
         </button>
         
-        {/* Route Icon - Tours */}
+        {/* Route Icon - Restaurer tournée */}
         <button 
           className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'tours' ? 'bg-gray-500' : ''}`}
-          onClick={() => onTabChange('tours')}
+          onClick={() => onRestoreTour()}
+          title="Restaurer une tournée depuis un fichier JSON"
         >
           <Route size={32} className={`${hasMap ? 'text-yellow-400' : 'text-white'}`} />
         </button>

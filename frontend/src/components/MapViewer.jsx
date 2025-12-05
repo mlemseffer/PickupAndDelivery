@@ -45,9 +45,7 @@ export default function MapViewer({
   // Extraire la liste des demandes de livraison
   const deliveries = deliveryRequestSet?.demands || [];
   
-  // Debug logs
-  console.log('MapViewer reçoit deliveryRequestSet:', deliveryRequestSet);
-  console.log('MapViewer deliveries:', deliveries);
+
 
   // Gérer le plein écran
   const toggleFullscreen = () => {
@@ -150,6 +148,7 @@ export default function MapViewer({
                 tourData={currentTour}
                 mapData={mapData}
                 deliveries={deliveries}
+                warehouse={deliveryRequestSet?.warehouse}
                 onTourUpdated={setCurrentTour}
                 onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
               />

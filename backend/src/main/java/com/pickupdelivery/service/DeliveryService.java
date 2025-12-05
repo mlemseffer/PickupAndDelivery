@@ -58,22 +58,38 @@ public class DeliveryService {
     public void addDeliveryRequest(DeliveryRequest request) {
         // Ajout à la liste simple
         currentRequests.add(request);
-        // Ajout à la tournée courante (currentRequestSet)
-        if (currentRequestSet != null) {
-            // Génère un id UUID si absent
-            if (request.getId() == null || request.getId().isEmpty()) {
-                request.setId(java.util.UUID.randomUUID().toString());
+        
+        // Initialiser currentRequestSet s'il n'existe pas
+        if (currentRequestSet == null) {
+            currentRequestSet = new DeliveryRequestSet();
+            currentRequestSet.setDemands(new ArrayList<>());
+            // Créer un warehouse par défaut si pas d'entrepôt
+            if (currentRequestSet.getWarehouse() == null) {
+                com.pickupdelivery.model.Warehouse warehouse = new com.pickupdelivery.model.Warehouse();
+                warehouse.setNodeId("0"); // ID par défaut du warehouse
+                currentRequestSet.setWarehouse(warehouse);
             }
-            // Convertit en Demand si besoin
-            com.pickupdelivery.model.Demand demand = new com.pickupdelivery.model.Demand();
-            demand.setId(request.getId());
-            demand.setPickupNodeId(request.getPickupAddress());
-            demand.setDeliveryNodeId(request.getDeliveryAddress());
-            demand.setPickupDurationSec(request.getPickupDuration());
-            demand.setDeliveryDurationSec(request.getDeliveryDuration());
-            demand.setCourierId(null);
-            currentRequestSet.getDemands().add(demand);
+            System.out.println("[ADD] Création de currentRequestSet");
         }
+        
+        // Générer un id UUID si absent
+        if (request.getId() == null || request.getId().isEmpty()) {
+            request.setId(java.util.UUID.randomUUID().toString());
+        }
+        
+        System.out.println("[ADD] Ajout demande: id=" + request.getId() + ", pickup=" + request.getPickupAddress() + ", delivery=" + request.getDeliveryAddress());
+        
+        // Convertir en Demand et ajouter à currentRequestSet
+        com.pickupdelivery.model.Demand demand = new com.pickupdelivery.model.Demand();
+        demand.setId(request.getId());
+        demand.setPickupNodeId(request.getPickupAddress());
+        demand.setDeliveryNodeId(request.getDeliveryAddress());
+        demand.setPickupDurationSec(request.getPickupDuration());
+        demand.setDeliveryDurationSec(request.getDeliveryDuration());
+        demand.setCourierId(null);
+        currentRequestSet.getDemands().add(demand);
+        
+        System.out.println("[ADD] Total demandes dans currentRequestSet: " + currentRequestSet.getDemands().size());
     }
 
     /**
@@ -108,6 +124,11 @@ public class DeliveryService {
      * @return L'ensemble des demandes avec l'entrepôt
      */
     public DeliveryRequestSet getCurrentRequestSet() {
+        if (currentRequestSet == null) {
+            System.out.println("[GET] currentRequestSet est NULL");
+        } else {
+            System.out.println("[GET] currentRequestSet contient " + currentRequestSet.getDemands().size() + " demandes");
+        }
         return currentRequestSet;
     }
 

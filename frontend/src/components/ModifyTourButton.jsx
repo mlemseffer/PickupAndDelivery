@@ -10,7 +10,7 @@ import './ModifyTourButton.css';
  * - Supprimer une livraison
  * - Modifier le coursier assigné
  */
-export default function ModifyTourButton({ tourData, mapData, deliveries, onTourUpdated, onDeliveryRequestSetUpdated }) {
+export default function ModifyTourButton({ tourData, mapData, deliveries, warehouse, onTourUpdated, onDeliveryRequestSetUpdated }) {
   const [showModal, setShowModal] = useState(false);
 
   return (
@@ -29,6 +29,7 @@ export default function ModifyTourButton({ tourData, mapData, deliveries, onTour
           tourData={tourData}
           mapData={mapData}
           deliveries={deliveries}
+          warehouse={warehouse}
           onClose={() => setShowModal(false)}
           onTourUpdated={onTourUpdated}
           onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
