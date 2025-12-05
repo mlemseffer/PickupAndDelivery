@@ -93,7 +93,9 @@ const handleRemoveDelivery = async (deliveryIndex) => {
         onDeliveryRequestSetUpdated(updatedRequestSet);
       }
       
-      setTimeout(() => onClose(), 1500);
+      // Ne pas fermer la modal automatiquement pour permettre d'autres suppressions
+      // L'utilisateur peut fermer manuellement quand il a terminé
+      setTimeout(() => setSuccess(null), 2000); // Effacer le message de succès après 2s
     } else {
       console.error('Erreur réponse backend:', response);
       setError(response.message || 'Erreur lors de la suppression');
@@ -152,18 +154,6 @@ const handleRemoveDelivery = async (deliveryIndex) => {
             <X size={24} />
           </button>
         </div>
-
-        {error && (
-          <div className="alert alert-error">
-            {error}
-          </div>
-        )}
-
-        {success && (
-          <div className="alert alert-success">
-            {success}
-          </div>
-        )}
 
         <div className="modal-tabs">
           <button 
@@ -270,6 +260,19 @@ const handleRemoveDelivery = async (deliveryIndex) => {
             </div>
           )}
         </div>
+
+        {/* Messages de succès/erreur en bas */}
+        {error && (
+          <div className="alert alert-error alert-bottom">
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div className="alert alert-success alert-bottom">
+            {success}
+          </div>
+        )}
       </div>
     </div>
   );

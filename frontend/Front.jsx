@@ -8,6 +8,8 @@ import CourierCountModal from './src/components/CourierCountModal';
 import RestoreTourModal from './src/components/RestoreTourModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
+import CustomAlert from './src/components/CustomAlert';
+import ModifyTourModal from './src/components/ModifyTourModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -142,6 +144,8 @@ export default function PickupDeliveryUI() {
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null);
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
+  const [showModifyTourModal, setShowModifyTourModal] = useState(false);
+  // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
   const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
@@ -149,8 +153,20 @@ export default function PickupDeliveryUI() {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [savedFormData, setSavedFormData] = useState(null); // Pour sauvegarder les données du formulaire
 
+  // États pour CustomAlert
+  const [alertConfig, setAlertConfig] = useState(null);
+
   // État pour savoir si on est en mode ajout manuel (formulaire ouvert ou sélection active)
   const isAddingManually = showManualForm || isMapSelectionActive;
+
+  // Fonction helper pour afficher une alerte personnalisée
+  const showAlert = (type, title, message, autoClose = false) => {
+    setAlertConfig({ type, title, message, autoClose });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig(null);
+  };
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -199,7 +215,7 @@ export default function PickupDeliveryUI() {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
     
     // Réassigner les couleurs dans le bon ordre après modification
-    if (updatedSet?.demands) {
+    if (updatedSet?.demands && updatedSet.demands.length > 0) {
       const demandsWithColors = updatedSet.demands.map((demand, index) => ({
         ...demand,
         color: getColorFromPalette(index)
@@ -211,15 +227,20 @@ export default function PickupDeliveryUI() {
       });
 
       // ✅ Recalculer automatiquement si une tournée était déjà calculée
-      if (tourData && demandsWithColors.length > 0) {
+      if (tourData) {
         console.log('🔄 Recalcul automatique de la tournée après modification des demandes...');
+        console.log('📊 Nombre de demandes après modification:', demandsWithColors.length);
         setIsCalculatingTour(true);
         
         try {
           const result = await apiService.calculateTour(courierCount);
+          console.log('📦 Résultat du recalcul:', result);
           
           if (result.success && result.data && result.data.length > 0) {
             const tour = result.data[0];
+            console.log('✅ Tour recalculé:', tour);
+            console.log('📍 Stops dans le nouveau tour:', tour.stops?.length || 0);
+            
             const newTourData = {
               tour: tour.trajets || tour.segments || tour.path || [],
               metrics: {
@@ -229,21 +250,26 @@ export default function PickupDeliveryUI() {
               }
             };
             
+            console.log('📊 Nouveau tourData créé:', newTourData);
+            console.log('🛣️  Nombre de trajets:', newTourData.tour.length);
             setTourData(newTourData);
-            console.log('✅ Tournée recalculée automatiquement');
+            console.log('✅ Tournée recalculée automatiquement avec', newTourData.tour.length, 'trajets');
+          } else {
+            console.warn('⚠️ Pas de données valides dans le résultat du recalcul');
+            setTourData(null);
           }
         } catch (error) {
           console.error('❌ Erreur lors du recalcul automatique:', error);
+          setTourData(null);
         } finally {
           setIsCalculatingTour(false);
         }
       }
     } else {
-      setDeliveryRequestSet(updatedSet);
-      // Si plus aucune demande, réinitialiser la tournée
-      if (tourData) {
-        setTourData(null);
-      }
+      // Si plus aucune demande, réinitialiser la tournée ET le deliveryRequestSet
+      console.log('⚠️ Aucune demande restante, réinitialisation de la tournée');
+      setDeliveryRequestSet(updatedSet || null);
+      setTourData(null);
     }
   };
 
@@ -272,7 +298,7 @@ export default function PickupDeliveryUI() {
   // Gestion du calcul de la tournée
   const handleCalculateTour = async () => {
     if (!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0) {
-      alert('Veuillez d\'abord charger des demandes de livraison');
+      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger des demandes de livraison');
       return;
     }
 
@@ -308,26 +334,33 @@ export default function PickupDeliveryUI() {
         console.log('📊 tour.length:', tourData.tour.length);
         
         setTourData(tourData);
-        alert(`✅ Tournée calculée avec succès !\n\n` +
-              `📍 Stops: ${tourData.metrics.stopCount}\n` +
-              `📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n` +
-              `🛣️  Segments: ${tourData.metrics.segmentCount}`);
+        showAlert(
+          'success',
+          '✅ Tournée calculée avec succès !',
+          `📍 Stops: ${tourData.metrics.stopCount}\n📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n🛣️  Segments: ${tourData.metrics.segmentCount}`,
+          true
+        );
       } else {
         console.error('❌ Réponse invalide:', result);
-        alert(`Erreur: ${result.message || 'Réponse invalide du serveur'}`);
+        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
       console.error('💥 Erreur lors du calcul de la tournée:', error);
-      alert(`Erreur: ${error.message}`);
+      showAlert('error', '❌ Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
   };
 
+  
+  
+
+  
+
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
-      alert('Veuillez d\'abord charger une carte');
+      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger une carte');
       return;
     }
     setShowManualForm(true);
@@ -370,7 +403,7 @@ export default function PickupDeliveryUI() {
       // Appeler le callback pour mettre à jour le state et recalculer si besoin
       handleDeliveryRequestSetUpdated(updatedRequestSet);
     } catch (err) {
-      alert('Erreur lors de l\'ajout manuel : ' + err.message);
+      showAlert('error', '❌ Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
     setSelectedNodeId(null);
@@ -528,6 +561,7 @@ export default function PickupDeliveryUI() {
 
         {/* Map Upload View */}
         {showMapUpload && !mapData && (
+
           <MapUploader 
             onMapLoaded={handleMapLoaded}
             onCancel={handleCancelUpload}
@@ -651,7 +685,7 @@ export default function PickupDeliveryUI() {
                   ) : (
                     // Boutons après calcul de tournée (4 boutons sur 2 lignes)
                     <div className="flex flex-col gap-3">
-                      {/* Première ligne : Ajouter et Calculer tournée */}
+                      {/* Première ligne : Ajouter et Modifier tournée */}
                       <div className="flex gap-3">
                         <button 
                           onClick={handleAddDeliveryManually}
@@ -663,63 +697,22 @@ export default function PickupDeliveryUI() {
                         </button>
 
                         <button
-                          onClick={handleCalculateTour}
-                          disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                          onClick={() => setShowModifyTourModal(true)}
+                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
                                    flex items-center justify-center gap-2"
-                          title="Calculer la tournée optimale"
+                          title="Modifier la tournée calculée"
                         >
-                          {isCalculatingTour ? 'Calcul en cours...' : '🧮 Calculer tournée'}
+                          ✏️ Modifier Tournée
                         </button>
                       </div>
                       
-                      {/* Deuxième ligne : Sauvegarder */}
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            const content = generateItineraryText(tourData);
-                            const blob = new Blob([content], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `itineraire_${new Date().toISOString().split('T')[0]}.txt`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder l'itinéraire en fichier texte"
-                        >
-                          📄 Sauvegarder itinéraire
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const tourJson = JSON.stringify(tourData, null, 2);
-                            const blob = new Blob([tourJson], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `tournee_${new Date().toISOString().split('T')[0]}.json`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder la tournée complète (JSON)"
-                        >
-                          💾 Sauvegarder Tournée
-                        </button>
-                      </div>
+                      {/* Deuxième ligne : Sauvegarder itinéraire et Sauvegarder tournée */}
+                      <TourActions
+                        tourData={tourData}
+                        deliveryRequestSet={deliveryRequestSet}
+                        onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
+                        onSaveTour={() => console.log('Tournée sauvegardée')}
+                      />
                     </div>
                   )}
                 </div>
@@ -740,7 +733,7 @@ export default function PickupDeliveryUI() {
           </div>
         )}
 
-        {/* Tours View - À implémenter */}
+  {/* Tours View - À implémenter */}
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
             <h2 className="text-2xl font-bold text-center">
@@ -751,7 +744,34 @@ export default function PickupDeliveryUI() {
             </p>
           </div>
         )}
+        {/* Save modals are centralized inside TourActions */}
+
       </main>
+
+      {/* CustomAlert */}
+      {alertConfig && (
+        <CustomAlert
+          type={alertConfig.type}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          autoClose={alertConfig.autoClose}
+          onClose={closeAlert}
+        />
+      )}
+
+      {/* ModifyTourModal */}
+      {showModifyTourModal && (
+        <ModifyTourModal
+          tourData={tourData}
+          mapData={mapData}
+          deliveries={deliveryRequestSet?.demands || []}
+          onClose={() => setShowModifyTourModal(false)}
+          onTourUpdated={(updatedTour) => {
+            setTourData(updatedTour);
+          }}
+          onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
+        />
+      )}
     </div>
   );
 }
