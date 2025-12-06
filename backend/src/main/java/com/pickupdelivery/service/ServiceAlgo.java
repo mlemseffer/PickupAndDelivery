@@ -1,6 +1,9 @@
 package com.pickupdelivery.service;
 
+import com.pickupdelivery.dto.DistributionWarnings;
 import com.pickupdelivery.dto.ShortestPathResult;
+import com.pickupdelivery.dto.TourDistributionResult;
+import com.pickupdelivery.dto.TourMetrics;
 import com.pickupdelivery.exception.AlgorithmException;
 import com.pickupdelivery.model.*;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
@@ -976,6 +979,209 @@ public class ServiceAlgo {
     }
 
     // =========================================================================
+    // DISTRIBUTION FIFO MULTI-COURSIERS (PHASE 2)
+    // =========================================================================
+
+    /**
+     * Distribue une route globale optimisée entre N coursiers selon l'algorithme FIFO strict
+     * 
+     * PRINCIPE:
+     * 1. Parcours séquentiel de la route optimisée (ordre FIFO)
+     * 2. Pour chaque pickup rencontré, évaluer si la demande complète (pickup + delivery) 
+     *    peut être ajoutée à la tournée actuelle sans dépasser 4h
+     * 3. Si oui: ajouter pickup ET delivery à la tournée actuelle
+     * 4. Si non: fermer la tournée actuelle, passer au coursier suivant
+     * 5. Si plus de coursiers disponibles: marquer la demande comme non assignée
+     * 
+     * CONTRAINTES RESPECTÉES:
+     * - Contrainte temporelle: aucune tournée > 4h (14400 secondes)
+     * - Contrainte de précédence: pickup et delivery d'une même demande toujours dans la même tournée
+     * - Ordre FIFO strict: pas d'optimisation d'équilibrage
+     * 
+     * @param globalOptimizedRoute Route globale optimisée (tous les stops)
+     * @param graph Graphe avec distances
+     * @param courierCount Nombre de coursiers disponibles (1-10)
+     * @param pickupsByRequestId Map des pickups par ID de demande
+     * @param deliveryByRequestId Map des deliveries par ID de demande
+     * @param demandMap Map des demandes complètes
+     * @param warehouse Stop warehouse
+     * @return Résultat de la distribution avec tours, métriques et warnings
+     */
+    private TourDistributionResult distributeFIFO(
+            List<Stop> globalOptimizedRoute,
+            Graph graph,
+            int courierCount,
+            Map<String, List<Stop>> pickupsByRequestId,
+            Map<String, Stop> deliveryByRequestId,
+            Map<String, Demand> demandMap,
+            Stop warehouse
+    ) {
+        System.out.println("\n📦 Phase FIFO: Distribution multi-coursiers...");
+        System.out.println("   Nombre de coursiers disponibles: " + courierCount);
+        System.out.println("   Contrainte temporelle: " + (TIME_LIMIT_SEC / 3600) + " heures");
+        
+        // Structures de résultat
+        List<com.pickupdelivery.model.AlgorithmModel.Tour> tours = new ArrayList<>();
+        List<String> unassignedDemandIds = new ArrayList<>();
+        Map<Integer, TourMetrics> metricsByCourier = new HashMap<>();
+        DistributionWarnings warnings = new DistributionWarnings();
+        
+        // État du coursier actuel
+        int currentCourierId = 1;
+        List<Stop> currentTourStops = new ArrayList<>();
+        currentTourStops.add(warehouse); // Départ depuis le warehouse
+        double currentTourTime = 0.0;
+        Set<String> processedDemands = new HashSet<>();
+        
+        System.out.println("\n   Parcours FIFO de la route optimisée...");
+        
+        // Parcours FIFO de la route optimisée
+        for (int i = 1; i < globalOptimizedRoute.size() - 1; i++) {
+            Stop stop = globalOptimizedRoute.get(i);
+            
+            // Ignorer les deliveries (traitées avec leurs pickups)
+            if (stop.getTypeStop() == Stop.TypeStop.DELIVERY) {
+                continue;
+            }
+            
+            // Traiter uniquement les pickups
+            if (stop.getTypeStop() == Stop.TypeStop.PICKUP) {
+                String demandId = stop.getIdDemande();
+                
+                // Vérifier si déjà traité
+                if (processedDemands.contains(demandId)) {
+                    continue;
+                }
+                
+                // Trouver le delivery correspondant dans la route
+                Stop deliveryStop = findDeliveryInRoute(demandId, globalOptimizedRoute, i);
+                
+                if (deliveryStop == null) {
+                    System.out.println("   ⚠️  Delivery non trouvé pour pickup " + demandId);
+                    throw new IllegalStateException(
+                        "Delivery non trouvé pour pickup " + demandId);
+                }
+                
+                // Récupérer la demande pour les temps de service
+                Demand demand = demandMap.get(demandId);
+                if (demand == null) {
+                    System.out.println("   ⚠️  Demande " + demandId + " non trouvée dans demandMap");
+                    throw new IllegalStateException("Demande " + demandId + " non trouvée");
+                }
+                
+                // Calculer le temps pour cette demande complète
+                Stop lastStop = currentTourStops.get(currentTourStops.size() - 1);
+                double demandTime = calculateDemandTime(
+                    lastStop, stop, deliveryStop, globalOptimizedRoute, graph, demand);
+                
+                // Temps avec retour au warehouse
+                double timeWithReturn = currentTourTime + demandTime 
+                    + calculateReturnTime(deliveryStop, warehouse, graph);
+                
+                // Vérifier contrainte 4h
+                if (timeWithReturn > TIME_LIMIT_SEC) {
+                    System.out.println("   ⚠️  Ajout de " + demandId + " dépasserait 4h (" + 
+                        String.format("%.2f", timeWithReturn / 3600) + "h)");
+                    
+                    // Fermer la tournée actuelle
+                    if (currentTourStops.size() > 1) {
+                        currentTourStops.add(warehouse);
+                        double tourDistance = computeRouteDistance(currentTourStops, graph);
+                        com.pickupdelivery.model.AlgorithmModel.Tour completedTour = 
+                            buildTour(currentTourStops, tourDistance, graph);
+                        completedTour.setCourierId(currentCourierId);
+                        tours.add(completedTour);
+                        
+                        System.out.println("   ✓ Tournée coursier " + currentCourierId + " fermée: " +
+                            String.format("%.2f", completedTour.getTotalDurationHours()) + "h, " +
+                            String.format("%.0f", tourDistance) + "m, " +
+                            completedTour.getRequestCount() + " demandes");
+                    }
+                    
+                    // Passer au coursier suivant
+                    if (currentCourierId < courierCount) {
+                        currentCourierId++;
+                        currentTourStops = new ArrayList<>();
+                        currentTourStops.add(warehouse);
+                        currentTourTime = 0.0;
+                        
+                        System.out.println("   → Passage au coursier " + currentCourierId);
+                        
+                        // Réessayer d'ajouter cette demande
+                        i--;
+                        continue;
+                    } else {
+                        // Plus de coursiers disponibles
+                        System.out.println("   ❌ Plus de coursiers disponibles, demande " + 
+                            demandId + " non assignée");
+                        unassignedDemandIds.add(demandId);
+                        processedDemands.add(demandId);
+                        warnings.setHasUnassignedDemands(true);
+                        warnings.addMessage("Demande " + demandId + 
+                            " non assignée (contrainte 4h et tous coursiers utilisés)");
+                        continue;
+                    }
+                }
+                
+                // Ajouter la demande complète à la tournée actuelle
+                currentTourStops.add(stop); // Pickup
+                currentTourStops.add(deliveryStop); // Delivery
+                currentTourTime += demandTime;
+                processedDemands.add(demandId);
+                
+                System.out.println("   ✓ Demande " + demandId + " assignée au coursier " + 
+                    currentCourierId + " (temps accumulé: " + 
+                    String.format("%.2f", currentTourTime / 3600) + "h)");
+            }
+        }
+        
+        // Fermer la dernière tournée
+        if (currentTourStops.size() > 1) {
+            currentTourStops.add(warehouse);
+            double tourDistance = computeRouteDistance(currentTourStops, graph);
+            com.pickupdelivery.model.AlgorithmModel.Tour lastTour = 
+                buildTour(currentTourStops, tourDistance, graph);
+            lastTour.setCourierId(currentCourierId);
+            tours.add(lastTour);
+            
+            System.out.println("   ✓ Tournée coursier " + currentCourierId + " (finale) fermée: " +
+                String.format("%.2f", lastTour.getTotalDurationHours()) + "h, " +
+                String.format("%.0f", tourDistance) + "m, " +
+                lastTour.getRequestCount() + " demandes");
+        }
+        
+        // Construire les métriques
+        for (com.pickupdelivery.model.AlgorithmModel.Tour tour : tours) {
+            TourMetrics metrics = new TourMetrics(
+                tour.getCourierId(),
+                tour.getTotalDistance(),
+                tour.getTotalDurationSec(),
+                tour.getRequestCount(),
+                tour.getStopCount(),
+                tour.exceedsTimeLimit()
+            );
+            metricsByCourier.put(tour.getCourierId(), metrics);
+            
+            if (tour.exceedsTimeLimit()) {
+                warnings.setHasTimeLimitExceeded(true);
+                warnings.addMessage("Coursier " + tour.getCourierId() + 
+                    " dépasse la limite de 4h (" + 
+                    String.format("%.2f", tour.getTotalDurationHours()) + "h)");
+            }
+        }
+        
+        System.out.println("\n   📊 Résumé de la distribution:");
+        System.out.println("      Coursiers utilisés: " + tours.size() + "/" + courierCount);
+        System.out.println("      Demandes assignées: " + processedDemands.size());
+        System.out.println("      Demandes non assignées: " + unassignedDemandIds.size());
+        
+        TourDistributionResult result = new TourDistributionResult(
+            tours, unassignedDemandIds, metricsByCourier, warnings);
+        
+        return result;
+    }
+
+    // =========================================================================
     // PHASE 5: INTÉGRATION - MÉTHODE PRINCIPALE DE CALCUL DE TOURNÉE
     // =========================================================================
 
@@ -1007,11 +1213,9 @@ public class ServiceAlgo {
             throw new IllegalArgumentException("Le graphe ne peut pas être null");
         }
 
-        if (courierCount != 1) {
-            throw new UnsupportedOperationException(
-                "Multi-livreurs pas encore implémenté. " +
-                "Utilisez courierCount = 1 pour le moment. " +
-                "Fonctionnalité prévue pour une prochaine version."
+        if (courierCount < 1 || courierCount > 10) {
+            throw new IllegalArgumentException(
+                "Le nombre de coursiers doit être entre 1 et 10 (reçu: " + courierCount + ")"
             );
         }
 
@@ -1021,6 +1225,7 @@ public class ServiceAlgo {
         
         System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
         System.out.println("║     CALCUL DE TOURNÉE OPTIMALE - GLOUTON + 2-OPT             ║");
+        System.out.println("║     Mode: " + (courierCount == 1 ? "1 COURSIER" : courierCount + " COURSIERS (FIFO)") + "                                        ║");
         System.out.println("╚════════════════════════════════════════════════════════════════╝");
         
         System.out.println("\n📊 Phase 1: Préparation des données...");
@@ -1092,16 +1297,62 @@ public class ServiceAlgo {
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
         System.out.println("\n📦 Phase 6: Construction de l'objet Tour...");
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // 6️⃣ CONSTRUCTION DES TOURS (MONO OU MULTI-COURSIER)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         
-        com.pickupdelivery.model.AlgorithmModel.Tour tour = buildTour(optimizedRoute, finalDistance, graph);
-        tour.setCourierId(DEFAULT_COURIER_ID);
+        System.out.println("\n📦 Phase 6: Construction des tours...");
         
-        System.out.println("   ✓ Tour créé avec succès");
-        System.out.println("   ✓ Livreur ID: " + tour.getCourierId());
-        System.out.println("   ✓ Nombre de trajets: " + tour.getTrajets().size());
-        System.out.println("   ⏱️  Durée totale: " + String.format("%.2f", tour.getTotalDurationHours()) + " h " +
-                         "(" + String.format("%.0f", tour.getTotalDurationSec()) + " s)");
-        System.out.println("   ✓ Respect de la contrainte 4h: " + (!tour.exceedsTimeLimit() ? "OUI" : "NON ⚠️"));
+        List<com.pickupdelivery.model.AlgorithmModel.Tour> tours;
+        
+        if (courierCount == 1) {
+            // MODE MONO-COURSIER : comportement classique
+            System.out.println("   Mode: 1 coursier (tournée unique)");
+            
+            com.pickupdelivery.model.AlgorithmModel.Tour tour = buildTour(optimizedRoute, finalDistance, graph);
+            tour.setCourierId(DEFAULT_COURIER_ID);
+            
+            System.out.println("   ✓ Tour créé avec succès");
+            System.out.println("   ✓ Livreur ID: " + tour.getCourierId());
+            System.out.println("   ✓ Nombre de trajets: " + tour.getTrajets().size());
+            System.out.println("   ⏱️  Durée totale: " + String.format("%.2f", tour.getTotalDurationHours()) + " h " +
+                             "(" + String.format("%.0f", tour.getTotalDurationSec()) + " s)");
+            System.out.println("   ✓ Respect de la contrainte 4h: " + (!tour.exceedsTimeLimit() ? "OUI" : "NON ⚠️"));
+            
+            tours = Arrays.asList(tour);
+            
+        } else {
+            // MODE MULTI-COURSIERS : distribution FIFO
+            System.out.println("   Mode: " + courierCount + " coursiers (distribution FIFO)");
+            
+            TourDistributionResult distributionResult = distributeFIFO(
+                optimizedRoute,
+                graph,
+                courierCount,
+                pickupsByRequestId,
+                deliveryByRequestId,
+                graph.getDemandMap(),
+                warehouse
+            );
+            
+            tours = distributionResult.getTours();
+            
+            // Afficher warnings si présents
+            if (distributionResult.getWarnings().hasWarnings()) {
+                System.out.println("\n   ⚠️  AVERTISSEMENTS:");
+                for (String message : distributionResult.getWarnings().getMessages()) {
+                    System.out.println("      - " + message);
+                }
+            }
+            
+            if (!distributionResult.getUnassignedDemandIds().isEmpty()) {
+                System.out.println("\n   ❌ DEMANDES NON ASSIGNÉES (" + 
+                    distributionResult.getUnassignedDemandIds().size() + "):");
+                for (String demandId : distributionResult.getUnassignedDemandIds()) {
+                    System.out.println("      - " + demandId);
+                }
+            }
+        }
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // 7️⃣ RÉSUMÉ ET RETOUR
@@ -1122,13 +1373,25 @@ public class ServiceAlgo {
         System.out.println("║  Amélioration                : " + String.format("%9.1f", gainPercent) + " %                ║");
         System.out.println("║  Nombre de stops             : " + String.format("%10d", optimizedRoute.size()) + "                    ║");
         System.out.println("║  Demandes                    : " + String.format("%10d", pickupsByRequestId.size()) + "                    ║");
-        System.out.println("║  Durée de la tournée         : " + String.format("%10.2f", tour.getTotalDurationHours()) + " h                ║");
-        System.out.println("║  Contrainte 4h               : " + (tour.exceedsTimeLimit() ? "⚠️  DÉPASSÉE" : "✓ RESPECTÉE") + "          ║");
+        
+        if (courierCount == 1) {
+            com.pickupdelivery.model.AlgorithmModel.Tour tour = tours.get(0);
+            System.out.println("║  Durée de la tournée         : " + String.format("%10.2f", tour.getTotalDurationHours()) + " h                ║");
+            System.out.println("║  Contrainte 4h               : " + (tour.exceedsTimeLimit() ? "⚠️  DÉPASSÉE" : "✓ RESPECTÉE") + "          ║");
+        } else {
+            System.out.println("║  Nombre de coursiers utilisés: " + String.format("%9d", tours.size()) + "                    ║");
+            double totalDistanceAll = tours.stream().mapToDouble(t -> t.getTotalDistance()).sum();
+            double maxDuration = tours.stream().mapToDouble(t -> t.getTotalDurationSec()).max().orElse(0);
+            System.out.println("║  Distance totale cumulée     : " + String.format("%10.2f", totalDistanceAll) + " m              ║");
+            System.out.println("║  Durée max (coursier)        : " + String.format("%10.2f", maxDuration / 3600) + " h                ║");
+        }
+        
         System.out.println("║  Temps de calcul total       : " + String.format("%10d", totalTime) + " ms                 ║");
-        System.out.println("║  Algorithme                  : Glouton + 2-opt                ║");
+        System.out.println("║  Algorithme                  : Glouton + 2-opt " + 
+            (courierCount > 1 ? "+ FIFO" : "       ") + "       ║");
         System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
         
-        return Arrays.asList(tour);
+        return tours;
     }
 
     /**
@@ -1217,5 +1480,112 @@ public class ServiceAlgo {
         }
         
         return sb.toString();
+    }
+
+    // =========================================================================
+    // MÉTHODES AUXILIAIRES POUR DISTRIBUTION FIFO (PHASE 2)
+    // =========================================================================
+
+    /**
+     * Trouve le stop delivery correspondant à un pickup dans une route optimisée
+     * 
+     * @param demandId ID de la demande
+     * @param route Route optimisée contenant tous les stops
+     * @param fromIndex Index à partir duquel commencer la recherche
+     * @return Le stop delivery ou null si non trouvé
+     */
+    private Stop findDeliveryInRoute(String demandId, List<Stop> route, int fromIndex) {
+        if (demandId == null || route == null) {
+            return null;
+        }
+        
+        for (int i = fromIndex + 1; i < route.size(); i++) {
+            Stop stop = route.get(i);
+            if (stop.getTypeStop() == Stop.TypeStop.DELIVERY && 
+                demandId.equals(stop.getIdDemande())) {
+                return stop;
+            }
+        }
+        
+        return null;
+    }
+
+    /**
+     * Trouve l'index d'un delivery dans la route
+     * 
+     * @param demandId ID de la demande
+     * @param route Route complète
+     * @return Index du delivery ou -1 si non trouvé
+     */
+    private int findDeliveryIndex(String demandId, List<Stop> route) {
+        if (demandId == null || route == null) {
+            return -1;
+        }
+        
+        for (int i = 0; i < route.size(); i++) {
+            Stop stop = route.get(i);
+            if (stop.getTypeStop() == Stop.TypeStop.DELIVERY && 
+                demandId.equals(stop.getIdDemande())) {
+                return i;
+            }
+        }
+        
+        return -1;
+    }
+
+    /**
+     * Calcule le temps nécessaire pour effectuer une demande complète (pickup + delivery)
+     * à partir de la position actuelle dans la tournée
+     * 
+     * @param currentStop Stop actuel dans la tournée (dernier stop ajouté)
+     * @param pickupStop Stop de pickup de la demande
+     * @param deliveryStop Stop de delivery de la demande
+     * @param globalRoute Route globale optimisée pour référence
+     * @param graph Graphe avec distances
+     * @param demand Objet Demand contenant les durées de service
+     * @return Temps total en secondes pour cette demande
+     */
+    private double calculateDemandTime(
+            Stop currentStop,
+            Stop pickupStop,
+            Stop deliveryStop,
+            List<Stop> globalRoute,
+            Graph graph,
+            Demand demand
+    ) {
+        double totalTime = 0.0;
+        
+        // 1. Temps de trajet du stop actuel vers le pickup
+        double distanceToPickup = distance(currentStop, pickupStop, graph);
+        totalTime += calculateTravelTime(distanceToPickup);
+        
+        // 2. Temps de service au pickup
+        totalTime += demand.getPickupDurationSec();
+        
+        // 3. Temps de trajet du pickup vers le delivery
+        double distancePickupToDelivery = distance(pickupStop, deliveryStop, graph);
+        totalTime += calculateTravelTime(distancePickupToDelivery);
+        
+        // 4. Temps de service au delivery
+        totalTime += demand.getDeliveryDurationSec();
+        
+        return totalTime;
+    }
+
+    /**
+     * Calcule le temps de retour vers le warehouse depuis un stop donné
+     * 
+     * @param fromStop Stop de départ
+     * @param warehouse Stop warehouse
+     * @param graph Graphe avec distances
+     * @return Temps de retour en secondes
+     */
+    private double calculateReturnTime(Stop fromStop, Stop warehouse, Graph graph) {
+        if (fromStop == null || warehouse == null || graph == null) {
+            return 0.0;
+        }
+        
+        double distanceToWarehouse = distance(fromStop, warehouse, graph);
+        return calculateTravelTime(distanceToWarehouse);
     }
 }
