@@ -19,4 +19,24 @@ public class Trajet {
     private Stop stopDepart;
     private Stop stopArrivee;
     private double distance; // Distance totale en mètres
+    
+    /**
+     * Durée du trajet en secondes (temps de déplacement uniquement, sans temps de service)
+     * Calculé avec la formule : distance / vitesse_coursier
+     */
+    private double durationSec;
+    
+    /**
+     * Retourne la durée en heures
+     */
+    public double getDurationHours() {
+        return durationSec / 3600.0;
+    }
+    
+    /**
+     * Retourne la durée en minutes
+     */
+    public double getDurationMinutes() {
+        return durationSec / 60.0;
+    }
 }

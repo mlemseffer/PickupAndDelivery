@@ -58,7 +58,8 @@ class TourControllerTest {
         Map<Stop, Map<Stop, Trajet>> distancesMatrix = new HashMap<>();
         mockGraph.setDistancesMatrix(distancesMatrix);
         
-        mockTour = new Tour(new ArrayList<>(), new ArrayList<>(), 450.0, 1);
+        // PHASE 1: Constructeur Tour modifié - ajout de totalDurationSec
+        mockTour = new Tour(new ArrayList<>(), new ArrayList<>(), 450.0, 0.0, 1);
     }
 
     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

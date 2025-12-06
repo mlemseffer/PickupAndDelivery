@@ -38,6 +38,16 @@ public class ServiceAlgo {
     
     /** Taille maximale du cache LRU pour les résultats de Dijkstra */
     private static final int DIJKSTRA_CACHE_SIZE = 500;
+    
+    // =========================================================================
+    // CONSTANTES POUR CALCUL DE TEMPS (PHASE 1)
+    // =========================================================================
+    
+    /** Vitesse du coursier en m/s (15 km/h = 4.17 m/s) */
+    private static final double COURIER_SPEED_MS = 15.0 / 3.6; // 4.166666... m/s
+    
+    /** Limite de temps pour une tournée en secondes (4 heures) */
+    private static final double TIME_LIMIT_SEC = 4 * 3600; // 14400 secondes
 
     // =========================================================================
     // CACHE POUR DIJKSTRA
@@ -395,6 +405,9 @@ public class ServiceAlgo {
                 trajet.setStopArrivee(stopDestination);
                 trajet.setSegments(result.getSegments());
                 trajet.setDistance(result.getDistance());
+                
+                // PHASE 1: Calculer la durée du trajet (temps de déplacement uniquement)
+                trajet.setDurationSec(calculateTravelTime(result.getDistance()));
 
                 // Ajouter dans la map (thread-safe avec ConcurrentHashMap)
                 trajetsFromSource.put(stopDestination, trajet);
@@ -404,6 +417,17 @@ public class ServiceAlgo {
         });
 
         graph.setDistancesMatrix(distancesMatrix);
+        
+        // PHASE 1: Construire la map des demandes pour le calcul de temps
+        // Parcourir les stops et extraire les demandes uniques
+        Map<String, Demand> demandMap = new HashMap<>();
+        for (Stop stop : stops) {
+            if (stop.getTypeStop() != Stop.TypeStop.WAREHOUSE && stop.getIdDemande() != null) {
+                // Cette information n'est pas disponible ici, elle sera ajoutée par le controller
+                // On laisse null pour l'instant
+            }
+        }
+        graph.setDemandMap(demandMap); // Map vide pour l'instant, sera remplie par le controller
         
         long elapsedTime = System.currentTimeMillis() - startTime;
         int totalPaths = stops.size() * (stops.size() - 1);
@@ -557,6 +581,88 @@ public class ServiceAlgo {
         }
 
         return totalDistance;
+    }
+
+    // =========================================================================
+    // CALCUL DE TEMPS (PHASE 1)
+    // =========================================================================
+
+    /**
+     * Calcule le temps de trajet entre deux stops (temps de déplacement uniquement)
+     * 
+     * @param distance Distance en mètres
+     * @return Temps en secondes
+     * @throws IllegalArgumentException Si la distance est négative
+     */
+    private double calculateTravelTime(double distance) {
+        if (distance < 0) {
+            throw new IllegalArgumentException("La distance ne peut pas être négative: " + distance);
+        }
+        if (distance == NO_PATH_DISTANCE || distance == Double.POSITIVE_INFINITY) {
+            return Double.POSITIVE_INFINITY;
+        }
+        return distance / COURIER_SPEED_MS; // temps = distance / vitesse
+    }
+
+    /**
+     * Récupère la demande associée à un stop
+     * 
+     * @param stop Le stop
+     * @param demandMap Map des demandes par ID
+     * @return La demande ou null si le stop est un warehouse
+     */
+    private Demand getDemandByStop(Stop stop, Map<String, Demand> demandMap) {
+        if (stop.getTypeStop() == Stop.TypeStop.WAREHOUSE) {
+            return null;
+        }
+        return demandMap.get(stop.getIdDemande());
+    }
+
+    /**
+     * Calcule la durée totale d'une tournée (route)
+     * Inclut : temps de déplacement + temps de service (pickup + delivery)
+     * 
+     * @param route Liste ordonnée des stops formant la tournée
+     * @param graph Le graphe contenant les distances entre stops
+     * @param demandMap Map des demandes par ID pour récupérer les durées de service
+     * @return La durée totale de la tournée en secondes
+     * @throws IllegalArgumentException Si les paramètres sont null ou si la route est invalide
+     */
+    private double computeRouteDuration(List<Stop> route, Graph graph, Map<String, Demand> demandMap) {
+        if (route == null || graph == null || demandMap == null) {
+            throw new IllegalArgumentException("Route, graph et demandMap ne peuvent pas être null");
+        }
+
+        if (route.size() < 2) {
+            return 0.0; // Une route avec 0 ou 1 stop a une durée de 0
+        }
+
+        double totalTime = 0.0;
+
+        for (int i = 0; i < route.size() - 1; i++) {
+            Stop current = route.get(i);
+            Stop next = route.get(i + 1);
+            
+            // 1. Temps de trajet entre current et next
+            double distance = distance(current, next, graph);
+            totalTime += calculateTravelTime(distance);
+            
+            // 2. Temps de service au stop current
+            if (current.getTypeStop() == Stop.TypeStop.PICKUP) {
+                Demand demand = getDemandByStop(current, demandMap);
+                if (demand != null) {
+                    totalTime += demand.getPickupDurationSec();
+                }
+            } else if (current.getTypeStop() == Stop.TypeStop.DELIVERY) {
+                Demand demand = getDemandByStop(current, demandMap);
+                if (demand != null) {
+                    totalTime += demand.getDeliveryDurationSec();
+                }
+            }
+            // Le warehouse n'a pas de temps de service
+        }
+
+        return totalTime;
     }
 
     /**
@@ -993,6 +1099,9 @@ public class ServiceAlgo {
         System.out.println("   ✓ Tour créé avec succès");
         System.out.println("   ✓ Livreur ID: " + tour.getCourierId());
         System.out.println("   ✓ Nombre de trajets: " + tour.getTrajets().size());
+        System.out.println("   ⏱️  Durée totale: " + String.format("%.2f", tour.getTotalDurationHours()) + " h " +
+                         "(" + String.format("%.0f", tour.getTotalDurationSec()) + " s)");
+        System.out.println("   ✓ Respect de la contrainte 4h: " + (!tour.exceedsTimeLimit() ? "OUI" : "NON ⚠️"));
 
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // 7️⃣ RÉSUMÉ ET RETOUR
@@ -1013,6 +1122,8 @@ public class ServiceAlgo {
         System.out.println("║  Amélioration                : " + String.format("%9.1f", gainPercent) + " %                ║");
         System.out.println("║  Nombre de stops             : " + String.format("%10d", optimizedRoute.size()) + "                    ║");
         System.out.println("║  Demandes                    : " + String.format("%10d", pickupsByRequestId.size()) + "                    ║");
+        System.out.println("║  Durée de la tournée         : " + String.format("%10.2f", tour.getTotalDurationHours()) + " h                ║");
+        System.out.println("║  Contrainte 4h               : " + (tour.exceedsTimeLimit() ? "⚠️  DÉPASSÉE" : "✓ RESPECTÉE") + "          ║");
         System.out.println("║  Temps de calcul total       : " + String.format("%10d", totalTime) + " ms                 ║");
         System.out.println("║  Algorithme                  : Glouton + 2-opt                ║");
         System.out.println("╚════════════════════════════════════════════════════════════════╝\n");
@@ -1023,11 +1134,12 @@ public class ServiceAlgo {
     /**
      * Construit un objet Tour à partir d'une route et de sa distance
      * Récupère les trajets détaillés depuis la matrice du Graph
+     * PHASE 1: Calcule également la durée totale de la tournée
      * 
      * @param route Liste ordonnée des stops
      * @param totalDistance Distance totale de la tournée
-     * @param graph Le graphe contenant les trajets détaillés
-     * @return Un objet Tour complet avec tous les trajets
+     * @param graph Le graphe contenant les trajets détaillés et les demandes
+     * @return Un objet Tour complet avec tous les trajets et la durée
      */
     private com.pickupdelivery.model.AlgorithmModel.Tour buildTour(List<Stop> route, double totalDistance, Graph graph) {
         if (route == null || graph == null) {
@@ -1059,6 +1171,15 @@ public class ServiceAlgo {
         }
         
         tour.setTrajets(trajets);
+        
+        // PHASE 1: Calculer la durée totale de la tournée
+        if (graph.getDemandMap() != null && !graph.getDemandMap().isEmpty()) {
+            double totalDuration = computeRouteDuration(route, graph, graph.getDemandMap());
+            tour.setTotalDurationSec(totalDuration);
+        } else {
+            // Si pas de demandes (cas de test), durée = 0
+            tour.setTotalDurationSec(0.0);
+        }
         
         return tour;
     }

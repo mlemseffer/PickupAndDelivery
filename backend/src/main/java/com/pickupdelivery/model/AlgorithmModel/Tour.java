@@ -32,9 +32,36 @@ public class Tour {
     private double totalDistance;
     
     /**
+     * Durée totale de la tournée en secondes
+     * Inclut : temps de déplacement + temps de service (pickups + deliveries)
+     */
+    private double totalDurationSec;
+    
+    /**
      * ID du livreur assigné à cette tournée (optionnel pour l'instant)
      */
     private Integer courierId;
+    
+    /**
+     * Retourne la durée totale en heures
+     */
+    public double getTotalDurationHours() {
+        return totalDurationSec / 3600.0;
+    }
+    
+    /**
+     * Retourne la durée totale en minutes
+     */
+    public double getTotalDurationMinutes() {
+        return totalDurationSec / 60.0;
+    }
+    
+    /**
+     * Vérifie si la tournée dépasse la limite de 4 heures
+     */
+    public boolean exceedsTimeLimit() {
+        return totalDurationSec > (4 * 3600); // 4 heures = 14400 secondes
+    }
     
     /**
      * Retourne le nombre de stops dans la tournée (incluant le warehouse de départ et d'arrivée)

@@ -114,6 +114,15 @@ public class TourController {
             
             Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
             
+            // PHASE 1: Ajouter les demandes au graph pour le calcul de temps
+            java.util.Map<String, com.pickupdelivery.model.Demand> demandMap = new java.util.HashMap<>();
+            if (deliveryRequestSet.getDemands() != null) {
+                for (com.pickupdelivery.model.Demand demand : deliveryRequestSet.getDemands()) {
+                    demandMap.put(demand.getId(), demand);
+                }
+            }
+            graph.setDemandMap(demandMap);
+            
             long graphElapsedTime = System.currentTimeMillis() - graphStartTime;
             System.out.println("   ✓ Graph construit en " + graphElapsedTime + " ms");
             System.out.println("   ✓ Matrice d'adjacence: " + graph.getDistancesMatrix().size() + " stops");
