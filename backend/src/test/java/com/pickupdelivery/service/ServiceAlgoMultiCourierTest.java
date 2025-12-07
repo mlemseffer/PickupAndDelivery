@@ -139,7 +139,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("1 coursier: doit retourner exactement 1 tournée")
     void testCalculateOptimalTours_OneCourier_ReturnsOneTour() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
         
         // Then
         assertNotNull(tours);
@@ -154,7 +155,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("1 coursier: vérifier structure de base de la tournée")
     void testCalculateOptimalTours_OneCourier_BasicStructure() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
         
         // Then
         Tour tour = tours.get(0);
@@ -171,7 +173,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("2 coursiers: doit créer 1 à 2 tournées")
     void testCalculateOptimalTours_TwoCouriers_ValidRange() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 2);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 2);
+        List<Tour> tours = result.getTours();
         
         // Then
         assertNotNull(tours);
@@ -183,7 +186,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Multi-coursiers: courierIds doivent être uniques")
     void testCalculateOptimalTours_MultiCourier_UniqueCourierIds() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        List<Tour> tours = result.getTours();
         
         // Then
         Set<Integer> courierIds = tours.stream()
@@ -197,7 +201,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Multi-coursiers: courierIds doivent être séquentiels (FIFO)")
     void testCalculateOptimalTours_MultiCourier_SequentialIds() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 5);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 5);
+        List<Tour> tours = result.getTours();
         
         // Then
         for (int i = 0; i < tours.size(); i++) {
@@ -214,7 +219,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Multi-coursiers: aucune tournée ne doit dépasser 4 heures")
     void testCalculateOptimalTours_MultiCourier_TimeLimitRespected() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        List<Tour> tours = result.getTours();
         
         // Then
         for (Tour tour : tours) {
@@ -234,7 +240,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Précédence: pickup avant delivery dans toutes les tournées")
     void testCalculateOptimalTours_PrecedenceRespected() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        List<Tour> tours = result.getTours();
         
         // Then
         for (Tour tour : tours) {
@@ -246,7 +253,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Paires: pickup et delivery dans la même tournée")
     void testCalculateOptimalTours_PairsNotSplit() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        List<Tour> tours = result.getTours();
         
         // Then
         Map<String, Demand> demandMap = testGraph.getDemandMap();
@@ -283,7 +291,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Cohérence: chaque tournée commence et finit au warehouse")
     void testCalculateOptimalTours_ToursStartEndAtWarehouse() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        List<Tour> tours = result.getTours();
         
         // Then
         for (Tour tour : tours) {
@@ -304,7 +313,8 @@ public class ServiceAlgoMultiCourierTest {
     @DisplayName("Métriques: distance totale positive")
     void testCalculateOptimalTours_TotalDistancePositive() {
         // When
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 3);
+        List<Tour> tours = result.getTours();
         
         // Then
         double totalDistance = tours.stream()

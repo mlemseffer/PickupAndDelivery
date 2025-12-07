@@ -212,7 +212,10 @@ class TourControllerTest {
         when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
         when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class))).thenReturn(mockStopSet);
         when(serviceAlgo.buildGraph(any(StopSet.class), any(CityMap.class))).thenReturn(mockGraph);
-        when(serviceAlgo.calculateOptimalTours(any(Graph.class), eq(1))).thenReturn(List.of(mockTour));
+        
+        com.pickupdelivery.dto.TourDistributionResult distributionResult = new com.pickupdelivery.dto.TourDistributionResult();
+        distributionResult.setTours(List.of(mockTour));
+        when(serviceAlgo.calculateOptimalTours(any(Graph.class), eq(1))).thenReturn(distributionResult);
         
         // When
         var response = tourController.calculateTour(1);
@@ -221,8 +224,8 @@ class TourControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().isSuccess());
         assertNotNull(response.getBody().getData());
-        assertEquals(1, response.getBody().getData().size());
-        assertEquals(450.0, response.getBody().getData().get(0).getTotalDistance());
+        assertEquals(1, response.getBody().getData().getTours().size());
+        assertEquals(450.0, response.getBody().getData().getTours().get(0).getTotalDistance());
         
         System.out.println("✅ Test 7 réussi: Calculate tour avec données valides");
     }
@@ -262,8 +265,11 @@ class TourControllerTest {
         when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
         when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class))).thenReturn(mockStopSet);
         when(serviceAlgo.buildGraph(any(StopSet.class), any(CityMap.class))).thenReturn(mockGraph);
+        
+        com.pickupdelivery.dto.TourDistributionResult distributionResult = new com.pickupdelivery.dto.TourDistributionResult();
+        distributionResult.setTours(mockTours);
         when(serviceAlgo.calculateOptimalTours(any(Graph.class), eq(2)))
-                .thenReturn(mockTours);
+                .thenReturn(distributionResult);
         
         // When
         var response = tourController.calculateTour(2);
@@ -272,9 +278,9 @@ class TourControllerTest {
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertTrue(response.getBody().isSuccess());
         assertNotNull(response.getBody().getData());
-        assertEquals(2, response.getBody().getData().size());
-        assertEquals(1, response.getBody().getData().get(0).getCourierId());
-        assertEquals(2, response.getBody().getData().get(1).getCourierId());
+        assertEquals(2, response.getBody().getData().getTours().size());
+        assertEquals(1, response.getBody().getData().getTours().get(0).getCourierId());
+        assertEquals(2, response.getBody().getData().getTours().get(1).getCourierId());
         
         System.out.println("✅ Test 8 réussi: Multi-coursiers supporté");
     }
@@ -321,7 +327,10 @@ class TourControllerTest {
         when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
         when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class))).thenReturn(mockStopSet);
         when(serviceAlgo.buildGraph(any(StopSet.class), any(CityMap.class))).thenReturn(mockGraph);
-        when(serviceAlgo.calculateOptimalTours(any(Graph.class), eq(1))).thenReturn(List.of(mockTour));
+        
+        com.pickupdelivery.dto.TourDistributionResult distributionResult = new com.pickupdelivery.dto.TourDistributionResult();
+        distributionResult.setTours(List.of(mockTour));
+        when(serviceAlgo.calculateOptimalTours(any(Graph.class), eq(1))).thenReturn(distributionResult);
         
         // When
         var response = tourController.calculateTour(1);

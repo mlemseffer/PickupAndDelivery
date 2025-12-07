@@ -99,6 +99,23 @@ class ServiceAlgoPhase5Test {
         graph.setStopDepart(warehouse);
         graph.setCout(0.0);
         graph.setDistancesMatrix(distancesMatrix);
+        
+        // Ajouter les demandes au graph pour le calcul de temps
+        Map<String, com.pickupdelivery.model.Demand> demandMap = new HashMap<>();
+        
+        com.pickupdelivery.model.Demand demand1 = new com.pickupdelivery.model.Demand();
+        demand1.setId("D1");
+        demand1.setPickupDurationSec(300); // 5 minutes en secondes
+        demand1.setDeliveryDurationSec(300);
+        
+        com.pickupdelivery.model.Demand demand2 = new com.pickupdelivery.model.Demand();
+        demand2.setId("D2");
+        demand2.setPickupDurationSec(300);
+        demand2.setDeliveryDurationSec(300);
+        
+        demandMap.put("D1", demand1);
+        demandMap.put("D2", demand2);
+        graph.setDemandMap(demandMap);
 
         return graph;
     }
@@ -110,7 +127,8 @@ class ServiceAlgoPhase5Test {
     @Test
     void testCalculateOptimalTours_OneCourier() {
         // Act
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
 
         // Assert
         assertNotNull(tours, "La liste des tours ne doit pas être null");
@@ -140,7 +158,8 @@ class ServiceAlgoPhase5Test {
     @Test
     void testCalculateOptimalTours_TrajetsCorrectlyBuilt() {
         // Act
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
         Tour tour = tours.get(0);
 
         // Assert - Vérifier les trajets
@@ -169,7 +188,8 @@ class ServiceAlgoPhase5Test {
     @Test
     void testCalculateOptimalTours_DistanceCalculationCorrect() {
         // Act
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
         Tour tour = tours.get(0);
 
         // Recalculer la distance manuellement pour vérifier
@@ -193,8 +213,9 @@ class ServiceAlgoPhase5Test {
         // Ce test vérifie simplement qu'on n'obtient plus d'exception
         
         // Act - Vérifie que la méthode accepte courierCount > 1 sans exception
-        List<com.pickupdelivery.model.AlgorithmModel.Tour> tours = 
+        com.pickupdelivery.dto.TourDistributionResult result = 
             serviceAlgo.calculateOptimalTours(testGraph, 1); // Utilise 1 car testGraph n'a pas de demandMap complet
+        List<com.pickupdelivery.model.AlgorithmModel.Tour> tours = result.getTours();
 
         // Assert
         assertNotNull(tours, "Le résultat ne doit pas être null");
@@ -242,7 +263,8 @@ class ServiceAlgoPhase5Test {
     @Test
     void testCalculateOptimalTours_TourMethods() {
         // Act
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
         Tour tour = tours.get(0);
 
         // Test des méthodes de Tour
@@ -265,7 +287,8 @@ class ServiceAlgoPhase5Test {
         Graph singleRequestGraph = createSingleRequestGraph(singlePickup, singleDelivery);
 
         // Act
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(singleRequestGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(singleRequestGraph, 1);
+        List<Tour> tours = result.getTours();
         Tour tour = tours.get(0);
 
         // Assert
@@ -315,6 +338,17 @@ class ServiceAlgoPhase5Test {
         Graph graph = new Graph();
         graph.setStopDepart(warehouse);
         graph.setDistancesMatrix(distancesMatrix);
+        
+        // Ajouter la demande au graph pour le calcul de temps
+        Map<String, com.pickupdelivery.model.Demand> demandMap = new HashMap<>();
+        
+        com.pickupdelivery.model.Demand demand = new com.pickupdelivery.model.Demand();
+        demand.setId(pickup.getIdDemande());
+        demand.setPickupDurationSec(300); // 5 minutes en secondes
+        demand.setDeliveryDurationSec(300);
+        
+        demandMap.put(pickup.getIdDemande(), demand);
+        graph.setDemandMap(demandMap);
 
         return graph;
     }
@@ -331,7 +365,8 @@ class ServiceAlgoPhase5Test {
 
         // ACT - Appeler la méthode principale
         long startTime = System.currentTimeMillis();
-        List<Tour> tours = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        com.pickupdelivery.dto.TourDistributionResult result = serviceAlgo.calculateOptimalTours(testGraph, 1);
+        List<Tour> tours = result.getTours();
         long elapsedTime = System.currentTimeMillis() - startTime;
 
         // ASSERT - Vérifications complètes
