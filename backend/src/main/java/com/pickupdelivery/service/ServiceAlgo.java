@@ -930,6 +930,7 @@ public class ServiceAlgo {
         int totalImprovements = 0;
         
         // Répéter jusqu'à ce qu'aucune amélioration ne soit trouvée
+        // Note: La convergence naturelle garantit la terminaison (optimum local)
         while (improved) {
             improved = false;
             iteration++;
@@ -1115,6 +1116,31 @@ public class ServiceAlgo {
                     System.out.println("   ⚠️  Ajout de " + demandId + " dépasserait 4h (" + 
                         String.format("%.2f", timeWithReturn / 3600) + "h)");
                     
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    // DÉTECTION INTELLIGENTE: Vérifier si la demande est impossible SEULE
+                    // Si même dans une tournée vide elle dépasse 4h, inutile de tenter d'autres coursiers
+                    // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                    
+                    boolean demandImpossibleAlone = false;
+                    if (currentTourStops.size() == 1) {  // Tournée vide (uniquement warehouse)
+                        // Cette demande seule dépasse 4h → impossible à assigner
+                        double timeAlone = demandTime + calculateReturnTime(deliveryStop, warehouse, graph);
+                        if (timeAlone > TIME_LIMIT_SEC) {
+                            demandImpossibleAlone = true;
+                            System.out.println("   ❌ Demande " + demandId + 
+                                " impossible à assigner: dépasse 4h même seule (" + 
+                                String.format("%.2f", timeAlone / 3600) + "h)");
+                            unassignedDemandIds.add(demandId);
+                            Demand unassignedDemand = demandMap.get(demandId);
+                            if (unassignedDemand != null) unassignedDemands.add(unassignedDemand);
+                            processedDemands.add(demandId);
+                            warnings.setHasUnassignedDemands(true);
+                            warnings.addMessage("Demande " + demandId + 
+                                " non assignée (dépasse 4h même seule)");
+                            continue;  // Passer à la demande suivante (PAS de retry inutile)
+                        }
+                    }
+                    
                     // Fermer la tournée actuelle SI elle contient des stops
                     if (currentTourStops.size() > 1) {  // Plus que juste le warehouse
                         System.out.println("   📦 Fermeture de la tournée avec " + (currentTourStops.size() - 1) + " stops (hors warehouse)");
@@ -1237,10 +1263,119 @@ public class ServiceAlgo {
         System.out.println("      Demandes assignées: " + processedDemands.size());
         System.out.println("      Demandes non assignées: " + unassignedDemandIds.size());
         
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // VALIDATION POST-DISTRIBUTION (CRITIQUE)
+        // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        
+        System.out.println("\n   🔍 Validation post-distribution...");
+        try {
+            validateTourDistribution(tours, pickupsByRequestId, deliveryByRequestId);
+            System.out.println("   ✓ Validation réussie: toutes les contraintes sont respectées");
+        } catch (AlgorithmException e) {
+            System.out.println("   ❌ ERREUR DE VALIDATION: " + e.getMessage());
+            throw e; // Propager l'exception pour éviter de retourner un résultat invalide
+        }
+        
         TourDistributionResult result = new TourDistributionResult(
             tours, unassignedDemandIds, unassignedDemands, metricsByCourier, warnings);
         
         return result;
+    }
+
+    /**
+     * Valide que la distribution des tours respecte toutes les contraintes de précédence
+     * 
+     * VÉRIFICATIONS:
+     * 1. Chaque delivery doit être dans le même tour que son pickup
+     * 2. Chaque delivery doit être APRÈS son pickup dans le tour
+     * 3. Pas de pickup orphelin (sans delivery dans le tour)
+     * 4. Pas de delivery orphelin (sans pickup dans le tour)
+     * 
+     * @param tours Liste des tours à valider
+     * @param pickupsByRequestId Map des pickups par ID de demande
+     * @param deliveryByRequestId Map des deliveries par ID de demande
+     * @throws AlgorithmException Si une contrainte est violée
+     */
+    private void validateTourDistribution(
+            List<com.pickupdelivery.model.AlgorithmModel.Tour> tours,
+            Map<String, List<Stop>> pickupsByRequestId,
+            Map<String, Stop> deliveryByRequestId
+    ) {
+        if (tours == null || tours.isEmpty()) {
+            return; // Rien à valider
+        }
+        
+        int tourIndex = 0;
+        for (com.pickupdelivery.model.AlgorithmModel.Tour tour : tours) {
+            tourIndex++;
+            List<Stop> stops = tour.getStops();
+            
+            if (stops == null || stops.size() < 2) {
+                continue; // Tour vide ou invalide, ignoré
+            }
+            
+            // Pour ce tour, collecter les demandes présentes (pickups et deliveries)
+            Set<String> tourPickupDemands = new HashSet<>();
+            Set<String> tourDeliveryDemands = new HashSet<>();
+            Set<Stop> visitedStops = new HashSet<>();
+            
+            for (Stop stop : stops) {
+                if (stop.getTypeStop() == Stop.TypeStop.PICKUP) {
+                    tourPickupDemands.add(stop.getIdDemande());
+                } else if (stop.getTypeStop() == Stop.TypeStop.DELIVERY) {
+                    tourDeliveryDemands.add(stop.getIdDemande());
+                }
+                
+                // Vérifier contrainte de précédence locale (delivery après pickup)
+                if (stop.getTypeStop() == Stop.TypeStop.DELIVERY) {
+                    String demandId = stop.getIdDemande();
+                    List<Stop> requiredPickups = pickupsByRequestId.get(demandId);
+                    
+                    if (requiredPickups == null || requiredPickups.isEmpty()) {
+                        throw new AlgorithmException(
+                            AlgorithmException.ErrorType.PRECEDENCE_VIOLATION,
+                            "Tour " + tourIndex + " (coursier " + tour.getCourierId() + "): " +
+                            "Delivery " + demandId + " sans pickup associé dans pickupsByRequestId"
+                        );
+                    }
+                    
+                    // Vérifier que TOUS les pickups requis ont été visités AVANT ce delivery
+                    if (!visitedStops.containsAll(requiredPickups)) {
+                        throw new AlgorithmException(
+                            AlgorithmException.ErrorType.PRECEDENCE_VIOLATION,
+                            "Tour " + tourIndex + " (coursier " + tour.getCourierId() + "): " +
+                            "Delivery " + demandId + " placé AVANT son pickup correspondant"
+                        );
+                    }
+                }
+                
+                visitedStops.add(stop);
+            }
+            
+            // Vérifier que chaque pickup a son delivery dans le même tour
+            for (String pickupDemandId : tourPickupDemands) {
+                if (!tourDeliveryDemands.contains(pickupDemandId)) {
+                    throw new AlgorithmException(
+                        AlgorithmException.ErrorType.PRECEDENCE_VIOLATION,
+                        "Tour " + tourIndex + " (coursier " + tour.getCourierId() + "): " +
+                        "Pickup de la demande " + pickupDemandId + " présent mais delivery absent " +
+                        "(violation de la contrainte de paire indivisible)"
+                    );
+                }
+            }
+            
+            // Vérifier que chaque delivery a son pickup dans le même tour
+            for (String deliveryDemandId : tourDeliveryDemands) {
+                if (!tourPickupDemands.contains(deliveryDemandId)) {
+                    throw new AlgorithmException(
+                        AlgorithmException.ErrorType.PRECEDENCE_VIOLATION,
+                        "Tour " + tourIndex + " (coursier " + tour.getCourierId() + "): " +
+                        "Delivery de la demande " + deliveryDemandId + " présent mais pickup absent " +
+                        "(violation de la contrainte de paire indivisible)"
+                    );
+                }
+            }
+        }
     }
 
     // =========================================================================
