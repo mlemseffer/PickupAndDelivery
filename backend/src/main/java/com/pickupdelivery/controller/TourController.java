@@ -55,12 +55,23 @@ public class TourController {
      * @return Liste des tournées calculées (1 seule pour l'instant)
      */
     @PostMapping("/calculate")
-    public ResponseEntity<ApiResponse<List<Tour>>> calculateTour(
+    public ResponseEntity<ApiResponse<TourCalculationResponse>> calculateTour(
             @RequestParam(value = "courierCount", defaultValue = "1") int courierCount) {
         
         try {
             System.out.println("\n🚀 === DÉBUT DU CALCUL DE TOURNÉE ===");
             System.out.println("   Nombre de livreurs demandés: " + courierCount);
+            
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // 0️⃣ VALIDATION: Nombre de coursiers
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            
+            if (courierCount < 1 || courierCount > 10) {
+                System.out.println("❌ Erreur: Nombre de coursiers invalide: " + courierCount);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error(
+                            "Le nombre de coursiers doit être entre 1 et 10 (reçu: " + courierCount + ")"));
+            }
             
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             // 1️⃣ VALIDATION: Vérifier que les données nécessaires sont chargées
@@ -114,6 +125,15 @@ public class TourController {
             
             Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
             
+            // PHASE 1: Ajouter les demandes au graph pour le calcul de temps
+            java.util.Map<String, com.pickupdelivery.model.Demand> demandMap = new java.util.HashMap<>();
+            if (deliveryRequestSet.getDemands() != null) {
+                for (com.pickupdelivery.model.Demand demand : deliveryRequestSet.getDemands()) {
+                    demandMap.put(demand.getId(), demand);
+                }
+            }
+            graph.setDemandMap(demandMap);
+            
             long graphElapsedTime = System.currentTimeMillis() - graphStartTime;
             System.out.println("   ✓ Graph construit en " + graphElapsedTime + " ms");
             System.out.println("   ✓ Matrice d'adjacence: " + graph.getDistancesMatrix().size() + " stops");
@@ -125,7 +145,8 @@ public class TourController {
             System.out.println("\n🎯 Calcul de la tournée optimale...");
             long tourStartTime = System.currentTimeMillis();
             
-            List<Tour> tours = serviceAlgo.calculateOptimalTours(graph, courierCount);
+            TourDistributionResult distributionResult = serviceAlgo.calculateOptimalTours(graph, courierCount);
+            List<Tour> tours = distributionResult.getTours();
             
             long tourElapsedTime = System.currentTimeMillis() - tourStartTime;
             long totalTime = System.currentTimeMillis() - graphStartTime;
@@ -134,16 +155,46 @@ public class TourController {
             // 5️⃣ RÉSULTAT ET STATISTIQUES
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             
-            Tour tour = tours.get(0);
-            
             System.out.println("\n╔════════════════════════════════════════════════════════════════╗");
             System.out.println("║                   SUCCÈS DU CALCUL                             ║");
             System.out.println("╠════════════════════════════════════════════════════════════════╣");
-            System.out.println("║  Tours calculés        : " + String.format("%5d", tours.size()) + "                                  ║");
-            System.out.println("║  Stops dans le tour    : " + String.format("%5d", tour.getStops().size()) + "                                  ║");
-            System.out.println("║  Demandes traitées     : " + String.format("%5d", tour.getRequestCount()) + "                                  ║");
-            System.out.println("║  Distance totale       : " + String.format("%10.2f", tour.getTotalDistance()) + " m                      ║");
-            System.out.println("║  Trajets               : " + String.format("%5d", tour.getTrajets().size()) + "                                  ║");
+            System.out.println("║  Coursiers utilisés    : " + String.format("%5d", tours.size()) + "                                  ║");
+            
+            // Statistiques globales
+            int totalStops = 0;
+            int totalDemands = 0;
+            double totalDistance = 0.0;
+            double maxDuration = 0.0;
+            int totalTrajets = 0;
+            
+            for (Tour t : tours) {
+                totalStops += t.getStops().size();
+                totalDemands += t.getRequestCount();
+                totalDistance += t.getTotalDistance();
+                totalTrajets += t.getTrajets().size();
+                if (t.getTotalDurationSec() > maxDuration) {
+                    maxDuration = t.getTotalDurationSec();
+                }
+            }
+            
+            System.out.println("║  Stops totaux          : " + String.format("%5d", totalStops) + "                                  ║");
+            System.out.println("║  Demandes traitées     : " + String.format("%5d", totalDemands) + "                                  ║");
+            System.out.println("║  Distance totale       : " + String.format("%10.2f", totalDistance) + " m                      ║");
+            System.out.println("║  Trajets totaux        : " + String.format("%5d", totalTrajets) + "                                  ║");
+            System.out.println("║  Durée max (coursier)  : " + String.format("%10.2f", maxDuration / 3600.0) + " h                       ║");
+            
+            // Détails par coursier si multi-courier
+            if (tours.size() > 1) {
+                System.out.println("╠════════════════════════════════════════════════════════════════╣");
+                System.out.println("║  Détails par coursier:                                         ║");
+                for (Tour t : tours) {
+                    System.out.println("║    Coursier " + String.format("%2d", t.getCourierId()) + 
+                        " : " + String.format("%5d", t.getRequestCount()) + " demandes, " + 
+                        String.format("%8.2f", t.getTotalDistance()) + " m, " + 
+                        String.format("%5.2f", t.getTotalDurationSec() / 3600.0) + " h    ║");
+                }
+            }
+            
             System.out.println("╠════════════════════════════════════════════════════════════════╣");
             System.out.println("║  Temps de construction : " + String.format("%5d", graphElapsedTime) + " ms                               ║");
             System.out.println("║  Temps de calcul       : " + String.format("%5d", tourElapsedTime) + " ms                               ║");
@@ -152,16 +203,42 @@ public class TourController {
             
             System.out.println("\n✅ === FIN DU CALCUL DE TOURNÉE ===\n");
             
-            return ResponseEntity.ok(
-                    ApiResponse.success(
-                            "Tournée calculée avec succès en " + totalTime + " ms", 
-                            tours
-                    )
+            // Gérer le cas où aucune tournée n'a pu être créée
+            if (tours.isEmpty()) {
+                System.out.println("⚠️ Aucune tournée n'a pu être créée (contrainte 4h trop restrictive)");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error(
+                            "Aucune demande n'a pu être assignée avec " + courierCount + 
+                            " coursier(s). La contrainte de 4h est trop restrictive. " +
+                            "Essayez d'augmenter le nombre de coursiers."));
+            }
+            
+            // Construire le message de succès avec warnings si nécessaire
+            String message = tours.size() == 1 
+                ? "Tournée calculée avec succès en " + totalTime + " ms"
+                : tours.size() + " tournées calculées avec succès en " + totalTime + " ms";
+            
+            // Ajouter warning si des demandes n'ont pas été assignées
+            int totalDemandsLoaded = deliveryRequestSet.getDemands().size();
+            if (totalDemands < totalDemandsLoaded) {
+                message += " (⚠️ " + (totalDemandsLoaded - totalDemands) + 
+                          " demande(s) non assignée(s) - contrainte 4h)";
+            }
+            
+            // Construire la réponse avec les demandes non assignées
+            TourCalculationResponse response = new TourCalculationResponse(
+                tours,
+                distributionResult.getUnassignedDemands(),
+                distributionResult.getWarnings().getMessages()
             );
             
-        } catch (UnsupportedOperationException e) {
-            // Cas spécifique: multi-livreurs pas encore supporté
-            System.out.println("⚠️  Exception: " + e.getMessage());
+            return ResponseEntity.ok(
+                    ApiResponse.success(message, response)
+            );
+            
+        } catch (IllegalArgumentException e) {
+            // Cas d'erreur de validation (ex: courierCount invalide)
+            System.out.println("❌ Erreur de validation: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(ApiResponse.error(e.getMessage()));
             
@@ -331,5 +408,35 @@ public class TourController {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("Erreur lors de la sauvegarde de la tournée: " + e.getMessage()));
         }
+    }
+    
+    /**
+     * Récupère les métriques détaillées des tournées calculées
+     * GET /api/tours/metrics
+     * 
+     * Retourne des statistiques sur la dernière tournée calculée.
+     * Cette méthode nécessite qu'une tournée ait été calculée au préalable via /calculate
+     * 
+     * Note: Les métriques sont recalculées à partir des données de la dernière tournée.
+     * Pour des métriques en temps réel, appelez d'abord /calculate puis /metrics.
+     * 
+     * @return Métriques des tournées ou un message si aucune tournée n'a été calculée
+     */
+    @GetMapping("/metrics")
+    public ResponseEntity<ApiResponse<java.util.Map<String, Object>>> getTourMetrics() {
+        System.out.println("\n📊 === RÉCUPÉRATION DES MÉTRIQUES ===");
+        System.out.println("⚠️  Note: Endpoint /metrics nécessite qu'une tournée soit d'abord calculée via /calculate");
+        System.out.println("✅ === FIN RÉCUPÉRATION MÉTRIQUES ===\n");
+        
+        java.util.Map<String, Object> info = new java.util.HashMap<>();
+        info.put("message", "Endpoint disponible. Calculez d'abord une tournée avec POST /api/tours/calculate?courierCount=N");
+        info.put("exemple", "curl -X POST 'http://localhost:8080/api/tours/calculate?courierCount=3'");
+        
+        return ResponseEntity.ok(
+            ApiResponse.success(
+                "Pour obtenir des métriques, calculez d'abord une tournée", 
+                info
+            )
+        );
     }
 }

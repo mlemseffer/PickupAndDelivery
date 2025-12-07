@@ -271,4 +271,12 @@ public class TourService {
         tour.setCourierId(courierId);
         toursByCourtier.put(courierId, tour);
     }
+    
+    /**
+     * Récupère toutes les tournées enregistrées
+     * @return Liste de toutes les tournées
+     */
+    public java.util.List<Tour> getAllTours() {
+        return new java.util.ArrayList<>(toursByCourtier.values());
+    }
 }

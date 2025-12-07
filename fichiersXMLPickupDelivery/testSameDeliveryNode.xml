@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<demandeDeLivraisons>
+    <!-- Entrepôt -->
+    <entrepot adresse="208769039" heureDepart="8:0:0"/>
+    
+    <!-- Demande 1: Pickup au nœud 208769457, Delivery au nœud 25336179 -->
+    <livraison adresseEnlevement="208769457" adresseLivraison="25336179" dureeEnlevement="180" dureeLivraison="240"/>
+    
+    <!-- Demande 2: Pickup au nœud 208769499, Delivery au MÊME nœud 25336179 -->
+    <livraison adresseEnlevement="208769499" adresseLivraison="25336179" dureeEnlevement="300" dureeLivraison="180"/>
+    
+    <!-- Demande 3: Pickup au nœud 208769120, Delivery au MÊME nœud 25336179 -->
+    <livraison adresseEnlevement="208769120" adresseLivraison="25336179" dureeEnlevement="120" dureeLivraison="200"/>
+</demandeDeLivraisons>
