@@ -1181,7 +1181,7 @@ public class ServiceAlgo {
             }
         }
         
-        // Fermer la dernière tournée SI ELLE CONTIENT DES DEMANDES
+        // Fermer la dernière tournée SI ELLE CONTIENT DES DEMANDES ET N'A PAS DÉJÀ ÉTÉ FERMÉE
         if (!currentCourierDemandIds.isEmpty()) {
             System.out.println("   📦 Fermeture tournée finale coursier " + currentCourierId);
             
@@ -1192,12 +1192,21 @@ public class ServiceAlgo {
             double finalDistance = computeRouteDistance(finalRoute, graph);
             com.pickupdelivery.model.AlgorithmModel.Tour lastTour = buildTour(finalRoute, finalDistance, graph);
             lastTour.setCourierId(currentCourierId);
-            tours.add(lastTour);
             
-            System.out.println("   ✓ Tournée coursier " + currentCourierId + " (finale) fermée: " +
-                String.format("%.2f", lastTour.getTotalDurationHours()) + "h, " +
-                String.format("%.0f", finalDistance) + "m, " +
-                lastTour.getRequestCount() + " demandes");
+            // ✅ FIX: Vérifier qu'on n'a pas déjà une tournée pour ce coursier
+            final int finalCourierId = currentCourierId; // Pour utilisation dans lambda
+            boolean courierAlreadyHasTour = tours.stream()
+                .anyMatch(t -> t.getCourierId() != null && t.getCourierId().equals(finalCourierId));
+            
+            if (!courierAlreadyHasTour) {
+                tours.add(lastTour);
+                System.out.println("   ✓ Tournée coursier " + currentCourierId + " (finale) fermée: " +
+                    String.format("%.2f", lastTour.getTotalDurationHours()) + "h, " +
+                    String.format("%.0f", finalDistance) + "m, " +
+                    lastTour.getRequestCount() + " demandes");
+            } else {
+                System.out.println("   ⚠️ Tournée coursier " + currentCourierId + " déjà fermée, ignorée");
+            }
         }
         
         // Construire les métriques
@@ -1224,6 +1233,15 @@ public class ServiceAlgo {
         System.out.println("      Coursiers utilisés: " + tours.size() + "/" + courierCount);
         System.out.println("      Demandes assignées: " + processedDemands.size());
         System.out.println("      Demandes non assignées: " + unassignedDemandIds.size());
+        
+        // 🔍 DEBUG: Afficher tous les courierIds
+        System.out.println("\n   🔍 DEBUG: CourierIds des tours créés:");
+        for (int i = 0; i < tours.size(); i++) {
+            com.pickupdelivery.model.AlgorithmModel.Tour tour = tours.get(i);
+            System.out.println("      Tour " + i + " -> courierId = " + tour.getCourierId() + 
+                " (" + tour.getRequestCount() + " demandes, " + 
+                String.format("%.2f", tour.getTotalDurationHours()) + "h)");
+        }
         
         // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
         // VALIDATION POST-DISTRIBUTION (CRITIQUE)

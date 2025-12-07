@@ -335,6 +335,15 @@ export default function PickupDeliveryUI() {
         // Stocker les tournées et demandes non assignées
         console.log('✅ Tournées calculées avec succès:', tours);
         console.log('⚠️  Demandes non assignées:', unassignedDemands);
+        
+        // 🔍 DEBUG: Vérifier les IDs des coursiers
+        console.log('🔍 CourierIds reçus:', tours.map(t => t.courierId));
+        const courierIds = tours.map(t => t.courierId);
+        const uniqueIds = new Set(courierIds);
+        if (courierIds.length !== uniqueIds.size) {
+          console.warn('⚠️ ATTENTION: Doublons de courierIds détectés!', courierIds);
+        }
+        
         setTourData(tours); // Array de tours
         setUnassignedDemands(unassignedDemands); // Demandes non assignées
         
