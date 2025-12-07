@@ -9,6 +9,7 @@ import CourierCountSelector from './src/components/CourierCountSelector';
 import TourTabs from './src/components/TourTabs';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
+import UnassignedDemands from './src/components/UnassignedDemands';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -170,6 +171,7 @@ export default function PickupDeliveryUI() {
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
   const [courierCount, setCourierCount] = useState(1);
   const [tourData, setTourData] = useState(null); // Maintenant peut être un array de tours
+  const [unassignedDemands, setUnassignedDemands] = useState([]); // Demandes non assignées (contrainte 4h)
   const [selectedCourierId, setSelectedCourierId] = useState(null); // null = tous les coursiers
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
   
@@ -314,18 +316,47 @@ export default function PickupDeliveryUI() {
       
       console.log('📦 Résultat complet:', result);
       
-      if (result.success && result.data && result.data.length > 0) {
-        // Stocker directement le tableau de tours
-        console.log('✅ Tournées calculées avec succès:', result.data);
-        setTourData(result.data); // Array de tours
+      if (result.success) {
+        // Nouvelle structure de réponse avec TourCalculationResponse
+        const response = result.data;
+        const tours = response.tours || [];
+        const unassignedDemands = response.unassignedDemands || [];
+        const warnings = response.warnings || [];
+        
+        // Cas où aucune tournée n'a été créée (toutes les demandes rejetées)
+        if (tours.length === 0) {
+          alert('⚠️ ATTENTION: Aucune tournée n\'a pu être calculée !\n\n' +
+                `Avec ${courierCount} coursier(s), la contrainte des 4h est trop restrictive.\n` +
+                'Toutes les demandes ont été rejetées.\n\n' +
+                '💡 Solution: Augmentez le nombre de coursiers.');
+          return;
+        }
+        
+        // Stocker les tournées et demandes non assignées
+        console.log('✅ Tournées calculées avec succès:', tours);
+        console.log('⚠️  Demandes non assignées:', unassignedDemands);
+        setTourData(tours); // Array de tours
+        setUnassignedDemands(unassignedDemands); // Demandes non assignées
         
         // Calculer les statistiques globales
-        const totalDistance = result.data.reduce((sum, tour) => sum + (tour.totalDistance || 0), 0);
-        const totalStops = result.data.reduce((sum, tour) => sum + (tour.stops?.length || 0), 0);
+        const totalDistance = tours.reduce((sum, tour) => sum + (tour.totalDistance || 0), 0);
+        const totalStops = tours.reduce((sum, tour) => sum + (tour.stops?.length || 0), 0);
+        const totalAssignedDemands = tours.reduce((sum, tour) => sum + (tour.requestCount || 0), 0);
+        const totalDemands = deliveryRequestSet.demands.length;
         
-        alert(`✅ ${courierCount} tournée(s) calculée(s) avec succès !\n\n` +
-              `📍 Stops total: ${totalStops}\n` +
-              `📏 Distance totale: ${(totalDistance / 1000).toFixed(2)} km`);
+        // Vérifier s'il y a des demandes non assignées
+        let alertMessage = `✅ ${courierCount} tournée(s) calculée(s) avec succès !\n\n`;
+        alertMessage += `📍 Stops total: ${totalStops}\n`;
+        alertMessage += `📏 Distance totale: ${(totalDistance / 1000).toFixed(2)} km\n`;
+        alertMessage += `📦 Demandes assignées: ${totalAssignedDemands}/${totalDemands}`;
+        
+        if (unassignedDemands.length > 0) {
+          alertMessage += `\n\n⚠️ ATTENTION: ${unassignedDemands.length} demande(s) NON assignée(s) !\n`;
+          alertMessage += `La contrainte des 4h par coursier a été dépassée.\n`;
+          alertMessage += `💡 Solution: Augmentez le nombre de coursiers pour traiter toutes les demandes.`;
+        }
+        
+        alert(alertMessage);
       } else {
         console.error('❌ Réponse invalide:', result);
         alert(`Erreur: ${result.message || 'Réponse invalide du serveur'}`);
@@ -651,15 +682,17 @@ export default function PickupDeliveryUI() {
           </div>
         )}
 
-        {/* Tours View - À implémenter */}
+        {/* Unassigned Demands View - Demandes non traitées */}
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
-            <h2 className="text-2xl font-bold text-center">
-              Calcul de tournées optimisées
+            <h2 className="text-2xl font-bold mb-6">
+              📋 Demandes non traitées
             </h2>
-            <p className="text-center text-gray-300 mt-4">
-              Cette section sera disponible prochainement.
-            </p>
+            <UnassignedDemands 
+              unassignedDemands={unassignedDemands}
+              deliveryRequestSet={deliveryRequestSet}
+              courierCount={courierCount}
+            />
           </div>
         )}
       </main>

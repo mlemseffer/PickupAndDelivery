@@ -57,10 +57,11 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage, has
           )}
         </button>
         
-        {/* Route Icon - Tours */}
+        {/* Route Icon - Demandes non traitées */}
         <button 
           className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'tours' ? 'bg-gray-500' : ''}`}
           onClick={() => onTabChange('tours')}
+          title="Demandes non traitées (contrainte 4h)"
         >
           <Route size={32} className={`${hasMap ? 'text-yellow-400' : 'text-white'}`} />
         </button>

@@ -1,6 +1,7 @@
 package com.pickupdelivery.dto;
 
 import com.pickupdelivery.model.AlgorithmModel.Tour;
+import com.pickupdelivery.model.Demand;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
@@ -29,6 +30,11 @@ public class TourDistributionResult {
      * (tous les coursiers sont à leur maximum de 4h)
      */
     private List<String> unassignedDemandIds = new ArrayList<>();
+    
+    /**
+     * Objets Demand complets des demandes non assignées
+     */
+    private List<Demand> unassignedDemands = new ArrayList<>();
     
     /**
      * Métriques détaillées par coursier

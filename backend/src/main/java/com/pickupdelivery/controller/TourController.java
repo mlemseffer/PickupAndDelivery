@@ -55,7 +55,7 @@ public class TourController {
      * @return Liste des tournées calculées (1 seule pour l'instant)
      */
     @PostMapping("/calculate")
-    public ResponseEntity<ApiResponse<List<Tour>>> calculateTour(
+    public ResponseEntity<ApiResponse<TourCalculationResponse>> calculateTour(
             @RequestParam(value = "courierCount", defaultValue = "1") int courierCount) {
         
         try {
@@ -145,7 +145,8 @@ public class TourController {
             System.out.println("\n🎯 Calcul de la tournée optimale...");
             long tourStartTime = System.currentTimeMillis();
             
-            List<Tour> tours = serviceAlgo.calculateOptimalTours(graph, courierCount);
+            TourDistributionResult distributionResult = serviceAlgo.calculateOptimalTours(graph, courierCount);
+            List<Tour> tours = distributionResult.getTours();
             
             long tourElapsedTime = System.currentTimeMillis() - tourStartTime;
             long totalTime = System.currentTimeMillis() - graphStartTime;
@@ -202,12 +203,37 @@ public class TourController {
             
             System.out.println("\n✅ === FIN DU CALCUL DE TOURNÉE ===\n");
             
+            // Gérer le cas où aucune tournée n'a pu être créée
+            if (tours.isEmpty()) {
+                System.out.println("⚠️ Aucune tournée n'a pu être créée (contrainte 4h trop restrictive)");
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error(
+                            "Aucune demande n'a pu être assignée avec " + courierCount + 
+                            " coursier(s). La contrainte de 4h est trop restrictive. " +
+                            "Essayez d'augmenter le nombre de coursiers."));
+            }
+            
+            // Construire le message de succès avec warnings si nécessaire
             String message = tours.size() == 1 
                 ? "Tournée calculée avec succès en " + totalTime + " ms"
                 : tours.size() + " tournées calculées avec succès en " + totalTime + " ms";
             
+            // Ajouter warning si des demandes n'ont pas été assignées
+            int totalDemandsLoaded = deliveryRequestSet.getDemands().size();
+            if (totalDemands < totalDemandsLoaded) {
+                message += " (⚠️ " + (totalDemandsLoaded - totalDemands) + 
+                          " demande(s) non assignée(s) - contrainte 4h)";
+            }
+            
+            // Construire la réponse avec les demandes non assignées
+            TourCalculationResponse response = new TourCalculationResponse(
+                tours,
+                distributionResult.getUnassignedDemands(),
+                distributionResult.getWarnings().getMessages()
+            );
+            
             return ResponseEntity.ok(
-                    ApiResponse.success(message, tours)
+                    ApiResponse.success(message, response)
             );
             
         } catch (IllegalArgumentException e) {
