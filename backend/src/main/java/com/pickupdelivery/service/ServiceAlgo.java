@@ -989,29 +989,32 @@ public class ServiceAlgo {
     // =========================================================================
 
     /**
-     * Distribue une route globale optimisée entre N coursiers selon l'algorithme FIFO strict
+     * Distribue une route globale optimisée entre N coursiers avec RÉOPTIMISATION INCRÉMENTALE
      * 
-     * PRINCIPE:
-     * 1. Parcours séquentiel de la route optimisée (ordre FIFO)
-     * 2. Pour chaque pickup rencontré, évaluer si la demande complète (pickup + delivery) 
-     *    peut être ajoutée à la tournée actuelle sans dépasser 4h
-     * 3. Si oui: ajouter pickup ET delivery à la tournée actuelle
-     * 4. Si non: fermer la tournée actuelle, passer au coursier suivant
-     * 5. Si plus de coursiers disponibles: marquer la demande comme non assignée
+     * PRINCIPE CORRIGÉ (Optimisation par coursier):
+     * 1. Parcours séquentiel de la route optimisée (ordre FIFO pour l'attribution)
+     * 2. Pour chaque demande rencontrée:
+     *    a. Ajouter temporairement la demande au coursier actuel
+     *    b. RECALCULER la tournée optimale (glouton + 2-opt) avec toutes les demandes assignées
+     *    c. Calculer la durée de la tournée optimisée
+     *    d. Si < 4h: garder cette assignation
+     *    e. Si > 4h: retirer la demande, fermer la tournée, passer au coursier suivant
+     * 3. Chaque coursier a une tournée OPTIMISÉE (pas séquentielle)
      * 
      * CONTRAINTES RESPECTÉES:
      * - Contrainte temporelle: aucune tournée > 4h (14400 secondes)
-     * - Contrainte de précédence: pickup et delivery d'une même demande toujours dans la même tournée
-     * - Ordre FIFO strict: pas d'optimisation d'équilibrage
+     * - Contrainte de précédence: pickup avant delivery dans chaque tournée optimisée
+     * - Contrainte d'optimalité: chaque tournée est optimisée (glouton + 2-opt)
+     * - Ordre FIFO: pour l'attribution aux coursiers (pas pour l'ordre des stops)
      * 
-     * @param globalOptimizedRoute Route globale optimisée (tous les stops)
+     * @param globalOptimizedRoute Route globale optimisée (pour ordre FIFO des demandes)
      * @param graph Graphe avec distances
      * @param courierCount Nombre de coursiers disponibles (1-10)
      * @param pickupsByRequestId Map des pickups par ID de demande
      * @param deliveryByRequestId Map des deliveries par ID de demande
      * @param demandMap Map des demandes complètes
      * @param warehouse Stop warehouse
-     * @return Résultat de la distribution avec tours, métriques et warnings
+     * @return Résultat de la distribution avec tours optimisés, métriques et warnings
      */
     private TourDistributionResult distributeFIFO(
             List<Stop> globalOptimizedRoute,
@@ -1022,27 +1025,26 @@ public class ServiceAlgo {
             Map<String, Demand> demandMap,
             Stop warehouse
     ) {
-        System.out.println("\n📦 Phase FIFO: Distribution multi-coursiers...");
+        System.out.println("\n📦 Phase Distribution avec Réoptimisation Incrémentale...");
         System.out.println("   Nombre de coursiers disponibles: " + courierCount);
         System.out.println("   Contrainte temporelle: " + (TIME_LIMIT_SEC / 3600) + " heures");
+        System.out.println("   Mode: FIFO pour attribution + Optimisation par coursier");
         
         // Structures de résultat
         List<com.pickupdelivery.model.AlgorithmModel.Tour> tours = new ArrayList<>();
         List<String> unassignedDemandIds = new ArrayList<>();
-        List<com.pickupdelivery.model.Demand> unassignedDemands = new ArrayList<>();  // Nouveauté
+        List<com.pickupdelivery.model.Demand> unassignedDemands = new ArrayList<>();
         Map<Integer, TourMetrics> metricsByCourier = new HashMap<>();
         DistributionWarnings warnings = new DistributionWarnings();
         
         // État du coursier actuel
         int currentCourierId = 1;
-        List<Stop> currentTourStops = new ArrayList<>();
-        currentTourStops.add(warehouse); // Départ depuis le warehouse
-        double currentTourTime = 0.0;
+        List<String> currentCourierDemandIds = new ArrayList<>();  // IDs des demandes assignées
         Set<String> processedDemands = new HashSet<>();
         
-        System.out.println("\n   Parcours FIFO de la route optimisée...");
+        System.out.println("\n   Parcours FIFO de la route optimisée (pour ordre d'attribution)...");
         
-        // Parcours FIFO de la route optimisée
+        // Parcours FIFO de la route optimisée pour déterminer l'ordre d'attribution
         for (int i = 1; i < globalOptimizedRoute.size() - 1; i++) {
             Stop stop = globalOptimizedRoute.get(i);
             
@@ -1054,188 +1056,148 @@ public class ServiceAlgo {
             // Traiter uniquement les pickups
             if (stop.getTypeStop() == Stop.TypeStop.PICKUP) {
                 String demandId = stop.getIdDemande();
-                Stop deliveryStop = null;
-                double demandTime = 0.0;
                 
                 // Vérifier si déjà traité
                 if (processedDemands.contains(demandId)) {
                     continue;
                 }
                 
-                try {
-                    // Trouver le delivery correspondant dans la route
-                    deliveryStop = findDeliveryInRoute(demandId, globalOptimizedRoute, i);
-                    
-                    if (deliveryStop == null) {
-                        System.out.println("   ⚠️  Delivery non trouvé pour pickup " + demandId);
-                        // Ne pas interrompre: marquer comme non assignée et continuer
-                        unassignedDemandIds.add(demandId);
-                        Demand unassignedDemand = demandMap.get(demandId);
-                        if (unassignedDemand != null) unassignedDemands.add(unassignedDemand);
-                        processedDemands.add(demandId);
-                        warnings.setHasUnassignedDemands(true);
-                        warnings.addMessage("Demande " + demandId + " ignorée (delivery introuvable)");
-                        continue;
-                    }
-                    
-                    // Récupérer la demande pour les temps de service
-                    Demand demand = demandMap.get(demandId);
-                    if (demand == null) {
-                        System.out.println("   ⚠️  Demande " + demandId + " non trouvée dans demandMap");
-                        // Ne pas interrompre: marquer comme non assignée et continuer
-                        unassignedDemandIds.add(demandId);
-                        // Pas de unassignedDemands.add ici car demand est null
-                        processedDemands.add(demandId);
-                        warnings.setHasUnassignedDemands(true);
-                        warnings.addMessage("Demande " + demandId + " ignorée (demande introuvable)");
-                        continue;
-                    }
-                    
-                    // Calculer le temps pour cette demande complète
-                    Stop lastStop = currentTourStops.get(currentTourStops.size() - 1);
-                    demandTime = calculateDemandTime(
-                        lastStop, stop, deliveryStop, globalOptimizedRoute, graph, demand);
-                    
-                    // Temps avec retour au warehouse
-                } catch (AlgorithmException | IllegalStateException ex) {
-                    // Ne JAMAIS casser la distribution: marquer cette demande et continuer
-                    System.out.println("   ⚠️  Erreur sur la demande " + demandId + " : " + ex.getMessage());
+                // Récupérer la demande
+                Demand demand = demandMap.get(demandId);
+                if (demand == null) {
+                    System.out.println("   ⚠️  Demande " + demandId + " non trouvée dans demandMap");
                     unassignedDemandIds.add(demandId);
-                    Demand unassignedDemand = demandMap.get(demandId);
-                    if (unassignedDemand != null) unassignedDemands.add(unassignedDemand);
                     processedDemands.add(demandId);
                     warnings.setHasUnassignedDemands(true);
-                    warnings.addMessage("Demande " + demandId + " ignorée (" + ex.getClass().getSimpleName() + ": " + ex.getMessage() + ")");
+                    warnings.addMessage("Demande " + demandId + " ignorée (demande introuvable)");
                     continue;
                 }
-                double timeWithReturn = currentTourTime + demandTime 
-                    + calculateReturnTime(deliveryStop, warehouse, graph);
+                
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                // ÉTAPE CRITIQUE: Tester si on peut ajouter cette demande au coursier actuel
+                // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+                
+                // Créer une liste temporaire avec la nouvelle demande
+                List<String> tentativeDemandIds = new ArrayList<>(currentCourierDemandIds);
+                tentativeDemandIds.add(demandId);
+                
+                // Reconstruire les stops pour cette liste de demandes
+                List<Stop> tentativeStops = buildStopsFromDemandIds(tentativeDemandIds, pickupsByRequestId, deliveryByRequestId);
+                
+                // RÉOPTIMISER la tournée avec toutes les demandes (glouton + 2-opt)
+                List<Stop> optimizedTentativeRoute = buildInitialRoute(graph, warehouse, tentativeStops, pickupsByRequestId);
+                optimizedTentativeRoute = optimizeWith2Opt(optimizedTentativeRoute, graph, pickupsByRequestId, deliveryByRequestId);
+                
+                // Calculer la durée de cette tournée optimisée
+                double tentativeDuration = computeRouteDuration(optimizedTentativeRoute, graph, demandMap);
+                
+                System.out.println("   Test demande " + demandId + " sur coursier " + currentCourierId + 
+                    ": " + String.format("%.2f", tentativeDuration / 3600) + "h");
                 
                 // Vérifier contrainte 4h
-                if (timeWithReturn > TIME_LIMIT_SEC) {
-                    System.out.println("   ⚠️  Ajout de " + demandId + " dépasserait 4h (" + 
-                        String.format("%.2f", timeWithReturn / 3600) + "h)");
-                    
+                if (tentativeDuration > TIME_LIMIT_SEC) {
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-                    // DÉTECTION INTELLIGENTE: Vérifier si la demande est impossible SEULE
-                    // Si même dans une tournée vide elle dépasse 4h, inutile de tenter d'autres coursiers
+                    // DÉTECTION: Demande impossible seule ?
                     // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
                     
-                    boolean demandImpossibleAlone = false;
-                    if (currentTourStops.size() == 1) {  // Tournée vide (uniquement warehouse)
-                        // Cette demande seule dépasse 4h → impossible à assigner
-                        double timeAlone = demandTime + calculateReturnTime(deliveryStop, warehouse, graph);
-                        if (timeAlone > TIME_LIMIT_SEC) {
-                            demandImpossibleAlone = true;
-                            System.out.println("   ❌ Demande " + demandId + 
-                                " impossible à assigner: dépasse 4h même seule (" + 
-                                String.format("%.2f", timeAlone / 3600) + "h)");
-                            unassignedDemandIds.add(demandId);
-                            Demand unassignedDemand = demandMap.get(demandId);
-                            if (unassignedDemand != null) unassignedDemands.add(unassignedDemand);
-                            processedDemands.add(demandId);
-                            warnings.setHasUnassignedDemands(true);
-                            warnings.addMessage("Demande " + demandId + 
-                                " non assignée (dépasse 4h même seule)");
-                            continue;  // Passer à la demande suivante (PAS de retry inutile)
-                        }
+                    if (currentCourierDemandIds.isEmpty()) {
+                        // Cette demande seule dépasse 4h → impossible
+                        System.out.println("   ❌ Demande " + demandId + 
+                            " impossible: dépasse 4h même seule (" + 
+                            String.format("%.2f", tentativeDuration / 3600) + "h)");
+                        unassignedDemandIds.add(demandId);
+                        unassignedDemands.add(demand);
+                        processedDemands.add(demandId);
+                        warnings.setHasUnassignedDemands(true);
+                        warnings.addMessage("Demande " + demandId + " non assignée (dépasse 4h même seule)");
+                        continue;  // Passer à la demande suivante
                     }
                     
-                    // Fermer la tournée actuelle SI elle contient des stops
-                    if (currentTourStops.size() > 1) {  // Plus que juste le warehouse
-                        System.out.println("   📦 Fermeture de la tournée avec " + (currentTourStops.size() - 1) + " stops (hors warehouse)");
-                        currentTourStops.add(warehouse);
-                        double tourDistance = computeRouteDistance(currentTourStops, graph);
-                        com.pickupdelivery.model.AlgorithmModel.Tour completedTour = 
-                            buildTour(currentTourStops, tourDistance, graph);
+                    // Fermer la tournée actuelle (sans cette nouvelle demande)
+                    if (!currentCourierDemandIds.isEmpty()) {
+                        System.out.println("   📦 Fermeture tournée coursier " + currentCourierId + 
+                            " avec " + currentCourierDemandIds.size() + " demandes");
+                        
+                        // Reconstruire et optimiser la tournée finale pour ce coursier
+                        List<Stop> finalStops = buildStopsFromDemandIds(currentCourierDemandIds, pickupsByRequestId, deliveryByRequestId);
+                        List<Stop> finalRoute = buildInitialRoute(graph, warehouse, finalStops, pickupsByRequestId);
+                        finalRoute = optimizeWith2Opt(finalRoute, graph, pickupsByRequestId, deliveryByRequestId);
+                        
+                        double finalDistance = computeRouteDistance(finalRoute, graph);
+                        com.pickupdelivery.model.AlgorithmModel.Tour completedTour = buildTour(finalRoute, finalDistance, graph);
                         completedTour.setCourierId(currentCourierId);
                         tours.add(completedTour);
                         
                         System.out.println("   ✓ Tournée coursier " + currentCourierId + " fermée: " +
                             String.format("%.2f", completedTour.getTotalDurationHours()) + "h, " +
-                            String.format("%.0f", tourDistance) + "m, " +
+                            String.format("%.0f", finalDistance) + "m, " +
                             completedTour.getRequestCount() + " demandes");
-                    } else {
-                        System.out.println("   ⚠️  Tournée vide (coursier " + currentCourierId + ") - pas de fermeture");
                     }
                     
                     // Passer au coursier suivant
                     if (currentCourierId < courierCount) {
                         currentCourierId++;
-                        currentTourStops = new ArrayList<>();
-                        currentTourStops.add(warehouse);
-                        currentTourTime = 0.0;
-                        
+                        currentCourierDemandIds = new ArrayList<>();
                         System.out.println("   → Passage au coursier " + currentCourierId);
                         
-                        // Réessayer d'ajouter cette demande
+                        // Réessayer cette demande sur le nouveau coursier
                         i--;
                         continue;
                     } else {
-                        // Plus de coursiers disponibles - réinitialiser pour éviter double fermeture
-                        currentTourStops = new ArrayList<>();
-                        currentTourStops.add(warehouse);
-                        currentTourTime = 0.0;
-                        
                         // Plus de coursiers disponibles
-                        System.out.println("   ❌ Plus de coursiers disponibles, demande " + 
-                            demandId + " non assignée");
+                        System.out.println("   ❌ Plus de coursiers disponibles, demandes restantes non assignées");
+                        
+                        // Marquer cette demande et toutes les suivantes comme non assignées
                         unassignedDemandIds.add(demandId);
-                        Demand unassignedDemand = demandMap.get(demandId);
-                        if (unassignedDemand != null) unassignedDemands.add(unassignedDemand);
+                        unassignedDemands.add(demand);
                         processedDemands.add(demandId);
                         warnings.setHasUnassignedDemands(true);
-                        warnings.addMessage("Demande " + demandId + 
-                            " non assignée (contrainte 4h et tous coursiers utilisés)");
+                        warnings.addMessage("Demande " + demandId + " non assignée (tous coursiers utilisés)");
                         
-                        // Marquer TOUTES les demandes restantes comme non assignées
-                        System.out.println("   ⚠️  Marquage des demandes restantes comme non assignées...");
+                        // Marquer TOUTES les demandes restantes
                         for (int j = i + 1; j < globalOptimizedRoute.size() - 1; j++) {
                             Stop remainingStop = globalOptimizedRoute.get(j);
                             if (remainingStop.getTypeStop() == Stop.TypeStop.PICKUP) {
                                 String remainingDemandId = remainingStop.getIdDemande();
                                 if (!processedDemands.contains(remainingDemandId)) {
+                                    Demand remainingDemand = demandMap.get(remainingDemandId);
                                     unassignedDemandIds.add(remainingDemandId);
-                                    Demand remaining = demandMap.get(remainingDemandId);
-                                    if (remaining != null) unassignedDemands.add(remaining);
+                                    if (remainingDemand != null) unassignedDemands.add(remainingDemand);
                                     processedDemands.add(remainingDemandId);
-                                    System.out.println("      ❌ Demande " + remainingDemandId + " non assignée");
                                 }
                             }
                         }
-                        
-                        // Sortir de la boucle FIFO - plus rien à traiter
-                        break;
+                        break;  // Sortir de la boucle
                     }
                 }
                 
-                // Ajouter la demande complète à la tournée actuelle
-                currentTourStops.add(stop); // Pickup
-                currentTourStops.add(deliveryStop); // Delivery
-                currentTourTime += demandTime;
+                // ✅ La demande peut être ajoutée (< 4h après optimisation)
+                currentCourierDemandIds.add(demandId);
                 processedDemands.add(demandId);
                 
-                System.out.println("   ✓ Demande " + demandId + " assignée au coursier " + 
-                    currentCourierId + " (temps accumulé: " + 
-                    String.format("%.2f", currentTourTime / 3600) + "h)");
+                System.out.println("   ✓ Demande " + demandId + " assignée au coursier " + currentCourierId + 
+                    " (" + currentCourierDemandIds.size() + " demandes, " + 
+                    String.format("%.2f", tentativeDuration / 3600) + "h)");
             }
         }
         
-        // Fermer la dernière tournée SI ELLE CONTIENT DES STOPS
-        if (currentTourStops.size() > 1) {  // Plus que juste le warehouse
-            currentTourStops.add(warehouse);
-            double tourDistance = computeRouteDistance(currentTourStops, graph);
-            com.pickupdelivery.model.AlgorithmModel.Tour lastTour = 
-                buildTour(currentTourStops, tourDistance, graph);
+        // Fermer la dernière tournée SI ELLE CONTIENT DES DEMANDES
+        if (!currentCourierDemandIds.isEmpty()) {
+            System.out.println("   📦 Fermeture tournée finale coursier " + currentCourierId);
+            
+            List<Stop> finalStops = buildStopsFromDemandIds(currentCourierDemandIds, pickupsByRequestId, deliveryByRequestId);
+            List<Stop> finalRoute = buildInitialRoute(graph, warehouse, finalStops, pickupsByRequestId);
+            finalRoute = optimizeWith2Opt(finalRoute, graph, pickupsByRequestId, deliveryByRequestId);
+            
+            double finalDistance = computeRouteDistance(finalRoute, graph);
+            com.pickupdelivery.model.AlgorithmModel.Tour lastTour = buildTour(finalRoute, finalDistance, graph);
             lastTour.setCourierId(currentCourierId);
             tours.add(lastTour);
             
             System.out.println("   ✓ Tournée coursier " + currentCourierId + " (finale) fermée: " +
                 String.format("%.2f", lastTour.getTotalDurationHours()) + "h, " +
-                String.format("%.0f", tourDistance) + "m, " +
+                String.format("%.0f", finalDistance) + "m, " +
                 lastTour.getRequestCount() + " demandes");
-        } else {
-            System.out.println("   ⚠️  Dernière tournée vide (coursier " + currentCourierId + ") - ignorée");
         }
         
         // Construire les métriques
@@ -1695,6 +1657,39 @@ public class ServiceAlgo {
         }
         
         return null;
+    }
+
+    /**
+     * Construit une liste de stops (pickups + deliveries) à partir d'une liste d'IDs de demandes
+     * Utilisé pour la réoptimisation incrémentale lors de la distribution
+     * 
+     * @param demandIds Liste des IDs de demandes à inclure
+     * @param pickupsByRequestId Map des pickups par ID de demande
+     * @param deliveryByRequestId Map des deliveries par ID de demande
+     * @return Liste des stops (tous les pickups et deliveries)
+     */
+    private List<Stop> buildStopsFromDemandIds(
+            List<String> demandIds,
+            Map<String, List<Stop>> pickupsByRequestId,
+            Map<String, Stop> deliveryByRequestId
+    ) {
+        List<Stop> stops = new ArrayList<>();
+        
+        for (String demandId : demandIds) {
+            // Ajouter le(s) pickup(s) de cette demande
+            List<Stop> pickups = pickupsByRequestId.get(demandId);
+            if (pickups != null) {
+                stops.addAll(pickups);
+            }
+            
+            // Ajouter le delivery de cette demande
+            Stop delivery = deliveryByRequestId.get(demandId);
+            if (delivery != null) {
+                stops.add(delivery);
+            }
+        }
+        
+        return stops;
     }
 
     /**
