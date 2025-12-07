@@ -5,11 +5,8 @@ import MapViewer from './src/components/MapViewer';
 import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
-import CourierCountSelector from './src/components/CourierCountSelector';
-import TourTabs from './src/components/TourTabs';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
-import UnassignedDemands from './src/components/UnassignedDemands';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -167,6 +164,7 @@ export default function PickupDeliveryUI() {
   const [showDeliveryUpload, setShowDeliveryUpload] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
   const [showCourierModal, setShowCourierModal] = useState(false);
+  const [showRestoreTourModal, setShowRestoreTourModal] = useState(false);
   const [mapData, setMapData] = useState(null);
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
   const [courierCount, setCourierCount] = useState(1);
@@ -174,6 +172,8 @@ export default function PickupDeliveryUI() {
   const [unassignedDemands, setUnassignedDemands] = useState([]); // Demandes non assignées (contrainte 4h)
   const [selectedCourierId, setSelectedCourierId] = useState(null); // null = tous les coursiers
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
+  const [showModifyTourModal, setShowModifyTourModal] = useState(false);
+  // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
   const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
@@ -181,8 +181,20 @@ export default function PickupDeliveryUI() {
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [savedFormData, setSavedFormData] = useState(null); // Pour sauvegarder les données du formulaire
 
+  // États pour CustomAlert
+  const [alertConfig, setAlertConfig] = useState(null);
+
   // État pour savoir si on est en mode ajout manuel (formulaire ouvert ou sélection active)
   const isAddingManually = showManualForm || isMapSelectionActive;
+
+  // Fonction helper pour afficher une alerte personnalisée
+  const showAlert = (type, title, message, autoClose = false) => {
+    setAlertConfig({ type, title, message, autoClose });
+  };
+
+  const closeAlert = () => {
+    setAlertConfig(null);
+  };
 
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
@@ -231,7 +243,7 @@ export default function PickupDeliveryUI() {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
     
     // Réassigner les couleurs dans le bon ordre après modification
-    if (updatedSet?.demands) {
+    if (updatedSet?.demands && updatedSet.demands.length > 0) {
       const demandsWithColors = updatedSet.demands.map((demand, index) => ({
         ...demand,
         color: getColorFromPalette(index)
@@ -243,15 +255,20 @@ export default function PickupDeliveryUI() {
       });
 
       // ✅ Recalculer automatiquement si une tournée était déjà calculée
-      if (tourData && demandsWithColors.length > 0) {
+      if (tourData) {
         console.log('🔄 Recalcul automatique de la tournée après modification des demandes...');
+        console.log('📊 Nombre de demandes après modification:', demandsWithColors.length);
         setIsCalculatingTour(true);
         
         try {
           const result = await apiService.calculateTour(courierCount);
+          console.log('📦 Résultat du recalcul:', result);
           
           if (result.success && result.data && result.data.length > 0) {
             const tour = result.data[0];
+            console.log('✅ Tour recalculé:', tour);
+            console.log('📍 Stops dans le nouveau tour:', tour.stops?.length || 0);
+            
             const newTourData = {
               tour: tour.trajets || tour.segments || tour.path || [],
               metrics: {
@@ -261,21 +278,26 @@ export default function PickupDeliveryUI() {
               }
             };
             
+            console.log('📊 Nouveau tourData créé:', newTourData);
+            console.log('🛣️  Nombre de trajets:', newTourData.tour.length);
             setTourData(newTourData);
-            console.log('✅ Tournée recalculée automatiquement');
+            console.log('✅ Tournée recalculée automatiquement avec', newTourData.tour.length, 'trajets');
+          } else {
+            console.warn('⚠️ Pas de données valides dans le résultat du recalcul');
+            setTourData(null);
           }
         } catch (error) {
           console.error('❌ Erreur lors du recalcul automatique:', error);
+          setTourData(null);
         } finally {
           setIsCalculatingTour(false);
         }
       }
     } else {
-      setDeliveryRequestSet(updatedSet);
-      // Si plus aucune demande, réinitialiser la tournée
-      if (tourData) {
-        setTourData(null);
-      }
+      // Si plus aucune demande, réinitialiser la tournée ET le deliveryRequestSet
+      console.log('⚠️ Aucune demande restante, réinitialisation de la tournée');
+      setDeliveryRequestSet(updatedSet || null);
+      setTourData(null);
     }
   };
 
@@ -304,7 +326,7 @@ export default function PickupDeliveryUI() {
   // Gestion du calcul de la tournée
   const handleCalculateTour = async () => {
     if (!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0) {
-      alert('Veuillez d\'abord charger des demandes de livraison');
+      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger des demandes de livraison');
       return;
     }
 
@@ -321,7 +343,6 @@ export default function PickupDeliveryUI() {
         const response = result.data;
         const tours = response.tours || [];
         const unassignedDemands = response.unassignedDemands || [];
-        const warnings = response.warnings || [];
         
         // Cas où aucune tournée n'a été créée (toutes les demandes rejetées)
         if (tours.length === 0) {
@@ -353,35 +374,32 @@ export default function PickupDeliveryUI() {
         const totalAssignedDemands = tours.reduce((sum, tour) => sum + (tour.requestCount || 0), 0);
         const totalDemands = deliveryRequestSet.demands.length;
         
-        // Vérifier s'il y a des demandes non assignées
-        let alertMessage = `✅ ${courierCount} tournée(s) calculée(s) avec succès !\n\n`;
-        alertMessage += `📍 Stops total: ${totalStops}\n`;
-        alertMessage += `📏 Distance totale: ${(totalDistance / 1000).toFixed(2)} km\n`;
-        alertMessage += `📦 Demandes assignées: ${totalAssignedDemands}/${totalDemands}`;
-        
-        if (unassignedDemands.length > 0) {
-          alertMessage += `\n\n⚠️ ATTENTION: ${unassignedDemands.length} demande(s) NON assignée(s) !\n`;
-          alertMessage += `La contrainte des 4h par coursier a été dépassée.\n`;
-          alertMessage += `💡 Solution: Augmentez le nombre de coursiers pour traiter toutes les demandes.`;
-        }
-        
-        alert(alertMessage);
+        setTourData(tourData);
+        alert(`✅ Tournée calculée avec succès !\n\n` +
+              `📍 Stops: ${tourData.metrics.stopCount}\n` +
+              `📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n` +
+              `🛣️  Segments: ${tourData.metrics.segmentCount}`);
       } else {
         console.error('❌ Réponse invalide:', result);
-        alert(`Erreur: ${result.message || 'Réponse invalide du serveur'}`);
+        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
       console.error('💥 Erreur lors du calcul de la tournée:', error);
-      alert(`Erreur: ${error.message}`);
+      showAlert('error', '❌ Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
   };
 
+  
+  
+
+  
+
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
-      alert('Veuillez d\'abord charger une carte');
+      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger une carte');
       return;
     }
     setShowManualForm(true);
@@ -390,32 +408,41 @@ export default function PickupDeliveryUI() {
   // Gestion de l'ajout manuel d'une demande
   const handleManualDemandAdd = async (demand) => {
     try {
-      // Enregistre la demande dans le backend
-      await apiService.addDeliveryRequest({
+      // Ajouter la demande au backend
+      const response = await apiService.addDeliveryRequest({
         pickupAddress: demand.pickupNodeId,
         deliveryAddress: demand.deliveryNodeId,
         pickupDuration: demand.pickupDurationSec,
         deliveryDuration: demand.deliveryDurationSec
       });
-      // Rafraîchit la liste depuis le backend pour récupérer l'id et l'état à jour
-      const requestSet = await apiService.getCurrentRequestSet();
-      
-      // Réassigner les couleurs dans le bon ordre
-      if (requestSet?.demands) {
-        const demandsWithColors = requestSet.demands.map((demand, index) => ({
-          ...demand,
-          color: getColorFromPalette(index)
-        }));
-        
-        setDeliveryRequestSet({
-          ...requestSet,
-          demands: demandsWithColors
-        });
-      } else {
-        setDeliveryRequestSet(requestSet);
-      }
+
+      // Extraire l'ID correctement selon la structure de réponse
+      const addedDemandId = response.data?.id || response.id;
+
+      const newDemand = {
+        id: addedDemandId || `demand_${Date.now()}`,
+        pickupNodeId: demand.pickupNodeId,
+        deliveryNodeId: demand.deliveryNodeId,
+        pickupDurationSec: demand.pickupDurationSec,
+        deliveryDurationSec: demand.deliveryDurationSec
+      };
+
+      // Ajouter à la liste existante
+      const updatedDemands = [...(deliveryRequestSet?.demands || []), newDemand];
+      const demandsWithColors = updatedDemands.map((d, index) => ({
+        ...d,
+        color: getColorFromPalette(index)
+      }));
+
+      const updatedRequestSet = {
+        warehouse: deliveryRequestSet?.warehouse || null,
+        demands: demandsWithColors
+      };
+
+      // Appeler le callback pour mettre à jour le state et recalculer si besoin
+      handleDeliveryRequestSetUpdated(updatedRequestSet);
     } catch (err) {
-      alert('Erreur lors de l\'ajout manuel : ' + err.message);
+      showAlert('error', '❌ Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
     setSelectedNodeId(null);
@@ -440,6 +467,102 @@ export default function PickupDeliveryUI() {
     }
   };
 
+  // Gestion de la restauration d'une tournée depuis un fichier JSON
+  const handleRestoreTour = async (restoredTourData, demands = []) => {
+    if (!mapData) {
+      alert('Veuillez d\'abord charger une carte');
+      return;
+    }
+
+    try {
+      console.log('🔄 Restauration de tournée avec', demands.length, 'demandes');
+
+      // Ajouter les demandes au backend et récupérer les IDs générés
+      const addedDemandsWithIds = [];
+      
+      for (const demand of demands) {
+        const response = await apiService.addDeliveryRequest({
+          pickupAddress: demand.pickupNodeId,
+          deliveryAddress: demand.deliveryNodeId,
+          pickupDuration: demand.pickupDurationSec,
+          deliveryDuration: demand.deliveryDurationSec
+        });
+        
+        // Récupérer l'ID retourné par le backend
+        const backendId = response.data?.id || response.id;
+        
+        addedDemandsWithIds.push({
+          ...demand,
+          id: backendId || demand.id // Utiliser l'ID du backend, sinon l'ancien ID
+        });
+      }
+
+      console.log('✅ Toutes les demandes ont été ajoutées au backend');
+
+      // Utiliser les demandes avec les IDs du backend
+      if (addedDemandsWithIds && addedDemandsWithIds.length > 0) {
+        console.log(`📊 ${addedDemandsWithIds.length} demandes avec IDs backend`);
+        
+        // Trouver le warehouse (premier nœud du premier segment)
+        const firstSegment = restoredTourData.tour[0]?.segments[0];
+        const warehouseNodeId = firstSegment?.origin || (mapData.nodes?.[0]?.id);
+        
+        const demandsWithColors = addedDemandsWithIds.map((demand, index) => ({
+          ...demand,
+          color: getColorFromPalette(index)
+        }));
+        
+        setDeliveryRequestSet({
+          warehouse: {
+            nodeId: warehouseNodeId,
+            departureTime: '08:00'
+          },
+          demands: demandsWithColors
+        });
+
+        console.log('✅ DeliveryRequestSet défini avec IDs du backend');
+        
+        // 🔄 Recalculer la tournée automatiquement pour avoir la bonne structure
+        setIsCalculatingTour(true);
+        try {
+          const result = await apiService.calculateTour(courierCount);
+          
+          if (result.success && result.data && result.data.length > 0) {
+            const tour = result.data[0];
+            const newTourData = {
+              tour: tour.trajets || tour.segments || tour.path || [],
+              metrics: {
+                stopCount: tour.stops?.length || 0,
+                totalDistance: tour.totalDistance || 0,
+                segmentCount: (tour.trajets || tour.segments || tour.path || []).length
+              }
+            };
+            
+            setTourData(newTourData);
+            console.log('✅ Tournée recalculée après restauration');
+          }
+        } catch (error) {
+          console.error('❌ Erreur lors du recalcul:', error);
+          // En cas d'erreur, garder la tournée restaurée
+          setTourData(restoredTourData);
+        } finally {
+          setIsCalculatingTour(false);
+        }
+      }
+
+      setActiveTab('map');
+      
+      alert(`Tournée restaurée avec succès !\n\n` +
+            `📍 Stops: ${restoredTourData.metrics.stopCount}\n` +
+            `📏 Distance: ${restoredTourData.metrics.totalDistance.toFixed(2)} m\n` +
+            `🛣️  Segments: ${restoredTourData.metrics.segmentCount}\n` +
+            `📦 Demandes: ${addedDemandsWithIds.length}`);
+    } catch (error) {
+      console.error('❌ Erreur lors de la restauration de la tournée:', error);
+      alert(`Erreur lors de la restauration : ${error.message}`);
+    }
+  };
+
   return (
     <div className="h-screen bg-gray-800 text-white flex flex-col overflow-hidden">
       {/* Navigation Bar avec titre intégré */}
@@ -450,8 +573,16 @@ export default function PickupDeliveryUI() {
           showMapMessage={showMessage}
           hasMap={mapData !== null}
           onLoadDeliveryRequests={() => setShowDeliveryUpload(true)}
+          onRestoreTour={() => setShowRestoreTourModal(true)}
         />
       </div>
+
+      {/* Restore Tour Modal */}
+      <RestoreTourModal
+        isOpen={showRestoreTourModal}
+        onClose={() => setShowRestoreTourModal(false)}
+        onRestore={handleRestoreTour}
+      />
 
       {/* Main Content */}
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
@@ -469,6 +600,7 @@ export default function PickupDeliveryUI() {
 
         {/* Map Upload View */}
         {showMapUpload && !mapData && (
+
           <MapUploader 
             onMapLoaded={handleMapLoaded}
             onCancel={handleCancelUpload}
@@ -525,7 +657,6 @@ export default function PickupDeliveryUI() {
                   deliveryRequestSet={deliveryRequestSet}
                   onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
                   tourData={tourData}
-                  selectedCourierId={selectedCourierId}
                   onSegmentClick={handleMapSegmentClick}
                   isMapSelectionActive={isMapSelectionActive}
                   isAddingManually={isAddingManually}
@@ -602,7 +733,7 @@ export default function PickupDeliveryUI() {
                   ) : (
                     // Boutons après calcul de tournée (4 boutons sur 2 lignes)
                     <div className="flex flex-col gap-3">
-                      {/* Première ligne : Ajouter et Calculer tournée */}
+                      {/* Première ligne : Ajouter et Modifier tournée */}
                       <div className="flex gap-3">
                         <button 
                           onClick={handleAddDeliveryManually}
@@ -614,63 +745,22 @@ export default function PickupDeliveryUI() {
                         </button>
 
                         <button
-                          onClick={handleCalculateTour}
-                          disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
-                          className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
+                          onClick={() => setShowModifyTourModal(true)}
+                          className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
                                    flex items-center justify-center gap-2"
-                          title="Calculer la tournée optimale"
+                          title="Modifier la tournée calculée"
                         >
-                          {isCalculatingTour ? 'Calcul en cours...' : '🧮 Calculer tournée'}
+                          ✏️ Modifier Tournée
                         </button>
                       </div>
                       
-                      {/* Deuxième ligne : Sauvegarder */}
-                      <div className="flex gap-3">
-                        <button
-                          onClick={() => {
-                            const content = generateItineraryText(tourData);
-                            const blob = new Blob([content], { type: 'text/plain' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `itineraire_${new Date().toISOString().split('T')[0]}.txt`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-teal-600 hover:bg-teal-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder l'itinéraire en fichier texte"
-                        >
-                          📄 Sauvegarder itinéraire
-                        </button>
-
-                        <button
-                          onClick={() => {
-                            const tourJson = JSON.stringify(tourData, null, 2);
-                            const blob = new Blob([tourJson], { type: 'application/json' });
-                            const url = URL.createObjectURL(blob);
-                            const link = document.createElement('a');
-                            link.href = url;
-                            link.download = `tournee_${new Date().toISOString().split('T')[0]}.json`;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                            URL.revokeObjectURL(url);
-                          }}
-                          disabled={!tourData}
-                          className="flex-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                   text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
-                                   flex items-center justify-center gap-2"
-                          title="Sauvegarder la tournée complète (JSON)"
-                        >
-                          💾 Sauvegarder Tournée
-                        </button>
-                      </div>
+                      {/* Deuxième ligne : Sauvegarder itinéraire et Sauvegarder tournée */}
+                      <TourActions
+                        tourData={tourData}
+                        deliveryRequestSet={deliveryRequestSet}
+                        onSaveItinerary={() => console.log('Itinéraire sauvegardée')}
+                        onSaveTour={() => console.log('Tournée sauvegardée')}
+                      />
                     </div>
                   )}
                 </div>
@@ -691,7 +781,7 @@ export default function PickupDeliveryUI() {
           </div>
         )}
 
-        {/* Unassigned Demands View - Demandes non traitées */}
+        {/* Tours View - À implémenter */}
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
             <h2 className="text-2xl font-bold mb-6">
@@ -704,7 +794,34 @@ export default function PickupDeliveryUI() {
             />
           </div>
         )}
+        {/* Save modals are centralized inside TourActions */}
+
       </main>
+
+      {/* CustomAlert */}
+      {alertConfig && (
+        <CustomAlert
+          type={alertConfig.type}
+          title={alertConfig.title}
+          message={alertConfig.message}
+          autoClose={alertConfig.autoClose}
+          onClose={closeAlert}
+        />
+      )}
+
+      {/* ModifyTourModal */}
+      {showModifyTourModal && (
+        <ModifyTourModal
+          tourData={tourData}
+          mapData={mapData}
+          deliveries={deliveryRequestSet?.demands || []}
+          onClose={() => setShowModifyTourModal(false)}
+          onTourUpdated={(updatedTour) => {
+            setTourData(updatedTour);
+          }}
+          onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
+        />
+      )}
     </div>
   );
 }

@@ -264,6 +264,11 @@
   border-left: 4px solid #2f9e44;
 }
 
+.alert-bottom {
+  margin-top: 16px;
+  margin-bottom: 0;
+}
+
 /* Deliveries list */
 .deliveries-list {
   max-height: 400px;
@@ -280,6 +285,9 @@
   border-radius: 4px;
   border: 1px solid #e0e0e0;
   gap: 12px;
+  border-left-width: 6px;
+  border-left-style: solid;
+  box-shadow: -4px 0 8px rgba(0, 0, 0, 0.05);
 }
 
 .delivery-info {

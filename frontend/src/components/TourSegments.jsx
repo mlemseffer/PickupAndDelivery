@@ -6,23 +6,18 @@ import L from 'leaflet';
  * Composant pour afficher les segments de la tournée en jaune avec numérotation et flèches
  */
 export default function TourSegments({ tourData, nodesById }) {
-  console.log('🔍 TourSegments - tourData:', tourData);
-  console.log('🔍 TourSegments - nodesById keys:', Object.keys(nodesById).length);
+
   
   if (!tourData || !tourData.tour || tourData.tour.length === 0) {
     console.warn('⚠️ TourSegments: Pas de données de tournée');
     return null;
   }
   
-  console.log('✅ TourSegments: Affichage de', tourData.tour.length, 'trajets');
-  
   // Aplatir tous les segments de tous les trajets
   let segmentCounter = 0;
   const allSegmentsWithNumbers = [];
   
   tourData.tour.forEach((trajet, trajetIndex) => {
-    console.log(`📍 Trajet ${trajetIndex + 1}:`, trajet);
-    
     if (!trajet.segments || trajet.segments.length === 0) {
       console.warn(`⚠️ Trajet ${trajetIndex + 1} n'a pas de segments`);
       return;
@@ -37,8 +32,6 @@ export default function TourSegments({ tourData, nodesById }) {
       });
     });
   });
-  
-  console.log(`📊 Total de ${segmentCounter} segments à afficher`);
 
   // Créer une icône de flèche personnalisée (petite et simple)
   const createArrowIcon = (rotation) => {
