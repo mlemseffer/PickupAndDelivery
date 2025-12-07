@@ -820,7 +820,7 @@ export default function PickupDeliveryUI() {
                   </h3>
                   <div className="flex-1 overflow-auto min-h-0">
                     {tourData ? (
-                      Array.isArray(tourData) && tourData.length > 1 ? (
+                      Array.isArray(tourData) ? (
                         <TourTabs
                           tours={tourData}
                           deliveryRequestSet={filteredDeliveryRequestSet}
@@ -851,7 +851,21 @@ export default function PickupDeliveryUI() {
                               const result = await apiService.recalculateAssignments(finalAssignments);
                               if (result?.success && result.data) {
                                 const resp = result.data;
-                                setTourData(resp.tours || null);
+                                const incomingTours = resp.tours || [];
+                                const toursWithDefault =
+                                  incomingTours.length > 0
+                                    ? incomingTours
+                                    : [
+                                        {
+                                          courierId: 1,
+                                          trajets: [],
+                                          stops: [],
+                                          totalDistance: 0,
+                                          totalDurationSec: 0,
+                                          requestCount: 0
+                                        }
+                                      ];
+                                setTourData(toursWithDefault);
                                 setUnassignedDemands(resp.unassignedDemands || []);
                               } else {
                                 throw new Error(result?.message || 'Réponse invalide du serveur');

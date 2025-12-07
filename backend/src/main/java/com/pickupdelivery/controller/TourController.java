@@ -455,8 +455,14 @@ public class TourController {
                         } catch (NumberFormatException nfe) {
                             // laisser tel quel si non numérique
                         }
+                        // Contrainte 4h
+                        if (t.getTotalDurationSec() > 4 * 3600) {
+                            warnings.add("Tournée coursier " + courierIdStr + " dépasse 4h, demandes remises en non assignées");
+                            unassigned.addAll(demandsForCourier);
+                        } else {
+                            tours.add(t);
+                        }
                     }
-                    tours.addAll(computed);
                 }
                 if (dist.getWarnings() != null && dist.getWarnings().getMessages() != null) {
                     warnings.addAll(dist.getWarnings().getMessages());

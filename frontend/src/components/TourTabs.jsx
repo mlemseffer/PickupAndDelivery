@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import GlobalStatistics from './GlobalStatistics';
 import { getCourierColor } from '../utils/courierColors';
 import DemandAssignmentTable from './DemandAssignmentTable';
@@ -40,14 +40,21 @@ export default function TourTabs({
   const [showReassignModal, setShowReassignModal] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [activeDemand, setActiveDemand] = useState(null);
+  const [extraCouriers, setExtraCouriers] = useState([]);
 
-  if (!tours || tours.length === 0) {
-    return (
-      <div className="text-gray-400 text-center py-8">
-        Aucune tournée calculée
-      </div>
-    );
-  }
+  const normalizedTours =
+    tours && tours.length > 0
+      ? tours
+      : [
+          {
+            courierId: 1,
+            trajets: [],
+            stops: [],
+            totalDistance: 0,
+            totalDurationSec: 0,
+            requestCount: 0,
+          },
+        ];
 
   const handleTabClick = (courierId) => {
     setSelectedCourierId(courierId);
@@ -57,7 +64,7 @@ export default function TourTabs({
       if (courierId === null) {
         onTourSelect(null); // Vue globale : afficher tous les tours
       } else {
-        const selectedTour = tours.find(t => t.courierId === courierId);
+        const selectedTour = displayTours.find(t => t.courierId === courierId);
         onTourSelect(selectedTour);
       }
     }
@@ -65,13 +72,50 @@ export default function TourTabs({
 
   const allDemands = deliveryRequestSet?.demands || [];
 
+  const uniqueTours = useMemo(() => {
+    const seen = new Set();
+    return normalizedTours.filter((tour) => {
+      const id = tour?.courierId;
+      if (id === null || id === undefined) return false;
+      if (seen.has(id)) return false;
+      seen.add(id);
+      return true;
+    });
+  }, [normalizedTours]);
+
+  const baseCouriers = uniqueTours.map((tour) => tour.courierId);
+
+  const filteredExtraCouriers = useMemo(
+    () => extraCouriers.filter((id) => !baseCouriers.includes(id)),
+    [extraCouriers, baseCouriers]
+  );
+
+  // Nettoyer les doublons quand les tournées changent (évite la duplication d'un coursier existant)
+  useEffect(() => {
+    if (filteredExtraCouriers.length !== extraCouriers.length) {
+      setExtraCouriers(filteredExtraCouriers);
+    }
+  }, [filteredExtraCouriers, extraCouriers]);
+
+  const displayTours = useMemo(() => {
+    const placeholders = filteredExtraCouriers.map((id) => ({
+      courierId: id,
+      trajets: [],
+      stops: [],
+      totalDistance: 0,
+      totalDurationSec: 0,
+      requestCount: 0,
+    }));
+    return [...uniqueTours, ...placeholders];
+  }, [uniqueTours, filteredExtraCouriers]);
+
   const courierOptions = useMemo(
     () =>
-      tours.map((tour) => ({
-        value: tour.courierId,
-        label: `Coursier ${tour.courierId}`,
+      [...baseCouriers, ...filteredExtraCouriers].map((id) => ({
+        value: id,
+        label: `Coursier ${id}`,
       })),
-    [tours]
+    [baseCouriers, filteredExtraCouriers]
   );
 
   const derivedUnassigned = useMemo(() => {
@@ -90,6 +134,15 @@ export default function TourTabs({
 
   const demandsForCourier = (courierId) =>
     allDemands.filter((d) => (demandAssignments?.[d.id] ?? null) === courierId);
+
+  const handleAddCourier = () => {
+    const maxId = [...baseCouriers, ...extraCouriers].reduce(
+      (m, v) => (Number(v) > m ? Number(v) : m),
+      0
+    );
+    const newId = maxId + 1 || 1;
+    setExtraCouriers((prev) => [...prev, newId]);
+  };
 
   const handleRequestReassign = (demand) => {
     setActiveDemand(demand);
@@ -127,20 +180,29 @@ export default function TourTabs({
   return (
     <div id="assignments-panel" className="tour-tabs flex flex-col h-full">
       {isEditing && (
-        <div className="flex items-center justify-end gap-2 mb-3">
+        <div className="flex items-center justify-between gap-2 mb-3">
           <button
-            onClick={onCancelEdit}
-            className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm font-semibold"
-          >
-            Annuler
-          </button>
-          <button
-            onClick={onValidateEdit}
-            className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
+            onClick={handleAddCourier}
+            className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
             disabled={isBusy}
           >
-            Valider
+            Ajouter coursier
           </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={onCancelEdit}
+              className="bg-gray-700 hover:bg-gray-600 text-white px-3 py-1.5 rounded text-sm font-semibold"
+            >
+              Annuler
+            </button>
+            <button
+              onClick={onValidateEdit}
+              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
+              disabled={isBusy}
+            >
+              Valider
+            </button>
+          </div>
         </div>
       )}
       {/* Onglets en haut */}
@@ -158,7 +220,7 @@ export default function TourTabs({
         </button>
         
         {/* Onglets par coursier */}
-        {tours.map(tour => (
+        {displayTours.map(tour => (
           <button
             key={tour.courierId}
             onClick={() => handleTabClick(tour.courierId)}
@@ -184,7 +246,7 @@ export default function TourTabs({
       <div className="tour-tab-content flex-1 overflow-y-auto">
         {selectedCourierId === null ? (
           <div className="space-y-6">
-            <GlobalStatistics tours={tours} />
+            <GlobalStatistics tours={displayTours} />
             {isEditing && (
               <DemandAssignmentTable
                 title="Toutes les demandes"
@@ -222,15 +284,15 @@ export default function TourTabs({
 
             {!isEditing && (
               <>
-                <TourStatistics tour={tours.find((t) => t.courierId === selectedCourierId)} />
+                <TourStatistics tour={displayTours.find((t) => t.courierId === selectedCourierId)} />
                 <div className="bg-gray-800 rounded-lg p-3">
                   <TourTable
                     tourData={{
-                      tour: tours.find((t) => t.courierId === selectedCourierId)?.trajets || [],
+                      tour: displayTours.find((t) => t.courierId === selectedCourierId)?.trajets || [],
                       metrics: {
-                        stopCount: tours.find((t) => t.courierId === selectedCourierId)?.stops?.length || 0,
-                        totalDistance: tours.find((t) => t.courierId === selectedCourierId)?.totalDistance || 0,
-                        segmentCount: tours.find((t) => t.courierId === selectedCourierId)?.trajets?.length || 0,
+                        stopCount: displayTours.find((t) => t.courierId === selectedCourierId)?.stops?.length || 0,
+                        totalDistance: displayTours.find((t) => t.courierId === selectedCourierId)?.totalDistance || 0,
+                        segmentCount: displayTours.find((t) => t.courierId === selectedCourierId)?.trajets?.length || 0,
                       },
                     }}
                     deliveryRequestSet={deliveryRequestSet}
