@@ -8,6 +8,7 @@ import com.pickupdelivery.model.AlgorithmModel.StopSet;
 import com.pickupdelivery.model.AlgorithmModel.Tour;
 import com.pickupdelivery.model.CityMap;
 import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.Demand;
 import com.pickupdelivery.service.DeliveryService;
 import com.pickupdelivery.service.MapService;
 import com.pickupdelivery.service.ServiceAlgo;
@@ -17,6 +18,10 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 /**
  * Contrôleur REST pour gérer les tournées de livraison
@@ -231,6 +236,11 @@ public class TourController {
                 distributionResult.getUnassignedDemands(),
                 distributionResult.getWarnings().getMessages()
             );
+
+            // Stocker les tournées calculées pour les réassignations ultérieures (si service présent)
+            if (tourService != null) {
+                tourService.setAlgoTours(tours);
+            }
             
             return ResponseEntity.ok(
                     ApiResponse.success(message, response)
@@ -365,6 +375,112 @@ public class TourController {
         } catch (Exception e) {
             return ResponseEntity.badRequest()
                     .body(ApiResponse.error("Erreur lors de la mise à jour du coursier: " + e.getMessage()));
+        }
+    }
+
+    /**
+     * Recalcule les tournées à partir d'une affectation explicite des demandes (courierId nullable)
+     * POST /api/tours/recalculate-assignments
+     */
+    @PostMapping("/recalculate-assignments")
+    public ResponseEntity<ApiResponse<TourCalculationResponse>> recalculateAssignments(
+            @RequestBody UpdateAssignmentsRequest request) {
+        try {
+            CityMap cityMap = mapService.getCurrentMap();
+            DeliveryRequestSet deliveryRequestSet = deliveryService.getCurrentRequestSet();
+
+            if (cityMap == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Aucune carte chargée. Veuillez d'abord charger une carte."));
+            }
+            if (deliveryRequestSet == null || deliveryRequestSet.getDemands() == null || deliveryRequestSet.getDemands().isEmpty()) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Aucune demande de livraison chargée."));
+            }
+            if (deliveryRequestSet.getWarehouse() == null) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                        .body(ApiResponse.error("Aucun entrepôt défini."));
+            }
+
+            Map<String, String> assignmentMap = new HashMap<>();
+            if (request != null && request.getAssignments() != null) {
+                for (UpdateAssignmentsRequest.Assignment a : request.getAssignments()) {
+                    if (a.getDemandId() != null) {
+                        assignmentMap.put(a.getDemandId(), (a.getCourierId() == null || a.getCourierId().isBlank()) ? null : a.getCourierId());
+                    }
+                }
+            }
+
+            Map<String, List<Demand>> demandsByCourier = new HashMap<>();
+            List<Demand> unassigned = new ArrayList<>();
+
+            for (Demand d : deliveryRequestSet.getDemands()) {
+                String assigned = assignmentMap.getOrDefault(d.getId(), null);
+                if (assigned == null) {
+                    unassigned.add(d);
+                } else {
+                    demandsByCourier.computeIfAbsent(assigned, k -> new ArrayList<>()).add(d);
+                }
+            }
+
+            List<Tour> tours = new ArrayList<>();
+            List<String> warnings = new ArrayList<>();
+
+            for (Map.Entry<String, List<Demand>> entry : demandsByCourier.entrySet()) {
+                String courierIdStr = entry.getKey();
+                List<Demand> demandsForCourier = entry.getValue();
+                if (demandsForCourier.isEmpty()) continue;
+
+                DeliveryRequestSet subset = new DeliveryRequestSet();
+                subset.setWarehouse(deliveryRequestSet.getWarehouse());
+                subset.setDemands(demandsForCourier);
+
+                StopSet stopSet = serviceAlgo.getStopSet(subset);
+                Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
+                // Injecter le demandMap attendu par l'algo (sinon warnings "demande introuvable")
+                Map<String, Demand> demandMap = new HashMap<>();
+                for (Demand d : demandsForCourier) {
+                    demandMap.put(d.getId(), d);
+                    // Ajout d'une clé alternative sans le premier caractère si besoin (robuste aux divergences d'ID)
+                    if (d.getId() != null && d.getId().length() > 1) {
+                        demandMap.put(d.getId().substring(1), d);
+                    }
+                }
+                graph.setDemandMap(demandMap);
+
+                com.pickupdelivery.dto.TourDistributionResult dist = serviceAlgo.calculateOptimalTours(graph, 1);
+                List<Tour> computed = dist.getTours();
+                if (computed != null) {
+                    for (Tour t : computed) {
+                        try {
+                            t.setCourierId(Integer.valueOf(courierIdStr));
+                        } catch (NumberFormatException nfe) {
+                            // laisser tel quel si non numérique
+                        }
+                        // Contrainte 4h
+                        if (t.getTotalDurationSec() > 4 * 3600) {
+                            warnings.add("Tournée coursier " + courierIdStr + " dépasse 4h, demandes remises en non assignées");
+                            unassigned.addAll(demandsForCourier);
+                        } else {
+                            tours.add(t);
+                        }
+                    }
+                }
+                if (dist.getWarnings() != null && dist.getWarnings().getMessages() != null) {
+                    warnings.addAll(dist.getWarnings().getMessages());
+                }
+            }
+
+            TourCalculationResponse resp = new TourCalculationResponse(tours, unassigned, warnings);
+            if (tourService != null) {
+                tourService.setAlgoTours(tours);
+            }
+
+            return ResponseEntity.ok(ApiResponse.success("Tournées recalculées avec affectations", resp));
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(ApiResponse.error("Erreur lors du recalcul des tournées: " + e.getMessage()));
         }
     }
 

@@ -267,7 +267,26 @@ class ApiService {
     });
 
     if (!response.ok) {
-      throw new Error('Erreur lors de la mise à jour du coursier');
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Erreur lors de la mise à jour du coursier');
+    }
+
+    return response.json();
+  }
+
+  async recalculateAssignments(assignments) {
+    // assignments: [{ demandId, courierId|null }]
+    const response = await fetch(`${API_BASE_URL}/tours/recalculate-assignments`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ assignments }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Erreur lors du recalcul des tournées');
     }
 
     return response.json();

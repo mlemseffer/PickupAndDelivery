@@ -11,7 +11,24 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class UpdateCourierRequest {
-    private String oldCourierId;           // ID du coursier actuel
-    private String newCourierId;           // ID du nouveau coursier
-    private int deliveryIndex;             // Index de la livraison à reassigner
+    /**
+     * Coursier source. Optionnel : si null/vidé, on le déduira en cherchant la demande.
+     */
+    private String oldCourierId;
+
+    /**
+     * Coursier cible (obligatoire).
+     */
+    private String newCourierId;
+
+    /**
+     * Index de la livraison dans la tournée source (optionnel).
+     * Si absent ou -1, on le recalculera à partir de demandId.
+     */
+    private Integer deliveryIndex;
+
+    /**
+     * Identifiant unique de la demande (recommandé).
+     */
+    private String demandId;
 }
