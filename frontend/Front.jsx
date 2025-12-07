@@ -5,6 +5,7 @@ import MapViewer from './src/components/MapViewer';
 import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
+import CourierCountSelector from './src/components/CourierCountSelector';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
 import apiService from './src/services/apiService';
@@ -499,39 +500,40 @@ export default function PickupDeliveryUI() {
                 {/* Boutons d'action */}
                 <div className="bg-gray-700 rounded-lg p-4 flex-shrink-0">
                   {!tourData ? (
-                    // Boutons avant calcul de tournée
-                    <div className="flex gap-3 justify-center">
-                      {/* Bouton Nombre de livreurs */}
-                      <button 
-                        onClick={() => setShowCourierModal(true)}
-                        disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0}
-                        className="flex-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                        title="Choisir le nombre de livreurs"
-                      >
-                        Nombre de livreurs {deliveryRequestSet?.demands?.length > 0 && `(${courierCount})`}
-                      </button>
+                    // Avant calcul de tournée : Sélecteur + Boutons
+                    <div className="flex flex-col gap-4">
+                      {/* Sélecteur de coursiers - Affiché seulement si des demandes sont chargées */}
+                      {deliveryRequestSet && deliveryRequestSet.demands && deliveryRequestSet.demands.length > 0 && (
+                        <CourierCountSelector
+                          value={courierCount}
+                          onChange={setCourierCount}
+                          disabled={isCalculatingTour}
+                        />
+                      )}
                       
-                      {/* Bouton Ajouter Pickup&Delivery (manuel) */}
-                      <button 
-                        onClick={handleAddDeliveryManually}
-                        disabled={!deliveryRequestSet}
-                        className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                        title={!deliveryRequestSet ? "Chargez d'abord des demandes de livraison" : "Ajouter manuellement une demande de livraison"}
-                      >
-                        Ajouter Pickup&Delivery
-                      </button>
-                      
-                      {/* Bouton Calculer tournée */}
-                      <button 
-                        onClick={handleCalculateTour}
-                        disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
-                        className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
-                                 text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                        title="Calculer la tournée optimale"
-                      >
-                        {isCalculatingTour ? 'Calcul en cours...' : 'Calculer tournée'}
-                      </button>
+                      {/* Boutons d'action */}
+                      <div className="flex gap-3">
+                        {/* Bouton Ajouter Pickup&Delivery (manuel) */}
+                        <button 
+                          onClick={handleAddDeliveryManually}
+                          disabled={!deliveryRequestSet}
+                          className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                          title={!deliveryRequestSet ? "Chargez d'abord des demandes de livraison" : "Ajouter manuellement une demande de livraison"}
+                        >
+                          Ajouter Pickup&Delivery
+                        </button>
+                        
+                        {/* Bouton Calculer tournée */}
+                        <button 
+                          onClick={handleCalculateTour}
+                          disabled={!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0 || isCalculatingTour}
+                          className="flex-1 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed 
+                                   text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
+                          title="Calculer la tournée optimale"
+                        >
+                          {isCalculatingTour ? 'Calcul en cours...' : 'Calculer tournée'}
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     // Boutons après calcul de tournée (4 boutons sur 2 lignes)
