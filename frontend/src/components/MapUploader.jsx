@@ -19,25 +19,37 @@ export default function MapUploader({ onMapLoaded, onCancel }) {
       return;
     }
 
+    console.log('📤 Upload du fichier:', file.name, `(${(file.size / 1024).toFixed(2)} KB)`);
+    
     setIsLoading(true);
     setError(null);
 
     try {
       // Upload du fichier vers le backend
+      console.log('⏳ Envoi du fichier au backend...');
       const uploadResponse = await apiService.uploadMap(file);
+      console.log('✅ Réponse upload:', uploadResponse);
       
       if (uploadResponse.success) {
         // Récupère les données de la carte complète
+        console.log('⏳ Récupération de la carte complète...');
         const mapResponse = await apiService.getCurrentMap();
+        console.log('✅ Carte reçue:', {
+          nodes: mapResponse.data?.nodes?.length || 0,
+          segments: mapResponse.data?.segments?.length || 0
+        });
         
         if (mapResponse.success) {
           onMapLoaded(mapResponse.data);
+        } else {
+          setError(mapResponse.message || 'Erreur lors de la récupération de la carte');
         }
       } else {
         setError(uploadResponse.message || 'Erreur lors du chargement de la carte');
       }
     } catch (err) {
-      setError('Erreur: ' + err.message);
+      console.error('❌ Erreur MapUploader:', err);
+      setError('Erreur: ' + (err.message || 'Erreur inconnue'));
     } finally {
       setIsLoading(false);
     }
