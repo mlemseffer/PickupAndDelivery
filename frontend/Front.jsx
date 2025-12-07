@@ -6,6 +6,7 @@ import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
 import CourierCountSelector from './src/components/CourierCountSelector';
+import TourTabs from './src/components/TourTabs';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
 import apiService from './src/services/apiService';
@@ -15,6 +16,35 @@ import './leaflet-custom.css';
  * Génère le contenu texte de l'itinéraire
  */
 function generateItineraryText(tourData) {
+  // Gérer le cas multi-tours
+  if (Array.isArray(tourData)) {
+    let content = '=== ITINÉRAIRES DE LIVRAISON MULTI-COURSIERS ===\n\n';
+    content += `Nombre de coursiers: ${tourData.length}\n\n`;
+    
+    tourData.forEach((tour, courierIndex) => {
+      content += `\n${'='.repeat(60)}\n`;
+      content += `COURSIER ${courierIndex + 1}\n`;
+      content += `${'='.repeat(60)}\n\n`;
+      content += `Distance totale: ${((tour.totalDistance || 0) / 1000).toFixed(2)} km\n`;
+      content += `Durée totale: ${((tour.totalDuration || 0) / 3600).toFixed(2)} h\n`;
+      content += `Nombre de stops: ${tour.stops?.length || 0}\n`;
+      content += `Nombre de segments: ${tour.trajets?.length || 0}\n\n`;
+      content += '--- TRAJETS ---\n\n';
+      
+      if (tour.trajets && Array.isArray(tour.trajets)) {
+        tour.trajets.forEach((trajet, index) => {
+          content += `${index + 1}. ${trajet.nomRue || 'Segment'}\n`;
+          content += `   De: ${trajet.origine || 'N/A'}\n`;
+          content += `   À: ${trajet.destination || 'N/A'}\n`;
+          content += `   Longueur: ${((trajet.longueur || 0) / 1000).toFixed(3)} km\n\n`;
+        });
+      }
+    });
+    
+    return content;
+  }
+  
+  // Cas mono-tour (ancien format)
   let content = '=== ITINÉRAIRE DE LIVRAISON ===\n\n';
   content += `Nombre de segments: ${tourData.tour?.length || 0}\n`;
   content += `Distance totale: ${tourData.metrics?.totalDistance?.toFixed(2) || 0} m\n`;
@@ -139,7 +169,8 @@ export default function PickupDeliveryUI() {
   const [mapData, setMapData] = useState(null);
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
   const [courierCount, setCourierCount] = useState(1);
-  const [tourData, setTourData] = useState(null);
+  const [tourData, setTourData] = useState(null); // Maintenant peut être un array de tours
+  const [selectedCourierId, setSelectedCourierId] = useState(null); // null = tous les coursiers
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
   
   // États pour la sélection sur la carte
@@ -284,33 +315,17 @@ export default function PickupDeliveryUI() {
       console.log('📦 Résultat complet:', result);
       
       if (result.success && result.data && result.data.length > 0) {
-        const tour = result.data[0]; // Premier tour (pour 1 livreur)
-        console.log('✅ Tournée calculée avec succès:', tour);
-        console.log('🔍 Structure du tour:', {
-          keys: Object.keys(tour),
-          trajets: tour.trajets,
-          stops: tour.stops,
-          totalDistance: tour.totalDistance
-        });
+        // Stocker directement le tableau de tours
+        console.log('✅ Tournées calculées avec succès:', result.data);
+        setTourData(result.data); // Array de tours
         
-        // Créer un objet tourData pour le MapViewer
-        const tourData = {
-          tour: tour.trajets || tour.segments || tour.path || [],  // Liste des trajets
-          metrics: {
-            stopCount: tour.stops?.length || 0,
-            totalDistance: tour.totalDistance || 0,
-            segmentCount: (tour.trajets || tour.segments || tour.path || []).length
-          }
-        };
+        // Calculer les statistiques globales
+        const totalDistance = result.data.reduce((sum, tour) => sum + (tour.totalDistance || 0), 0);
+        const totalStops = result.data.reduce((sum, tour) => sum + (tour.stops?.length || 0), 0);
         
-        console.log('📊 tourData créé:', tourData);
-        console.log('📊 tour.length:', tourData.tour.length);
-        
-        setTourData(tourData);
-        alert(`✅ Tournée calculée avec succès !\n\n` +
-              `📍 Stops: ${tourData.metrics.stopCount}\n` +
-              `📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n` +
-              `🛣️  Segments: ${tourData.metrics.segmentCount}`);
+        alert(`✅ ${courierCount} tournée(s) calculée(s) avec succès !\n\n` +
+              `📍 Stops total: ${totalStops}\n` +
+              `📏 Distance totale: ${(totalDistance / 1000).toFixed(2)} km`);
       } else {
         console.error('❌ Réponse invalide:', result);
         alert(`Erreur: ${result.message || 'Réponse invalide du serveur'}`);
@@ -470,6 +485,7 @@ export default function PickupDeliveryUI() {
                   deliveryRequestSet={deliveryRequestSet}
                   onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
                   tourData={tourData}
+                  selectedCourierId={selectedCourierId}
                   onSegmentClick={handleMapSegmentClick}
                   isMapSelectionActive={isMapSelectionActive}
                   isAddingManually={isAddingManually}
@@ -478,17 +494,25 @@ export default function PickupDeliveryUI() {
               
               {/* Panneau droit avec informations et boutons */}
               <div className={`flex-1 flex flex-col gap-4 min-h-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
-                {/* Tableau de tournée */}
+                {/* Tableau de tournée ou onglets multi-tours */}
                 <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 overflow-hidden">
                   <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
-                    {tourData ? 'Tournée Calculée' : 'Informations'}
+                    {tourData ? (Array.isArray(tourData) && tourData.length > 1 ? 'Tournées Multi-Coursiers' : 'Tournée Calculée') : 'Informations'}
                   </h3>
                   <div className="flex-1 overflow-auto min-h-0">
                     {tourData ? (
-                      <TourTable 
-                        tourData={tourData}
-                        deliveryRequestSet={deliveryRequestSet}
-                      />
+                      Array.isArray(tourData) && tourData.length > 1 ? (
+                        <TourTabs
+                          tours={tourData}
+                          deliveryRequestSet={deliveryRequestSet}
+                          onTourSelect={(tour) => setSelectedCourierId(tour?.courierId || null)}
+                        />
+                      ) : (
+                        <TourTable 
+                          tourData={Array.isArray(tourData) ? { tour: tourData[0].trajets, metrics: { stopCount: tourData[0].stops?.length || 0, totalDistance: tourData[0].totalDistance || 0, segmentCount: tourData[0].trajets?.length || 0 }} : tourData}
+                          deliveryRequestSet={deliveryRequestSet}
+                        />
+                      )
                     ) : (
                       <div className="text-gray-400 text-center py-8">
                         Chargez des demandes et calculez une tournée

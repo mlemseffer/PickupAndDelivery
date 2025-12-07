@@ -4,6 +4,7 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
 import ModifyTourButton from './ModifyTourButton';
 import TourSegments from './TourSegments';
+import MultiTourPolylines from './MultiTourPolylines';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -32,7 +33,8 @@ export default function MapViewer({
   mapData, 
   onClearMap, 
   deliveryRequestSet, 
-  tourData, 
+  tourData,
+  selectedCourierId,
   onDeliveryRequestSetUpdated,
   onSegmentClick,
   isMapSelectionActive,
@@ -229,12 +231,22 @@ export default function MapViewer({
             />
           )}
 
-          {/* Affichage de la tournée calculée (segments jaunes numérotés) */}
+          {/* Affichage de la tournée ou des tournées multi-coursiers */}
           {tourData && (
-            <TourSegments 
-              tourData={tourData}
-              nodesById={nodesById}
-            />
+            Array.isArray(tourData) && tourData.length > 1 ? (
+              // Multi-tours avec couleurs
+              <MultiTourPolylines 
+                tours={tourData}
+                nodesById={nodesById}
+                selectedCourierId={selectedCourierId}
+              />
+            ) : (
+              // Single tour (ancien format)
+              <TourSegments 
+                tourData={Array.isArray(tourData) ? { tour: tourData[0].trajets, metrics: { stopCount: tourData[0].stops?.length || 0, totalDistance: tourData[0].totalDistance || 0 }} : tourData}
+                nodesById={nodesById}
+              />
+            )
           )}
         </MapContainer>
       </div>
