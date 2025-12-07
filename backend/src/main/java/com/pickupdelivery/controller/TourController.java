@@ -237,8 +237,10 @@ public class TourController {
                 distributionResult.getWarnings().getMessages()
             );
 
-            // Stocker les tournées calculées pour les réassignations ultérieures
-            tourService.setAlgoTours(tours);
+            // Stocker les tournées calculées pour les réassignations ultérieures (si service présent)
+            if (tourService != null) {
+                tourService.setAlgoTours(tours);
+            }
             
             return ResponseEntity.ok(
                     ApiResponse.success(message, response)
@@ -470,7 +472,9 @@ public class TourController {
             }
 
             TourCalculationResponse resp = new TourCalculationResponse(tours, unassigned, warnings);
-            tourService.setAlgoTours(tours);
+            if (tourService != null) {
+                tourService.setAlgoTours(tours);
+            }
 
             return ResponseEntity.ok(ApiResponse.success("Tournées recalculées avec affectations", resp));
 
