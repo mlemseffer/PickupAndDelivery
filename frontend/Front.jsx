@@ -7,6 +7,12 @@ import ManualDeliveryForm from './src/components/ManualDeliveryForm';
 import CourierCountModal from './src/components/CourierCountModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
+import RestoreTourModal from './src/components/RestoreTourModal';
+import CourierCountSelector from './src/components/CourierCountSelector';
+import TourTabs from './src/components/TourTabs';
+import CustomAlert from './src/components/CustomAlert';
+import UnassignedDemands from './src/components/UnassignedDemands';
+import ModifyTourModal from './src/components/ModifyTourModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -368,17 +374,28 @@ export default function PickupDeliveryUI() {
         setTourData(tours); // Array de tours
         setUnassignedDemands(unassignedDemands); // Demandes non assignées
         
-        // Calculer les statistiques globales
-        const totalDistance = tours.reduce((sum, tour) => sum + (tour.totalDistance || 0), 0);
-        const totalStops = tours.reduce((sum, tour) => sum + (tour.stops?.length || 0), 0);
-        const totalAssignedDemands = tours.reduce((sum, tour) => sum + (tour.requestCount || 0), 0);
-        const totalDemands = deliveryRequestSet.demands.length;
-        
-        setTourData(tourData);
-        alert(`✅ Tournée calculée avec succès !\n\n` +
-              `📍 Stops: ${tourData.metrics.stopCount}\n` +
-              `📏 Distance: ${tourData.metrics.totalDistance.toFixed(2)} m\n` +
-              `🛣️  Segments: ${tourData.metrics.segmentCount}`);
+        // Calculer les statistiques globales pour l'alerte récapitulative
+        const totalDistance = tours.reduce(
+          (sum, tour) => sum + (tour.totalDistance || 0),
+          0
+        );
+        const totalStops = tours.reduce(
+          (sum, tour) => sum + (tour.stops?.length || 0),
+          0
+        );
+        const totalSegments = tours.reduce(
+          (sum, tour) =>
+            sum + ((tour.trajets || tour.segments || tour.path || []).length),
+          0
+        );
+
+        alert(
+          `✅ Tournée calculée avec succès !\n\n` +
+          `👥 Coursiers: ${tours.length}\n` +
+          `📍 Stops: ${totalStops}\n` +
+          `📏 Distance: ${Number(totalDistance || 0).toFixed(2)} m\n` +
+          `🛣️  Segments: ${totalSegments}`
+        );
       } else {
         console.error('❌ Réponse invalide:', result);
         showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
@@ -657,6 +674,7 @@ export default function PickupDeliveryUI() {
                   deliveryRequestSet={deliveryRequestSet}
                   onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
                   tourData={tourData}
+                  selectedCourierId={selectedCourierId}
                   onSegmentClick={handleMapSegmentClick}
                   isMapSelectionActive={isMapSelectionActive}
                   isAddingManually={isAddingManually}
