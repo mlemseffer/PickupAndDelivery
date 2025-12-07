@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import Navigation from './src/components/Navigation';
 import MapUploader from './src/components/MapUploader';
 import MapViewer from './src/components/MapViewer';
@@ -12,7 +12,6 @@ import CourierCountSelector from './src/components/CourierCountSelector';
 import TourTabs from './src/components/TourTabs';
 import CustomAlert from './src/components/CustomAlert';
 import UnassignedDemands from './src/components/UnassignedDemands';
-import ModifyTourModal from './src/components/ModifyTourModal';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -178,7 +177,9 @@ export default function PickupDeliveryUI() {
   const [unassignedDemands, setUnassignedDemands] = useState([]); // Demandes non assignées (contrainte 4h)
   const [selectedCourierId, setSelectedCourierId] = useState(null); // null = tous les coursiers
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
-  const [showModifyTourModal, setShowModifyTourModal] = useState(false);
+  const [isEditingAssignments, setIsEditingAssignments] = useState(false);
+  const [stagedAssignments, setStagedAssignments] = useState(null); // demandId -> courierId|null
+  const [stagedRemovals, setStagedRemovals] = useState([]);
   // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
@@ -304,6 +305,135 @@ export default function PickupDeliveryUI() {
       console.log('⚠️ Aucune demande restante, réinitialisation de la tournée');
       setDeliveryRequestSet(updatedSet || null);
       setTourData(null);
+    }
+  };
+
+  const buildDemandAssignments = (tours, requestSet) => {
+    const demands = requestSet?.demands || [];
+    const mapping = {};
+    demands.forEach((d) => {
+      mapping[d.id] = null;
+    });
+
+    if (!Array.isArray(tours) || tours.length === 0) return mapping;
+
+    const nodeBelongsToDemand = (nodeId, demand) =>
+      demand.pickupNodeId === nodeId || demand.deliveryNodeId === nodeId;
+
+    tours.forEach((tour) => {
+      const courierId = tour.courierId;
+      // Collect node ids from trajets stopArrivee and stops if present
+      const nodes = new Set();
+      (tour.trajets || tour.tour || []).forEach((trajet) => {
+        if (trajet?.stopArrivee?.idNode) nodes.add(trajet.stopArrivee.idNode);
+        if (trajet?.stopDepart?.idNode) nodes.add(trajet.stopDepart.idNode);
+      });
+      (tour.stops || []).forEach((stop) => {
+        if (stop?.idNode) nodes.add(stop.idNode);
+      });
+
+      demands.forEach((d) => {
+        if (nodeBelongsToDemand(d.pickupNodeId, d) && nodes.has(d.pickupNodeId)) {
+          mapping[d.id] = courierId;
+        }
+        if (nodeBelongsToDemand(d.deliveryNodeId, d) && nodes.has(d.deliveryNodeId)) {
+          mapping[d.id] = courierId;
+        }
+      });
+    });
+
+    return mapping;
+  };
+
+  const demandAssignments = useMemo(
+    () => buildDemandAssignments(tourData, deliveryRequestSet),
+    [tourData, deliveryRequestSet]
+  );
+
+  const effectiveAssignments = isEditingAssignments && stagedAssignments ? stagedAssignments : demandAssignments;
+
+  const filteredDeliveryRequestSet = useMemo(() => {
+    if (!deliveryRequestSet) return deliveryRequestSet;
+    if (!isEditingAssignments || !Array.isArray(stagedRemovals) || stagedRemovals.length === 0) return deliveryRequestSet;
+    return {
+      ...deliveryRequestSet,
+      demands: (deliveryRequestSet.demands || []).filter((d) => !stagedRemovals.includes(d.id)),
+    };
+  }, [deliveryRequestSet, isEditingAssignments, stagedRemovals]);
+
+  const recalculateToursSilent = async () => {
+    setIsCalculatingTour(true);
+    try {
+      const result = await apiService.calculateTour(courierCount);
+      if (result.success) {
+        const response = result.data;
+        const tours = response.tours || [];
+        const unassigned = response.unassignedDemands || [];
+        setTourData(tours);
+        setUnassignedDemands(unassigned);
+      } else {
+        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
+      }
+    } catch (error) {
+      console.error('💥 Erreur lors du recalcul de la tournée:', error);
+      showAlert('error', '❌ Erreur', error.message);
+    } finally {
+      setIsCalculatingTour(false);
+    }
+  };
+
+  const handleRemoveDemandById = async (demandId) => {
+    if (!demandId) return;
+    if (isEditingAssignments) {
+      setStagedRemovals((prev) => Array.from(new Set([...(prev || []), demandId])));
+      setStagedAssignments((prev) => {
+        const next = { ...(prev || effectiveAssignments) };
+        delete next[demandId];
+        return next;
+      });
+      return;
+    }
+
+    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette demande ?')) return;
+    try {
+      await apiService.removeDemand(demandId);
+      const updatedDemands = (deliveryRequestSet?.demands || []).filter((d) => d.id !== demandId);
+      const updatedRequestSet = {
+        warehouse: deliveryRequestSet?.warehouse || null,
+        demands: updatedDemands,
+      };
+      await handleDeliveryRequestSetUpdated(updatedRequestSet);
+      await recalculateToursSilent();
+    } catch (err) {
+      showAlert('error', '❌ Erreur', err.message);
+    }
+  };
+
+  const handleReassignDemand = async (demandId, targetCourierId) => {
+    if (!deliveryRequestSet?.demands) return;
+    if (isEditingAssignments) {
+      setStagedAssignments((prev) => {
+        const base = prev || effectiveAssignments || {};
+        return { ...base, [demandId]: targetCourierId === '' ? null : targetCourierId };
+      });
+      return;
+    }
+
+    try {
+      setIsCalculatingTour(true);
+      await apiService.updateCourierAssignment({
+        demandId,
+        newCourierId: targetCourierId !== null && targetCourierId !== undefined ? String(targetCourierId) : null,
+        oldCourierId: (demandAssignments?.[demandId] ?? selectedCourierId ?? null) !== null
+          ? String(demandAssignments?.[demandId] ?? selectedCourierId)
+          : null,
+        deliveryIndex: null,
+      });
+      await recalculateToursSilent();
+    } catch (err) {
+      showAlert('error', '❌ Erreur', err.message);
+    } finally {
+      setIsCalculatingTour(false);
     }
   };
 
@@ -693,8 +823,53 @@ export default function PickupDeliveryUI() {
                       Array.isArray(tourData) && tourData.length > 1 ? (
                         <TourTabs
                           tours={tourData}
-                          deliveryRequestSet={deliveryRequestSet}
+                          deliveryRequestSet={filteredDeliveryRequestSet}
                           onTourSelect={(tour) => setSelectedCourierId(tour?.courierId || null)}
+                          demandAssignments={effectiveAssignments}
+                          unassignedDemands={unassignedDemands}
+                          onReassignDemand={handleReassignDemand}
+                          onRemoveDemand={handleRemoveDemandById}
+                          isBusy={isCalculatingTour}
+                          isEditing={isEditingAssignments}
+                          onValidateEdit={async () => {
+                            // Recalcul complet via nouvel endpoint
+                            try {
+                              setIsCalculatingTour(true);
+                              // Construire assignments pour toutes les demandes courantes
+                              const assignments = (filteredDeliveryRequestSet?.demands || []).map((d) => ({
+                                demandId: d.id,
+                                courierId: (stagedAssignments && stagedAssignments[d.id] !== undefined)
+                                  ? stagedAssignments[d.id]
+                                  : (demandAssignments?.[d.id] ?? null),
+                              }));
+
+                              // Inclure les suppressions : on exclut simplement ces demandes
+                              const finalAssignments = assignments.filter(
+                                (a) => !(stagedRemovals || []).includes(a.demandId)
+                              );
+
+                              const result = await apiService.recalculateAssignments(finalAssignments);
+                              if (result?.success && result.data) {
+                                const resp = result.data;
+                                setTourData(resp.tours || null);
+                                setUnassignedDemands(resp.unassignedDemands || []);
+                              } else {
+                                throw new Error(result?.message || 'Réponse invalide du serveur');
+                              }
+                            } catch (err) {
+                              showAlert('error', '❌ Erreur', err.message);
+                            } finally {
+                              setIsCalculatingTour(false);
+                              setIsEditingAssignments(false);
+                              setStagedAssignments(null);
+                              setStagedRemovals([]);
+                            }
+                          }}
+                          onCancelEdit={() => {
+                            setIsEditingAssignments(false);
+                            setStagedAssignments(null);
+                            setStagedRemovals([]);
+                          }}
                         />
                       ) : (
                         <TourTable 
@@ -763,7 +938,15 @@ export default function PickupDeliveryUI() {
                         </button>
 
                         <button
-                          onClick={() => setShowModifyTourModal(true)}
+                          onClick={() => {
+                            setIsEditingAssignments(true);
+                            setStagedAssignments({ ...demandAssignments });
+                            setStagedRemovals([]);
+                            const panel = document.getElementById('assignments-panel');
+                            if (panel) {
+                              panel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                            }
+                          }}
                           className="flex-1 bg-orange-600 hover:bg-orange-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
                                    flex items-center justify-center gap-2"
                           title="Modifier la tournée calculée"
@@ -824,20 +1007,6 @@ export default function PickupDeliveryUI() {
           message={alertConfig.message}
           autoClose={alertConfig.autoClose}
           onClose={closeAlert}
-        />
-      )}
-
-      {/* ModifyTourModal */}
-      {showModifyTourModal && (
-        <ModifyTourModal
-          tourData={tourData}
-          mapData={mapData}
-          deliveries={deliveryRequestSet?.demands || []}
-          onClose={() => setShowModifyTourModal(false)}
-          onTourUpdated={(updatedTour) => {
-            setTourData(updatedTour);
-          }}
-          onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
         />
       )}
     </div>

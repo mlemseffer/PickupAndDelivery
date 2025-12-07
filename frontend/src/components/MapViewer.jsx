@@ -4,7 +4,6 @@ import { Maximize2, Minimize2 } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
 import TourSegments from './TourSegments';
 import MultiTourPolylines from './MultiTourPolylines';
-import ModifyTourButton from './ModifyTourButton';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -122,7 +121,6 @@ export default function MapViewer({
   isAddingManually 
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [currentTour, setCurrentTour] = useState(null);
   const mapContainerRef = useRef(null);
 
   // Debug : vérifier les données reçues
@@ -287,16 +285,6 @@ export default function MapViewer({
               {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               {isFullscreen ? "Réduire" : "Plein écran"}
             </button>
-            <div className={isAddingManually ? 'pointer-events-none opacity-50' : ''}>
-              <ModifyTourButton 
-                tourData={currentTour}
-                mapData={mapData}
-                deliveries={deliveries}
-                warehouse={deliveryRequestSet?.warehouse}
-                onTourUpdated={setCurrentTour}
-                onDeliveryRequestSetUpdated={onDeliveryRequestSetUpdated}
-              />
-            </div>
             <button
               onClick={onClearMap}
               disabled={isAddingManually}

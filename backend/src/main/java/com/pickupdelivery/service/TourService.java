@@ -6,10 +6,16 @@ import com.pickupdelivery.dto.TourModificationResponse;
 import com.pickupdelivery.dto.UpdateCourierRequest;
 import com.pickupdelivery.model.DeliveryRequest;
 import com.pickupdelivery.model.Tour;
+import com.pickupdelivery.model.AlgorithmModel.Stop;
+import com.pickupdelivery.model.AlgorithmModel.Trajet;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Optional;
 
 /**
  * Service pour calculer et optimiser les tournées de livraison
@@ -20,6 +26,11 @@ public class TourService {
 
     // Stockage en mémoire des tournées par coursier (en prod: base de données)
     private Map<String, Tour> toursByCourtier = new HashMap<>();
+    // Stockage des tournées calculées (modèle AlgorithmModel) pour réassignation multi-coursiers
+    private Map<String, com.pickupdelivery.model.AlgorithmModel.Tour> algoToursByCourier = new HashMap<>();
+
+    @Autowired
+    private DeliveryService deliveryService;
 
     /**
      * Calcule une tournée optimisée pour les demandes de livraison
@@ -160,59 +171,145 @@ public class TourService {
     public TourModificationResponse updateCourierAssignment(UpdateCourierRequest request) {
         String oldCourierId = request.getOldCourierId();
         String newCourierId = request.getNewCourierId();
-        int deliveryIndex = request.getDeliveryIndex();
-        
-        // Récupérer la tournée du coursier actuel
-        Tour oldTour = toursByCourtier.get(oldCourierId);
-        if (oldTour == null || deliveryIndex >= oldTour.getDeliveryRequests().size()) {
+        String demandId = request.getDemandId();
+
+        // Validation minimale
+        if (newCourierId == null || newCourierId.isBlank()) {
             TourModificationResponse response = new TourModificationResponse();
             response.setSuccess(false);
-            response.setErrorMessage("Livraison non trouvée dans la tournée du coursier " + oldCourierId);
+            response.setErrorMessage("newCourierId est requis");
             return response;
         }
-        
-        // Extraire la livraison
-        DeliveryRequest delivery = oldTour.getDeliveryRequests().remove(deliveryIndex);
-        
-        // Ajouter à la tournée du nouveau coursier
-        Tour newTour = toursByCourtier.getOrDefault(newCourierId, new Tour());
-        newTour.setCourierId(newCourierId);
-        
-        // Vérifier la faisabilité
-        boolean isFeasible = validateDeliveryFeasibility(newTour, delivery);
-        
-        if (!isFeasible) {
-            // Restaurer l'ancienne tournée
-            oldTour.getDeliveryRequests().add(deliveryIndex, delivery);
-            
+        if (demandId == null || demandId.isBlank()) {
             TourModificationResponse response = new TourModificationResponse();
             response.setSuccess(false);
-            response.setRequiresCourierChange(true);
-            response.setErrorMessage(
-                "Impossible d'assigner cette livraison au coursier " + newCourierId + 
-                ". Sélectionnez un autre coursier."
-            );
+            response.setErrorMessage("demandId est requis pour la réassignation");
             return response;
         }
-        
-        // Ajouter la livraison au nouveau coursier
-        newTour.getDeliveryRequests().add(delivery);
-        
-        // Réoptimiser les deux tournées
-        Tour optimizedOldTour = recalculateOptimalTour(oldTour);
-        Tour optimizedNewTour = recalculateOptimalTour(newTour);
-        
-        // Sauvegarder
-        toursByCourtier.put(oldCourierId, optimizedOldTour);
-        toursByCourtier.put(newCourierId, optimizedNewTour);
-        
+
+        // S'assurer que les tournées calculées sont présentes
+        if (algoToursByCourier == null || algoToursByCourier.isEmpty()) {
+            TourModificationResponse response = new TourModificationResponse();
+            response.setSuccess(false);
+            response.setErrorMessage("Aucune tournée calculée en mémoire pour réaliser la réassignation");
+            return response;
+        }
+
+        // Trouver la tournée source
+        com.pickupdelivery.model.AlgorithmModel.Tour sourceTour = null;
+        String resolvedOldCourierId = oldCourierId;
+
+        if (resolvedOldCourierId != null && !resolvedOldCourierId.isBlank()) {
+            sourceTour = algoToursByCourier.get(resolvedOldCourierId);
+        }
+
+        if (sourceTour == null) {
+            // Chercher par demandId dans toutes les tournées
+            for (Map.Entry<String, com.pickupdelivery.model.AlgorithmModel.Tour> entry : algoToursByCourier.entrySet()) {
+                com.pickupdelivery.model.AlgorithmModel.Tour tour = entry.getValue();
+                if (tour != null && tour.getStops() != null) {
+                    boolean contains = tour.getStops().stream()
+                            .anyMatch(s -> s != null && demandId.equals(s.getIdDemande()));
+                    if (contains) {
+                        sourceTour = tour;
+                        resolvedOldCourierId = entry.getKey();
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (sourceTour == null) {
+            sourceTour = new com.pickupdelivery.model.AlgorithmModel.Tour();
+            sourceTour.setStops(new ArrayList<>());
+            sourceTour.setTrajets(new ArrayList<>());
+        }
+
+        // Identifier les stops pickup/delivery à déplacer (si présents)
+        List<Stop> stops = new ArrayList<>(Optional.ofNullable(sourceTour.getStops()).orElse(new ArrayList<>()));
+        List<Stop> toMove = new ArrayList<>();
+        for (Stop s : stops) {
+            if (s != null && demandId.equals(s.getIdDemande())) {
+                toMove.add(s);
+            }
+        }
+
+        if (!toMove.isEmpty()) {
+            stops.removeAll(toMove);
+            sourceTour.setStops(stops);
+            sourceTour.setTrajets(new ArrayList<Trajet>()); // trajectoires invalidées
+        }
+
+        // Si non trouvé dans la tournée source, essayer de reconstruire les stops depuis le DeliveryRequestSet
+        if (toMove.isEmpty()) {
+            var requestSet = deliveryService.getCurrentRequestSet();
+            if (requestSet != null && requestSet.getDemands() != null) {
+                for (com.pickupdelivery.model.Demand demand : requestSet.getDemands()) {
+                    if (demandId.equals(demand.getId())) {
+                        // pickup
+                        Stop pickup = new Stop(demand.getPickupNodeId(), demand.getId(), Stop.TypeStop.PICKUP);
+                        // delivery
+                        Stop delivery = new Stop(demand.getDeliveryNodeId(), demand.getId(), Stop.TypeStop.DELIVERY);
+                        toMove.add(pickup);
+                        toMove.add(delivery);
+                        break;
+                    }
+                }
+            }
+        }
+
+        if (toMove.isEmpty()) {
+            TourModificationResponse response = new TourModificationResponse();
+            response.setSuccess(false);
+            response.setErrorMessage("Livraison non trouvée (id=" + demandId + ")");
+            return response;
+        }
+
+        // Récupérer ou créer la tournée cible
+        com.pickupdelivery.model.AlgorithmModel.Tour targetTour = algoToursByCourier.get(newCourierId);
+        if (targetTour == null) {
+            targetTour = new com.pickupdelivery.model.AlgorithmModel.Tour();
+            targetTour.setCourierId(Integer.valueOf(newCourierId));
+            targetTour.setStops(new ArrayList<>());
+            targetTour.setTrajets(new ArrayList<>());
+        }
+
+        List<Stop> targetStops = new ArrayList<>(Optional.ofNullable(targetTour.getStops()).orElse(new ArrayList<>()));
+        targetStops.addAll(toMove);
+        targetTour.setStops(targetStops);
+        targetTour.setTrajets(new ArrayList<Trajet>());
+
+        // Mettre à jour les métriques (placeholder minimal)
+        sourceTour.setTotalDistance(0);
+        sourceTour.setTotalDurationSec(0);
+        targetTour.setTotalDistance(0);
+        targetTour.setTotalDurationSec(0);
+
+        // Sauvegarder les tournées mises à jour
+        algoToursByCourier.put(resolvedOldCourierId, sourceTour);
+        algoToursByCourier.put(newCourierId, targetTour);
+
         TourModificationResponse response = new TourModificationResponse();
         response.setSuccess(true);
         response.setMessage("Livraison réassignée au coursier " + newCourierId + " avec succès");
-        response.setUpdatedTour(optimizedNewTour);
+        // Placeholder: pas de modèle AlgorithmModel dans TourModificationResponse
+        response.setUpdatedTour(null);
         response.setRequiresCourierChange(false);
-        
+
         return response;
+    }
+
+    /**
+     * Met à disposition les tournées calculées (AlgorithmModel) pour les réassignations
+     */
+    public void setAlgoTours(java.util.List<com.pickupdelivery.model.AlgorithmModel.Tour> tours) {
+        algoToursByCourier.clear();
+        if (tours == null) return;
+        for (com.pickupdelivery.model.AlgorithmModel.Tour t : tours) {
+            if (t != null && t.getCourierId() != null) {
+                algoToursByCourier.put(String.valueOf(t.getCourierId()), t);
+            }
+        }
     }
 
     /**
