@@ -10,6 +10,7 @@ import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
 import CustomAlert from './src/components/CustomAlert';
 import ModifyTourModal from './src/components/ModifyTourModal';
+import ErrorBoundary from './src/components/ErrorBoundary';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -612,16 +613,18 @@ export default function PickupDeliveryUI() {
             <div className="flex-1 flex gap-4 min-h-0">
               {/* Carte sur la gauche - plus grande */}
               <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
-                <MapViewer 
-                  mapData={mapData}
-                  onClearMap={handleClearMap}
-                  deliveryRequestSet={deliveryRequestSet}
-                  onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
-                  tourData={tourData}
-                  onSegmentClick={handleMapSegmentClick}
-                  isMapSelectionActive={isMapSelectionActive}
-                  isAddingManually={isAddingManually}
-                />
+                <ErrorBoundary>
+                  <MapViewer 
+                    mapData={mapData}
+                    onClearMap={handleClearMap}
+                    deliveryRequestSet={deliveryRequestSet}
+                    onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
+                    tourData={tourData}
+                    onSegmentClick={handleMapSegmentClick}
+                    isMapSelectionActive={isMapSelectionActive}
+                    isAddingManually={isAddingManually}
+                  />
+                </ErrorBoundary>
               </div>
               
               {/* Panneau droit avec informations et boutons */}

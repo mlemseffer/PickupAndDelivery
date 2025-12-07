@@ -30,6 +30,7 @@ public class MapXmlParser {
      */
     public CityMap parseMapFromXML(MultipartFile file) throws Exception {
         CityMap map = new CityMap();
+        int skippedSegmentsCount = 0;
 
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
@@ -132,8 +133,20 @@ public class MapXmlParser {
                 } catch (IllegalArgumentException e) {
                     // Ignorer les segments invalides (ex: origine = destination)
                     // et continuer le parsing
-                    System.err.println("⚠️  Segment #" + (i + 1) + " ignoré : " + e.getMessage());
+                    skippedSegmentsCount++;
                 }
+            }
+            
+            // Afficher un résumé si des segments ont été ignorés
+            if (skippedSegmentsCount > 0) {
+                System.out.println("ℹ️  Carte chargée avec succès : " + 
+                    map.getNodes().size() + " nœuds, " + 
+                    map.getSegments().size() + " segments valides (" + 
+                    skippedSegmentsCount + " segment(s) invalide(s) ignoré(s))");
+            } else {
+                System.out.println("✅ Carte chargée avec succès : " + 
+                    map.getNodes().size() + " nœuds, " + 
+                    map.getSegments().size() + " segments");
             }
         }
 
