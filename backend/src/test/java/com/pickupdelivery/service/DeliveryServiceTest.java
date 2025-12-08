@@ -129,7 +129,7 @@ class DeliveryServiceTest {
         cityMap.getNodes().add(new Node("3", 45.77, 4.87));
 
         // Créer un ensemble de demandes valide
-        DeliveryRequestSet mockRequestSet = new DeliveryRequestSet();
+        DemandeSet mockRequestSet = new DemandeSet();
         Warehouse warehouse = new Warehouse();
         warehouse.setId("w1");
         warehouse.setNodeId("1");
@@ -150,7 +150,7 @@ class DeliveryServiceTest {
         when(mapService.getCurrentMap()).thenReturn(cityMap);
 
         // Act
-        DeliveryRequestSet result = deliveryService.loadDeliveryRequests(file);
+        DemandeSet result = deliveryService.loadDeliveryRequests(file);
 
         // Assert
         assertNotNull(result);
@@ -180,7 +180,7 @@ class DeliveryServiceTest {
         smallMap.getNodes().add(new Node("2", 45.76, 4.86));
 
         // Demandes avec des nœuds qui n'existent pas dans la carte
-        DeliveryRequestSet mockRequestSet = new DeliveryRequestSet();
+        DemandeSet mockRequestSet = new DemandeSet();
         Warehouse warehouse = new Warehouse();
         warehouse.setId("w1");
         warehouse.setNodeId("999999"); // Nœud inexistant
@@ -235,7 +235,7 @@ class DeliveryServiceTest {
         map.getNodes().add(new Node("2", 45.76, 4.86));
         // Nœud "3" n'existe pas
 
-        DeliveryRequestSet mockRequestSet = new DeliveryRequestSet();
+        DemandeSet mockRequestSet = new DemandeSet();
         Warehouse warehouse = new Warehouse();
         warehouse.setId("w1");
         warehouse.setNodeId("1"); // OK
@@ -281,7 +281,7 @@ class DeliveryServiceTest {
             "xml content".getBytes()
         );
 
-        DeliveryRequestSet mockRequestSet = new DeliveryRequestSet();
+        DemandeSet mockRequestSet = new DemandeSet();
         Warehouse warehouse = new Warehouse();
         warehouse.setId("w1");
         warehouse.setNodeId("1");
@@ -310,7 +310,7 @@ class DeliveryServiceTest {
     @Test
     void getCurrentRequestSet_WhenNoRequestsLoaded_ShouldReturnNull() {
         // Act
-        DeliveryRequestSet result = deliveryService.getCurrentRequestSet();
+        DemandeSet result = deliveryService.getCurrentRequestSet();
 
         // Assert
         assertNull(result);
@@ -329,7 +329,7 @@ class DeliveryServiceTest {
         CityMap cityMap = new CityMap();
         cityMap.getNodes().add(new Node("1", 45.75, 4.85));
 
-        DeliveryRequestSet mockRequestSet = new DeliveryRequestSet();
+        DemandeSet mockRequestSet = new DemandeSet();
         Warehouse warehouse = new Warehouse();
         warehouse.setNodeId("1");
         mockRequestSet.setWarehouse(warehouse);
@@ -340,7 +340,7 @@ class DeliveryServiceTest {
 
         // Act
         deliveryService.loadDeliveryRequests(file);
-        DeliveryRequestSet result = deliveryService.getCurrentRequestSet();
+        DemandeSet result = deliveryService.getCurrentRequestSet();
 
         // Assert
         assertNotNull(result);

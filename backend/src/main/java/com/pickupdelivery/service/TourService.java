@@ -240,7 +240,7 @@ public class TourService {
             sourceTour.setTrajets(new ArrayList<Trajet>()); // trajectoires invalidées
         }
 
-        // Si non trouvé dans la tournée source, essayer de reconstruire les stops depuis le DeliveryRequestSet
+        // Si non trouvé dans la tournée source, essayer de reconstruire les stops depuis le DemandeSet
         if (toMove.isEmpty()) {
             var requestSet = deliveryService.getCurrentRequestSet();
             if (requestSet != null && requestSet.getDemands() != null) {

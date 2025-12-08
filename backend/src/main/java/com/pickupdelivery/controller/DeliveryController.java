@@ -2,7 +2,7 @@ package com.pickupdelivery.controller;
 
 import com.pickupdelivery.dto.ApiResponse;
 import com.pickupdelivery.model.DeliveryRequest;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.service.DeliveryService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -97,7 +97,7 @@ public class DeliveryController {
      * @return L'ensemble des demandes avec l'entrepôt et les couleurs
      */
     @PostMapping("/load")
-    public ResponseEntity<ApiResponse<DeliveryRequestSet>> loadDeliveryRequests(
+    public ResponseEntity<ApiResponse<DemandeSet>> loadDeliveryRequests(
             @RequestParam("file") MultipartFile file) {
         try {
             if (file.isEmpty()) {
@@ -110,7 +110,7 @@ public class DeliveryController {
                         .body(ApiResponse.error("Le fichier doit être au format XML"));
             }
 
-            DeliveryRequestSet requestSet = deliveryService.loadDeliveryRequests(file);
+            DemandeSet requestSet = deliveryService.loadDeliveryRequests(file);
             
             return ResponseEntity.ok(
                     ApiResponse.success("Demandes de livraison chargées avec succès", requestSet));
@@ -126,8 +126,8 @@ public class DeliveryController {
      * @return L'ensemble des demandes avec l'entrepôt
      */
     @GetMapping("/current")
-    public ResponseEntity<ApiResponse<DeliveryRequestSet>> getCurrentRequestSet() {
-        DeliveryRequestSet requestSet = deliveryService.getCurrentRequestSet();
+    public ResponseEntity<ApiResponse<DemandeSet>> getCurrentRequestSet() {
+        DemandeSet requestSet = deliveryService.getCurrentRequestSet();
         if (requestSet == null) {
             return ResponseEntity.ok(ApiResponse.success("Aucune demande chargée", null));
         }
@@ -168,9 +168,9 @@ public class DeliveryController {
      */
     @DeleteMapping("/{deliveryId}")
 
-    public ResponseEntity<ApiResponse<DeliveryRequestSet>> removeDemand(@PathVariable String deliveryId) {
+    public ResponseEntity<ApiResponse<DemandeSet>> removeDemand(@PathVariable String deliveryId) {
     try {
-        DeliveryRequestSet requestSet = deliveryService.removeDemand(deliveryId);
+        DemandeSet requestSet = deliveryService.removeDemand(deliveryId);
         return ResponseEntity.ok(ApiResponse.success("Demande supprimée avec succès", requestSet));
     } catch (IllegalStateException e) {
         return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));

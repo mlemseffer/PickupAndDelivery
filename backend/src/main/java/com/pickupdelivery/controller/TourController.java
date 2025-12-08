@@ -7,7 +7,7 @@ import com.pickupdelivery.model.AlgorithmModel.Graph;
 import com.pickupdelivery.model.AlgorithmModel.StopSet;
 import com.pickupdelivery.model.AlgorithmModel.Tour;
 import com.pickupdelivery.model.CityMap;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.Demand;
 import com.pickupdelivery.service.DeliveryService;
 import com.pickupdelivery.service.MapService;
@@ -89,20 +89,20 @@ public class TourController {
                         .body(ApiResponse.error("Aucune carte n'a été chargée. Veuillez d'abord charger une carte."));
             }
             
-            DeliveryRequestSet deliveryRequestSet = deliveryService.getCurrentRequestSet();
-            if (deliveryRequestSet == null) {
+            DemandeSet DemandeSet = deliveryService.getCurrentRequestSet();
+            if (DemandeSet == null) {
                 System.out.println("❌ Erreur: Aucune demande chargée");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(ApiResponse.error("Aucune demande de livraison n'a été chargée. Veuillez d'abord charger des demandes."));
             }
             
-            if (deliveryRequestSet.getWarehouse() == null) {
+            if (DemandeSet.getWarehouse() == null) {
                 System.out.println("❌ Erreur: Aucun entrepôt défini");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(ApiResponse.error("Aucun entrepôt n'a été défini. Veuillez définir un entrepôt."));
             }
             
-            if (deliveryRequestSet.getDemands() == null || deliveryRequestSet.getDemands().isEmpty()) {
+            if (DemandeSet.getDemands() == null || DemandeSet.getDemands().isEmpty()) {
                 System.out.println("❌ Erreur: Aucune demande de livraison");
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(ApiResponse.error("Aucune demande de livraison à traiter."));
@@ -110,15 +110,15 @@ public class TourController {
             
             System.out.println("✅ Validation réussie:");
             System.out.println("   - Carte: " + cityMap.getNodes().size() + " nœuds, " + cityMap.getSegments().size() + " segments");
-            System.out.println("   - Entrepôt: " + deliveryRequestSet.getWarehouse().getNodeId());
-            System.out.println("   - Demandes: " + deliveryRequestSet.getDemands().size());
+            System.out.println("   - Entrepôt: " + DemandeSet.getWarehouse().getNodeId());
+            System.out.println("   - Demandes: " + DemandeSet.getDemands().size());
             
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             // 2️⃣ CONSTRUCTION DU STOPSET
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             
             System.out.println("\n📊 Construction du StopSet...");
-            StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+            StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
             System.out.println("   ✓ StopSet créé avec " + stopSet.getStops().size() + " stops");
             
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -132,8 +132,8 @@ public class TourController {
             
             // PHASE 1: Ajouter les demandes au graph pour le calcul de temps
             java.util.Map<String, com.pickupdelivery.model.Demand> demandMap = new java.util.HashMap<>();
-            if (deliveryRequestSet.getDemands() != null) {
-                for (com.pickupdelivery.model.Demand demand : deliveryRequestSet.getDemands()) {
+            if (DemandeSet.getDemands() != null) {
+                for (com.pickupdelivery.model.Demand demand : DemandeSet.getDemands()) {
                     demandMap.put(demand.getId(), demand);
                 }
             }
@@ -224,7 +224,7 @@ public class TourController {
                 : tours.size() + " tournées calculées avec succès en " + totalTime + " ms";
             
             // Ajouter warning si des demandes n'ont pas été assignées
-            int totalDemandsLoaded = deliveryRequestSet.getDemands().size();
+            int totalDemandsLoaded = DemandeSet.getDemands().size();
             if (totalDemands < totalDemandsLoaded) {
                 message += " (⚠️ " + (totalDemandsLoaded - totalDemands) + 
                           " demande(s) non assignée(s) - contrainte 4h)";
@@ -277,14 +277,14 @@ public class TourController {
     @GetMapping("/status")
     public ResponseEntity<ApiResponse<String>> getStatus() {
         CityMap cityMap = mapService.getCurrentMap();
-        DeliveryRequestSet deliveryRequestSet = deliveryService.getCurrentRequestSet();
+        DemandeSet DemandeSet = deliveryService.getCurrentRequestSet();
         
         boolean hasMap = cityMap != null;
-        boolean hasRequests = deliveryRequestSet != null && 
-                              deliveryRequestSet.getDemands() != null && 
-                              !deliveryRequestSet.getDemands().isEmpty();
-        boolean hasWarehouse = deliveryRequestSet != null && 
-                               deliveryRequestSet.getWarehouse() != null;
+        boolean hasRequests = DemandeSet != null && 
+                              DemandeSet.getDemands() != null && 
+                              !DemandeSet.getDemands().isEmpty();
+        boolean hasWarehouse = DemandeSet != null && 
+                               DemandeSet.getWarehouse() != null;
         
         String status = String.format(
             "TourController opérationnel | Carte: %s | Demandes: %s | Entrepôt: %s",
@@ -387,17 +387,17 @@ public class TourController {
             @RequestBody UpdateAssignmentsRequest request) {
         try {
             CityMap cityMap = mapService.getCurrentMap();
-            DeliveryRequestSet deliveryRequestSet = deliveryService.getCurrentRequestSet();
+            DemandeSet DemandeSet = deliveryService.getCurrentRequestSet();
 
             if (cityMap == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(ApiResponse.error("Aucune carte chargée. Veuillez d'abord charger une carte."));
             }
-            if (deliveryRequestSet == null || deliveryRequestSet.getDemands() == null || deliveryRequestSet.getDemands().isEmpty()) {
+            if (DemandeSet == null || DemandeSet.getDemands() == null || DemandeSet.getDemands().isEmpty()) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(ApiResponse.error("Aucune demande de livraison chargée."));
             }
-            if (deliveryRequestSet.getWarehouse() == null) {
+            if (DemandeSet.getWarehouse() == null) {
                 return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                         .body(ApiResponse.error("Aucun entrepôt défini."));
             }
@@ -414,7 +414,7 @@ public class TourController {
             Map<String, List<Demand>> demandsByCourier = new HashMap<>();
             List<Demand> unassigned = new ArrayList<>();
 
-            for (Demand d : deliveryRequestSet.getDemands()) {
+            for (Demand d : DemandeSet.getDemands()) {
                 String assigned = assignmentMap.getOrDefault(d.getId(), null);
                 if (assigned == null) {
                     unassigned.add(d);
@@ -431,8 +431,8 @@ public class TourController {
                 List<Demand> demandsForCourier = entry.getValue();
                 if (demandsForCourier.isEmpty()) continue;
 
-                DeliveryRequestSet subset = new DeliveryRequestSet();
-                subset.setWarehouse(deliveryRequestSet.getWarehouse());
+                DemandeSet subset = new DemandeSet();
+                subset.setWarehouse(DemandeSet.getWarehouse());
                 subset.setDemands(demandsForCourier);
 
                 StopSet stopSet = serviceAlgo.getStopSet(subset);

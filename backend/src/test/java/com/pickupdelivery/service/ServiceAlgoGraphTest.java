@@ -21,7 +21,7 @@ class ServiceAlgoGraphTest {
 
     private ServiceAlgo serviceAlgo;
     private CityMap cityMap;
-    private DeliveryRequestSet deliveryRequestSet;
+    private DemandeSet DemandeSet;
 
     @BeforeEach
     void setUp() {
@@ -31,7 +31,7 @@ class ServiceAlgoGraphTest {
         cityMap = createSimpleCityMap();
         
         // Créer un ensemble de demandes
-        deliveryRequestSet = createSimpleDeliveryRequestSet();
+        DemandeSet = createSimpleDemandeSet();
     }
 
     /**
@@ -82,7 +82,7 @@ class ServiceAlgoGraphTest {
     /**
      * Créer un ensemble simple de demandes avec un warehouse et 2 demandes
      */
-    private DeliveryRequestSet createSimpleDeliveryRequestSet() {
+    private DemandeSet createSimpleDemandeSet() {
         // Warehouse au centre (N5)
         Warehouse warehouse = new Warehouse("W1", "N5", "8:0:0");
         
@@ -106,15 +106,15 @@ class ServiceAlgoGraphTest {
         demand2.setDeliveryDurationSec(60);
         demands.add(demand2);
         
-        return new DeliveryRequestSet(warehouse, demands);
+        return new DemandeSet(warehouse, demands);
     }
 
     @Test
     void testGetStopSet_shouldCreateCorrectNumberOfStops() {
-        // GIVEN : Un DeliveryRequestSet avec 1 warehouse et 2 demandes
+        // GIVEN : Un DemandeSet avec 1 warehouse et 2 demandes
         
         // WHEN : On crée le StopSet
-        StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+        StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
         
         // THEN : On doit avoir 5 stops (1 warehouse + 2 pickups + 2 deliveries)
         assertNotNull(stopSet);
@@ -148,7 +148,7 @@ class ServiceAlgoGraphTest {
     @Test
     void testBuildGraph_shouldCreateCompleteDistanceMatrix() {
         // GIVEN : Un StopSet et une CityMap
-        StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+        StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
         
         // WHEN : On construit le Graph
         Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
@@ -198,7 +198,7 @@ class ServiceAlgoGraphTest {
     @Test
     void testBuildGraph_shouldComputeCorrectDistances() {
         // GIVEN : Un StopSet et une CityMap
-        StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+        StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
         
         // WHEN : On construit le Graph
         Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
@@ -228,7 +228,7 @@ class ServiceAlgoGraphTest {
     @Test
     void testBuildGraph_performanceTest() {
         // Test de performance : mesurer le temps de construction du graph
-        StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+        StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
         
         long startTime = System.currentTimeMillis();
         Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);

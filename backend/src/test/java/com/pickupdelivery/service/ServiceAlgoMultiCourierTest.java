@@ -6,7 +6,7 @@ import com.pickupdelivery.model.AlgorithmModel.StopSet;
 import com.pickupdelivery.model.AlgorithmModel.Tour;
 import com.pickupdelivery.model.AlgorithmModel.Trajet;
 import com.pickupdelivery.model.Demand;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.CityMap;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;

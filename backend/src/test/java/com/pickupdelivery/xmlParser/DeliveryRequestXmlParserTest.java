@@ -1,6 +1,6 @@
 package com.pickupdelivery.xmlparser;
 
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.Demand;
 import com.pickupdelivery.model.Warehouse;
 import org.junit.jupiter.api.BeforeEach;
@@ -237,7 +237,7 @@ class DeliveryRequestXmlParserTest {
         );
 
         // Act
-        DeliveryRequestSet result = parser.parseDeliveryRequestFromXML(file);
+        DemandeSet result = parser.parseDeliveryRequestFromXML(file);
 
         // Assert
         assertNotNull(result);
@@ -284,7 +284,7 @@ class DeliveryRequestXmlParserTest {
         );
 
         // Act
-        DeliveryRequestSet result = parser.parseDeliveryRequestFromXML(file);
+        DemandeSet result = parser.parseDeliveryRequestFromXML(file);
 
         // Assert
         assertNotNull(result);
@@ -340,7 +340,7 @@ class DeliveryRequestXmlParserTest {
         );
 
         // Act
-        DeliveryRequestSet result = parser.parseDeliveryRequestFromXML(file);
+        DemandeSet result = parser.parseDeliveryRequestFromXML(file);
 
         // Assert
         assertNotNull(result);

@@ -5,7 +5,7 @@ import com.pickupdelivery.model.AlgorithmModel.Stop;
 import com.pickupdelivery.model.AlgorithmModel.StopSet;
 import com.pickupdelivery.model.AlgorithmModel.Trajet;
 import com.pickupdelivery.model.CityMap;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.service.DeliveryService;
 import com.pickupdelivery.service.MapService;
 import com.pickupdelivery.service.ServiceAlgo;
@@ -49,15 +49,15 @@ public class GraphTestController {
             }
 
             // Vérifier qu'un ensemble de demandes est chargé
-            DeliveryRequestSet deliveryRequestSet = deliveryService.getCurrentRequestSet();
-            if (deliveryRequestSet == null) {
+            DemandeSet DemandeSet = deliveryService.getCurrentRequestSet();
+            if (DemandeSet == null) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "Aucune demande chargée. Veuillez d'abord charger un fichier de demandes XML."
                 ));
             }
 
             // Créer le StopSet
-            StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+            StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
 
             // Mesurer le temps de construction du Graph
             long startTime = System.currentTimeMillis();
@@ -169,15 +169,15 @@ public class GraphTestController {
     public ResponseEntity<?> testGraphSummary() {
         try {
             CityMap cityMap = mapService.getCurrentMap();
-            DeliveryRequestSet deliveryRequestSet = deliveryService.getCurrentRequestSet();
+            DemandeSet DemandeSet = deliveryService.getCurrentRequestSet();
 
-            if (cityMap == null || deliveryRequestSet == null) {
+            if (cityMap == null || DemandeSet == null) {
                 return ResponseEntity.badRequest().body(Map.of(
                         "error", "Veuillez charger une carte et des demandes d'abord"
                 ));
             }
 
-            StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+            StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
             Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
 
             return ResponseEntity.ok(Map.of(

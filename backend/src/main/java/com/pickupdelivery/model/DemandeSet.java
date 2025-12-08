@@ -13,7 +13,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class DeliveryRequestSet {
+public class DemandeSet {
     private Warehouse warehouse;
     private List<Demand> demands = new ArrayList<>();
 }

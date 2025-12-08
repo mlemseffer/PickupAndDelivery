@@ -29,7 +29,7 @@ public class DeliveryRequestXmlParser {
      * @return L'ensemble des demandes avec l'entrepôt
      * @throws Exception Si le parsing échoue
      */
-    public DeliveryRequestSet parseDeliveryRequestFromXML(MultipartFile file) throws Exception {
+    public DemandeSet parseDeliveryRequestFromXML(MultipartFile file) throws Exception {
         DocumentBuilderFactory factory = DocumentBuilderFactory.newInstance();
         DocumentBuilder builder = factory.newDocumentBuilder();
         
@@ -50,7 +50,7 @@ public class DeliveryRequestXmlParser {
                 );
             }
 
-            DeliveryRequestSet requestSet = new DeliveryRequestSet();
+            DemandeSet requestSet = new DemandeSet();
             
             // Parser l'entrepôt
             NodeList entrepotList = document.getElementsByTagName("entrepot");

@@ -2,7 +2,7 @@ package com.pickupdelivery.controller;
 
 import com.pickupdelivery.model.AlgorithmModel.*;
 import com.pickupdelivery.model.CityMap;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.service.DeliveryService;
 import com.pickupdelivery.service.MapService;
 import com.pickupdelivery.service.ServiceAlgo;
@@ -39,7 +39,7 @@ class TourControllerTest {
     private TourController tourController;
 
     private CityMap mockCityMap;
-    private DeliveryRequestSet mockDeliveryRequestSet;
+    private DemandeSet mockDemandeSet;
     private StopSet mockStopSet;
     private Graph mockGraph;
     private Tour mockTour;
@@ -50,7 +50,7 @@ class TourControllerTest {
         
         // Setup mock objects
         mockCityMap = new CityMap();
-        mockDeliveryRequestSet = new DeliveryRequestSet();
+        mockDemandeSet = new DemandeSet();
         mockStopSet = new StopSet(new ArrayList<>());
         
         // Setup mockGraph with non-null distancesMatrix
@@ -69,12 +69,12 @@ class TourControllerTest {
     @Test
     void testGetStatus_WhenSystemReady_ShouldReturnReady() {
         // Given: Tous les éléments sont chargés
-        mockDeliveryRequestSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
-        mockDeliveryRequestSet.setDemands(new ArrayList<>());
-        mockDeliveryRequestSet.getDemands().add(new com.pickupdelivery.model.Demand());
+        mockDemandeSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
+        mockDemandeSet.setDemands(new ArrayList<>());
+        mockDemandeSet.getDemands().add(new com.pickupdelivery.model.Demand());
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
         
         // When
         var response = tourController.getStatus();
@@ -95,7 +95,7 @@ class TourControllerTest {
     void testGetStatus_WhenMapMissing_ShouldReturnNotReady() {
         // Given: Aucune carte chargée
         when(mapService.getCurrentMap()).thenReturn(null);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
         
         // When
         var response = tourController.getStatus();
@@ -156,11 +156,11 @@ class TourControllerTest {
     @Test
     void testCalculateTour_WhenWarehouseMissing_ShouldReturnError() {
         // Given: Carte et demandes présentes mais pas d'entrepôt
-        mockDeliveryRequestSet.setWarehouse(null);
-        mockDeliveryRequestSet.setDemands(new ArrayList<>());
+        mockDemandeSet.setWarehouse(null);
+        mockDemandeSet.setDemands(new ArrayList<>());
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
         
         // When
         var response = tourController.calculateTour(1);
@@ -179,12 +179,12 @@ class TourControllerTest {
     
     @Test
     void testCalculateTour_WhenEmptyDemands_ShouldReturnError() {
-        // Given: DeliveryRequestSet avec liste de demandes vide
-        mockDeliveryRequestSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
-        mockDeliveryRequestSet.setDemands(Collections.emptyList());
+        // Given: DemandeSet avec liste de demandes vide
+        mockDemandeSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
+        mockDemandeSet.setDemands(Collections.emptyList());
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
         
         // When
         var response = tourController.calculateTour(1);
@@ -204,13 +204,13 @@ class TourControllerTest {
     @Test
     void testCalculateTour_WithValidData_ShouldReturnTour() {
         // Given: Système prêt avec données valides
-        mockDeliveryRequestSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
-        mockDeliveryRequestSet.setDemands(new ArrayList<>());
-        mockDeliveryRequestSet.getDemands().add(new com.pickupdelivery.model.Demand());
+        mockDemandeSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
+        mockDemandeSet.setDemands(new ArrayList<>());
+        mockDemandeSet.getDemands().add(new com.pickupdelivery.model.Demand());
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
-        when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class))).thenReturn(mockStopSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
+        when(serviceAlgo.getStopSet(any(DemandeSet.class))).thenReturn(mockStopSet);
         when(serviceAlgo.buildGraph(any(StopSet.class), any(CityMap.class))).thenReturn(mockGraph);
         
         com.pickupdelivery.dto.TourDistributionResult distributionResult = new com.pickupdelivery.dto.TourDistributionResult();
@@ -237,9 +237,9 @@ class TourControllerTest {
     @Test
     void testCalculateTour_WithMultipleCouriers_ShouldReturnSuccess() {
         // Given: Multi-coursiers maintenant supporté
-        mockDeliveryRequestSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
-        mockDeliveryRequestSet.setDemands(new ArrayList<>());
-        mockDeliveryRequestSet.getDemands().add(new com.pickupdelivery.model.Demand());
+        mockDemandeSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
+        mockDemandeSet.setDemands(new ArrayList<>());
+        mockDemandeSet.getDemands().add(new com.pickupdelivery.model.Demand());
         
         // Créer 2 tours mockés avec tous les champs requis pour éviter NullPointerException
         List<com.pickupdelivery.model.AlgorithmModel.Tour> mockTours = new ArrayList<>();
@@ -262,8 +262,8 @@ class TourControllerTest {
         mockTours.add(tour2);
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
-        when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class))).thenReturn(mockStopSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
+        when(serviceAlgo.getStopSet(any(DemandeSet.class))).thenReturn(mockStopSet);
         when(serviceAlgo.buildGraph(any(StopSet.class), any(CityMap.class))).thenReturn(mockGraph);
         
         com.pickupdelivery.dto.TourDistributionResult distributionResult = new com.pickupdelivery.dto.TourDistributionResult();
@@ -292,13 +292,13 @@ class TourControllerTest {
     @Test
     void testCalculateTour_WhenUnexpectedError_ShouldReturnServerError() {
         // Given: Exception inattendue dans le calcul
-        mockDeliveryRequestSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
-        mockDeliveryRequestSet.setDemands(new ArrayList<>());
-        mockDeliveryRequestSet.getDemands().add(new com.pickupdelivery.model.Demand());
+        mockDemandeSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
+        mockDemandeSet.setDemands(new ArrayList<>());
+        mockDemandeSet.getDemands().add(new com.pickupdelivery.model.Demand());
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
-        when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class)))
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
+        when(serviceAlgo.getStopSet(any(DemandeSet.class)))
                 .thenThrow(new RuntimeException("Erreur de base de données"));
         
         // When
@@ -319,13 +319,13 @@ class TourControllerTest {
     @Test
     void testCalculateTour_SuccessMessage_ShouldContainTiming() {
         // Given: Système prêt
-        mockDeliveryRequestSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
-        mockDeliveryRequestSet.setDemands(new ArrayList<>());
-        mockDeliveryRequestSet.getDemands().add(new com.pickupdelivery.model.Demand());
+        mockDemandeSet.setWarehouse(new com.pickupdelivery.model.Warehouse());
+        mockDemandeSet.setDemands(new ArrayList<>());
+        mockDemandeSet.getDemands().add(new com.pickupdelivery.model.Demand());
         
         when(mapService.getCurrentMap()).thenReturn(mockCityMap);
-        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDeliveryRequestSet);
-        when(serviceAlgo.getStopSet(any(DeliveryRequestSet.class))).thenReturn(mockStopSet);
+        when(deliveryService.getCurrentRequestSet()).thenReturn(mockDemandeSet);
+        when(serviceAlgo.getStopSet(any(DemandeSet.class))).thenReturn(mockStopSet);
         when(serviceAlgo.buildGraph(any(StopSet.class), any(CityMap.class))).thenReturn(mockGraph);
         
         com.pickupdelivery.dto.TourDistributionResult distributionResult = new com.pickupdelivery.dto.TourDistributionResult();

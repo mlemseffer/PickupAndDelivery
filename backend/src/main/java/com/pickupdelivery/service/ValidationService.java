@@ -3,7 +3,7 @@ package com.pickupdelivery.service;
 import com.pickupdelivery.exception.ValidationException;
 import com.pickupdelivery.model.CityMap;
 import com.pickupdelivery.model.Demand;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.Node;
 import org.springframework.stereotype.Service;
 
@@ -26,7 +26,7 @@ public class ValidationService {
      * @param cityMap La carte de la ville
      * @throws ValidationException Si des nœuds n'existent pas dans la carte
      */
-    public void validateDeliveryRequests(DeliveryRequestSet requestSet, CityMap cityMap) {
+    public void validateDeliveryRequests(DemandeSet requestSet, CityMap cityMap) {
         if (requestSet == null) {
             throw new ValidationException("L'ensemble de demandes est null");
         }
@@ -95,7 +95,7 @@ public class ValidationService {
      * @param cityMap La carte de la ville
      * @return Le nombre de demandes valides
      */
-    public int countValidDemands(DeliveryRequestSet requestSet, CityMap cityMap) {
+    public int countValidDemands(DemandeSet requestSet, CityMap cityMap) {
         if (requestSet == null || requestSet.getDemands() == null || cityMap == null) {
             return 0;
         }
@@ -119,7 +119,7 @@ public class ValidationService {
      * @param cityMap La carte de la ville
      * @return Un nouvel ensemble avec uniquement les demandes valides
      */
-    public DeliveryRequestSet filterValidDemands(DeliveryRequestSet requestSet, CityMap cityMap) {
+    public DemandeSet filterValidDemands(DemandeSet requestSet, CityMap cityMap) {
         if (requestSet == null || cityMap == null) {
             return requestSet;
         }
@@ -140,7 +140,7 @@ public class ValidationService {
             )
             .collect(Collectors.toList());
 
-        DeliveryRequestSet filtered = new DeliveryRequestSet();
+        DemandeSet filtered = new DemandeSet();
         filtered.setWarehouse(warehouseValid ? requestSet.getWarehouse() : null);
         filtered.setDemands(validDemands);
         

@@ -1,7 +1,7 @@
 package com.pickupdelivery.service;
 
 import com.pickupdelivery.model.CityMap;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
 import com.pickupdelivery.model.AlgorithmModel.Stop;
 import com.pickupdelivery.model.AlgorithmModel.StopSet;
@@ -39,16 +39,16 @@ public class ServiceAlgoSimpleTest {
             System.out.println("\n📂 Chargement des demandes...");
             String requestPath = "/Users/diegoaquino/IF4/PickupAndDelivery/fichiersXMLPickupDelivery/demandePetit1.xml";
             DeliveryRequestXmlParser requestParser = new DeliveryRequestXmlParser();
-            DeliveryRequestSet deliveryRequestSet = requestParser.parseDeliveryRequestFromXML(createMockFile(requestPath));
+            DemandeSet DemandeSet = requestParser.parseDeliveryRequestFromXML(createMockFile(requestPath));
             
             System.out.println("✅ Demandes chargées :");
-            System.out.println("   - Warehouse : " + deliveryRequestSet.getWarehouse().getNodeId());
-            System.out.println("   - Nombre de demandes : " + deliveryRequestSet.getDemands().size());
+            System.out.println("   - Warehouse : " + DemandeSet.getWarehouse().getNodeId());
+            System.out.println("   - Nombre de demandes : " + DemandeSet.getDemands().size());
 
             // 3. Créer le ServiceAlgo et générer le StopSet
             System.out.println("\n🔄 Création du StopSet...");
             ServiceAlgo serviceAlgo = new ServiceAlgo();
-            StopSet stopSet = serviceAlgo.getStopSet(deliveryRequestSet);
+            StopSet stopSet = serviceAlgo.getStopSet(DemandeSet);
             
             System.out.println("✅ StopSet créé :");
             System.out.println("   - Nombre total de stops : " + stopSet.getStops().size());

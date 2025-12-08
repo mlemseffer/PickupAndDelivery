@@ -280,31 +280,31 @@ public class ServiceAlgo {
 
     /**
      * Récupère un StopSet contenant tous les stops (pickup, delivery et warehouse)
-     * à partir d'un DeliveryRequestSet
+     * à partir d'un DemandeSet
      *
-     * @param deliveryRequestSet L'ensemble des demandes de livraison avec l'entrepôt
+     * @param DemandeSet L'ensemble des demandes de livraison avec l'entrepôt
      * @return Un StopSet contenant tous les stops
      */
-    public StopSet getStopSet(DeliveryRequestSet deliveryRequestSet) {
-        if (deliveryRequestSet == null) {
-            throw new IllegalArgumentException("DeliveryRequestSet ne peut pas être null");
+    public StopSet getStopSet(DemandeSet DemandeSet) {
+        if (DemandeSet == null) {
+            throw new IllegalArgumentException("DemandeSet ne peut pas être null");
         }
 
         StopSet stopSet = new StopSet();
         List<Stop> stops = new ArrayList<>();
 
         // Ajouter le warehouse comme stop
-        if (deliveryRequestSet.getWarehouse() != null) {
+        if (DemandeSet.getWarehouse() != null) {
             Stop warehouseStop = new Stop();
-            warehouseStop.setIdNode(deliveryRequestSet.getWarehouse().getNodeId());
+            warehouseStop.setIdNode(DemandeSet.getWarehouse().getNodeId());
             warehouseStop.setIdDemande(null); // null pour le warehouse
             warehouseStop.setTypeStop(Stop.TypeStop.WAREHOUSE);
             stops.add(warehouseStop);
         }
 
         // Ajouter tous les pickups et deliveries des demandes
-        if (deliveryRequestSet.getDemands() != null) {
-            for (Demand demand : deliveryRequestSet.getDemands()) {
+        if (DemandeSet.getDemands() != null) {
+            for (Demand demand : DemandeSet.getDemands()) {
                 // Ajouter le pickup
                 Stop pickupStop = new Stop();
                 pickupStop.setIdNode(demand.getPickupNodeId());

@@ -1,7 +1,7 @@
 package com.pickupdelivery.service;
 
 import com.pickupdelivery.model.DeliveryRequest;
-import com.pickupdelivery.model.DeliveryRequestSet;
+import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.Demand;
 import com.pickupdelivery.xmlparser.DeliveryRequestXmlParser;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,7 +19,7 @@ import java.util.List;
 public class DeliveryService {
 
     private List<DeliveryRequest> currentRequests = new ArrayList<>();
-    private DeliveryRequestSet currentRequestSet;
+    private DemandeSet currentRequestSet;
     
     @Autowired
     private DeliveryRequestXmlParser deliveryRequestXmlParser;
@@ -61,7 +61,7 @@ public class DeliveryService {
         
         // Initialiser currentRequestSet s'il n'existe pas
         if (currentRequestSet == null) {
-            currentRequestSet = new DeliveryRequestSet();
+            currentRequestSet = new DemandeSet();
             currentRequestSet.setDemands(new ArrayList<>());
             System.out.println("[ADD] Création de currentRequestSet");
         }
@@ -97,7 +97,7 @@ public class DeliveryService {
         }
 
         if (currentRequestSet == null) {
-            currentRequestSet = new DeliveryRequestSet();
+            currentRequestSet = new DemandeSet();
             currentRequestSet.setDemands(new ArrayList<>());
         }
 
@@ -124,9 +124,9 @@ public class DeliveryService {
      * @return L'ensemble des demandes avec l'entrepôt
      * @throws Exception Si le parsing échoue ou si des nœuds sont manquants
      */
-    public DeliveryRequestSet loadDeliveryRequests(MultipartFile file) throws Exception {
+    public DemandeSet loadDeliveryRequests(MultipartFile file) throws Exception {
         // Parser le fichier XML
-        DeliveryRequestSet requestSet = deliveryRequestXmlParser.parseDeliveryRequestFromXML(file);
+        DemandeSet requestSet = deliveryRequestXmlParser.parseDeliveryRequestFromXML(file);
         
         // Valider que tous les nœuds existent dans la carte chargée
         validationService.validateDeliveryRequests(requestSet, mapService.getCurrentMap());
@@ -140,7 +140,7 @@ public class DeliveryService {
      * Récupère l'ensemble des demandes actuelles
      * @return L'ensemble des demandes avec l'entrepôt
      */
-    public DeliveryRequestSet getCurrentRequestSet() {
+    public DemandeSet getCurrentRequestSet() {
         if (currentRequestSet == null) {
             System.out.println("[GET] currentRequestSet est NULL");
         } else {
@@ -156,7 +156,7 @@ public class DeliveryService {
      * @return L'ensemble des demandes mis à jour
      * @throws IllegalStateException Si la demande n'existe pas
      */
-    public DeliveryRequestSet removeDemand(String deliveryId) {
+    public DemandeSet removeDemand(String deliveryId) {
     if (currentRequestSet == null || currentRequestSet.getDemands() == null) {
         throw new IllegalStateException("Aucune demande à supprimer");
     }
