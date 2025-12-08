@@ -179,7 +179,6 @@ export default function PickupDeliveryUI() {
   const [isCalculatingTour, setIsCalculatingTour] = useState(false);
   const [isEditingAssignments, setIsEditingAssignments] = useState(false);
   const [stagedAssignments, setStagedAssignments] = useState(null); // demandId -> courierId|null
-  const [stagedRemovals, setStagedRemovals] = useState([]);
   // Save modal state moved to `TourActions` to centralize save logic
   
   // États pour la sélection sur la carte
@@ -352,14 +351,8 @@ export default function PickupDeliveryUI() {
 
   const effectiveAssignments = isEditingAssignments && stagedAssignments ? stagedAssignments : demandAssignments;
 
-  const filteredDeliveryRequestSet = useMemo(() => {
-    if (!deliveryRequestSet) return deliveryRequestSet;
-    if (!isEditingAssignments || !Array.isArray(stagedRemovals) || stagedRemovals.length === 0) return deliveryRequestSet;
-    return {
-      ...deliveryRequestSet,
-      demands: (deliveryRequestSet.demands || []).filter((d) => !stagedRemovals.includes(d.id)),
-    };
-  }, [deliveryRequestSet, isEditingAssignments, stagedRemovals]);
+  // Plus besoin de filtrer les demandes puisqu'on ne les supprime plus
+  const filteredDeliveryRequestSet = deliveryRequestSet;
 
   const recalculateToursSilent = async () => {
     setIsCalculatingTour(true);
@@ -385,28 +378,17 @@ export default function PickupDeliveryUI() {
   const handleRemoveDemandById = async (demandId) => {
     if (!demandId) return;
     if (isEditingAssignments) {
-      setStagedRemovals((prev) => Array.from(new Set([...(prev || []), demandId])));
+      // En mode édition : désassigner la demande (la mettre à null)
       setStagedAssignments((prev) => {
-        const next = { ...(prev || effectiveAssignments) };
-        delete next[demandId];
-        return next;
+        const base = prev || effectiveAssignments || {};
+        return { ...base, [demandId]: null };
       });
       return;
     }
 
-    if (!window.confirm('Êtes-vous sûr de vouloir supprimer cette demande ?')) return;
-    try {
-      await apiService.removeDemand(demandId);
-      const updatedDemands = (deliveryRequestSet?.demands || []).filter((d) => d.id !== demandId);
-      const updatedRequestSet = {
-        warehouse: deliveryRequestSet?.warehouse || null,
-        demands: updatedDemands,
-      };
-      await handleDeliveryRequestSetUpdated(updatedRequestSet);
-      await recalculateToursSilent();
-    } catch (err) {
-      showAlert('error', '❌ Erreur', err.message);
-    }
+    // Hors mode édition : impossible de supprimer directement
+    // L'utilisateur doit passer par le mode édition
+    showAlert('warning', '⚠️ Attention', 'Pour retirer une demande de la tournée, utilisez le bouton "Modifier Tournée"');
   };
 
   const handleReassignDemand = async (demandId, targetCourierId) => {
@@ -934,27 +916,12 @@ export default function PickupDeliveryUI() {
                             try {
                               setIsCalculatingTour(true);
 
-                              // 1) Supprimer réellement les demandes marquées côté backend et frontend
-                              let remainingDemands = deliveryRequestSet?.demands || [];
-                              if (Array.isArray(stagedRemovals) && stagedRemovals.length > 0) {
-                                await Promise.all(stagedRemovals.map((id) => apiService.removeDemand(id)));
-                                remainingDemands = remainingDemands.filter((d) => !stagedRemovals.includes(d.id));
-
-                                // Réappliquer les couleurs localement après suppression
-                                const demandsWithColors = remainingDemands.map((demand, index) => ({
-                                  ...demand,
-                                  color: getColorFromPalette(index),
-                                }));
-
-                                setDeliveryRequestSet((prev) => ({
-                                  ...(prev || {}),
-                                  warehouse: deliveryRequestSet?.warehouse || prev?.warehouse || null,
-                                  demands: demandsWithColors,
-                                }));
-                              }
-
-                              // 2) Construire les assignments uniquement avec les demandes restantes
-                              const assignments = (remainingDemands || []).map((d) => ({
+                              // Ne plus supprimer les demandes, juste construire les assignments
+                              // Les demandes "supprimées" sont en fait désassignées (courierId = null)
+                              const allDemands = deliveryRequestSet?.demands || [];
+                              
+                              // Construire les assignments avec toutes les demandes
+                              const assignments = allDemands.map((d) => ({
                                 demandId: d.id,
                                 courierId:
                                   stagedAssignments && stagedAssignments[d.id] !== undefined
@@ -991,13 +958,11 @@ export default function PickupDeliveryUI() {
                               setIsCalculatingTour(false);
                               setIsEditingAssignments(false);
                               setStagedAssignments(null);
-                              setStagedRemovals([]);
                             }
                           }}
                           onCancelEdit={() => {
                             setIsEditingAssignments(false);
                             setStagedAssignments(null);
-                            setStagedRemovals([]);
                           }}
                         />
                       ) : (
@@ -1070,7 +1035,6 @@ export default function PickupDeliveryUI() {
                           onClick={() => {
                             setIsEditingAssignments(true);
                             setStagedAssignments({ ...demandAssignments });
-                            setStagedRemovals([]);
                             const panel = document.getElementById('assignments-panel');
                             if (panel) {
                               panel.scrollIntoView({ behavior: 'smooth', block: 'start' });

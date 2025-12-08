@@ -59,14 +59,16 @@ export default function Navigation({ activeTab, onTabChange, showMapMessage, has
         
         {/* Route Icon - Restaurer tournée */}
         <button 
-          className={`p-6 hover:bg-gray-600 transition-colors cursor-pointer relative ${activeTab === 'tours' ? 'bg-gray-500' : ''}`}
-          onClick={() => onRestoreTour()}
-          title="Restaurer une tournée depuis un fichier JSON"
+          className={`p-6 relative hover:bg-gray-600 transition-colors cursor-pointer ${activeTab === 'tours' ? 'bg-gray-500' : ''}`}
+          onClick={() => hasMap ? onRestoreTour() : alert('Veuillez d\'abord charger une carte')}
+          title={hasMap ? "Restaurer une tournée depuis un fichier JSON" : "Chargez d'abord une carte"}
         >
-          <Route size={32} className={`${hasMap ? 'text-yellow-400' : 'text-white'}`} />
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 px-2 py-0.5 rounded text-xs font-bold pointer-events-none">
-            JSON
-          </div>
+          <Route size={32} className={`${hasMap ? 'text-yellow-400' : 'text-gray-500'}`} />
+          {hasMap && (
+            <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 bg-yellow-400 text-gray-900 px-2 py-0.5 rounded text-xs font-bold pointer-events-none">
+              JSON
+            </div>
+          )}
         </button>
         </div>
       </div>
