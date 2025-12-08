@@ -15,7 +15,11 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
   const [jsonDefaultName, setJsonDefaultName] = useState('');
 
   const openItinModal = () => {
-    if (!tourData || !tourData.tour) {
+    const hasItinerary = Array.isArray(tourData)
+      ? tourData.some((t) => Array.isArray(t?.trajets) || Array.isArray(t?.tour))
+      : Array.isArray(tourData?.tour) || Array.isArray(tourData?.trajets);
+
+    if (!hasItinerary) {
       alert('Aucune tournée à sauvegarder');
       return;
     }
@@ -36,103 +40,233 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
 
   const performItinSave = (filename) => {
     if (!filename) return;
-    // Générer le contenu du fichier texte en s'inspirant de TourTable.jsx
-    let content = '=== ITINÉRAIRE DE LIVRAISON ===\n\n';
+    const toursToExport = (() => {
+      if (!tourData) return [];
+      if (Array.isArray(tourData)) {
+        return tourData.map((tour, idx) => ({
+          courierId: tour.courierId ?? idx + 1,
+          trajets: tour.trajets || tour.tour || [],
+          stops: tour.stops || [],
+          totalDistance:
+            typeof tour.totalDistance === 'number'
+              ? tour.totalDistance
+              : tour.metrics?.totalDistance ?? 0,
+          totalDurationSec:
+            typeof tour.totalDurationSec === 'number'
+              ? tour.totalDurationSec
+              : tour.metrics?.totalDurationSec ?? 0,
+        }));
+      }
+      if (Array.isArray(tourData?.trajets) || Array.isArray(tourData?.tour)) {
+        const trajets = tourData.trajets || tourData.tour || [];
+        return [
+          {
+            courierId: tourData.courierId ?? 1,
+            trajets,
+            stops: tourData.stops || [],
+            totalDistance:
+              tourData.totalDistance ??
+              tourData.metrics?.totalDistance ??
+              0,
+            totalDurationSec:
+              tourData.totalDurationSec ??
+              tourData.metrics?.totalDurationSec ??
+              0,
+          },
+        ];
+      }
+      return [];
+    })();
 
-    const segmentCount = Array.isArray(tourData?.tour) ? tourData.tour.length : 0;
-    content += `Nombre de segments: ${segmentCount}\n`;
-    const totalDistance = tourData?.metrics && typeof tourData.metrics.totalDistance === 'number'
-      ? Number(tourData.metrics.totalDistance).toFixed(2)
-      : '0.00';
-    content += `Distance totale: ${totalDistance} m\n`;
-    content += `Nombre de stops: ${tourData?.metrics?.stopCount || 0}\n\n`;
+    if (!toursToExport.length) {
+      alert('Aucune tournée à sauvegarder');
+      return;
+    }
 
-    content += '=== DÉTAIL DES TRAJETS ET STOPS ===\n\n';
+    // Prépare des index pour retrouver rapidement les demandes associées aux stops
+    const demands = Array.isArray(deliveryRequestSet?.demands)
+      ? deliveryRequestSet.demands
+      : [];
+    const demandsByPickupNode = new Map();
+    const demandsByDeliveryNode = new Map();
+    const demandsById = new Map();
+    demands.forEach((d) => {
+      if (d.pickupNodeId) demandsByPickupNode.set(d.pickupNodeId, d);
+      if (d.deliveryNodeId) demandsByDeliveryNode.set(d.deliveryNodeId, d);
+      if (d.id) demandsById.set(d.id, d);
+    });
 
-    // Time calculation constants (copied from TourTable logic)
     const COURIER_SPEED_KMH = 15;
     const COURIER_SPEED_M_PER_MIN = (COURIER_SPEED_KMH * 1000) / 60;
 
-    // Déterminer l'heure de départ (en minutes depuis minuit)
-    let currentTimeMinutes = 8 * 60; // fallback 08:00
-    if (deliveryRequestSet?.warehouse?.departureTime) {
-      const parts = deliveryRequestSet.warehouse.departureTime.split(':').map(Number);
-      if (parts.length === 2) currentTimeMinutes = parts[0] * 60 + parts[1];
-    }
-
-    // Helper formatters (reuse small versions from TourTable)
     const formatTime = (totalMinutes) => {
       const rounded = Math.round(totalMinutes);
       const hours = Math.floor(rounded / 60);
       const minutes = rounded % 60;
       return `${hours}h${minutes.toString().padStart(2, '0')}`;
     };
+
     const formatTimeRange = (startMinutes, durationMinutes) => {
       const s = Math.round(startMinutes);
       const e = Math.round(startMinutes + durationMinutes);
-      const sh = Math.floor(s / 60); const sm = s % 60;
-      const eh = Math.floor(e / 60); const em = e % 60;
+      const sh = Math.floor(s / 60);
+      const sm = s % 60;
+      const eh = Math.floor(e / 60);
+      const em = e % 60;
       return `${sh}h${sm.toString().padStart(2, '0')}-${eh}h${em.toString().padStart(2, '0')}`;
     };
 
-    // If warehouse exists, print it as start
-    if (deliveryRequestSet?.warehouse) {
-      content += `Départ Entrepôt (${deliveryRequestSet.warehouse.nodeId || 'N/A'}) - départ: ${formatTime(currentTimeMinutes)}\n\n`;
-    }
+    const computeTrajetDistance = (trajet) => {
+      if (!trajet) return 0;
+      if (Array.isArray(trajet.segments) && trajet.segments.length > 0) {
+        return trajet.segments.reduce(
+          (sum, s) => sum + (s.length ?? s.longueur ?? 0),
+          0
+        );
+      }
+      if (typeof trajet.longueurTotale === 'number') {
+        return trajet.longueurTotale;
+      }
+      if (typeof trajet.distance === 'number') {
+        return trajet.distance;
+      }
+      if (typeof trajet.longueur === 'number') {
+        return trajet.longueur;
+      }
+      return 0;
+    };
 
-    if (Array.isArray(tourData?.tour)) {
-      tourData.tour.forEach((trajet, index) => {
-        // compute total distance for this trajet
-        let totalDistanceTrajet = 0;
-        if (Array.isArray(trajet.segments) && trajet.segments.length > 0) {
-          totalDistanceTrajet = trajet.segments.reduce((sum, s) => sum + (s.length || s.longueur || 0), 0);
-        } else if (trajet.longueurTotale) {
-          totalDistanceTrajet = trajet.longueurTotale;
-        } else if (trajet.distance) {
-          totalDistanceTrajet = trajet.distance;
-        }
+    const sumTrajetsDistance = (trajets) => {
+      if (!Array.isArray(trajets)) return 0;
+      return trajets.reduce((acc, t) => acc + computeTrajetDistance(t), 0);
+    };
 
-        // travel time
-        const travelTimeMinutes = totalDistanceTrajet > 0 ? totalDistanceTrajet / COURIER_SPEED_M_PER_MIN : 0;
-        // list streets involved
-        let streets = [];
-        if (Array.isArray(trajet.segments) && trajet.segments.length > 0) {
-          streets = trajet.segments.map(s => s.name || s.nomRue || s.street || s.streetName || 'Rue inconnue');
-        }
+    const getDemandForStop = (stopNode, demandId, stopType) => {
+      if (stopType === 'PICKUP') {
+        return (
+          demandsByPickupNode.get(stopNode) ||
+          (demandId ? demandsById.get(demandId) : null)
+        );
+      }
+      if (stopType === 'DELIVERY') {
+        return (
+          demandsByDeliveryNode.get(stopNode) ||
+          (demandId ? demandsById.get(demandId) : null)
+        );
+      }
+      return demandId ? demandsById.get(demandId) : null;
+    };
 
-        // arrival stop info
-        const stopNode = trajet.stopArrivee?.idNode || trajet.stopArrivee || 'N/A';
-        const stopType = trajet.stopArrivee?.typeStop || trajet.stopArrivee?.type || null;
+    const totalDistanceAll = toursToExport.reduce(
+      (sum, tour) => sum + (tour.totalDistance || sumTrajetsDistance(tour.trajets)),
+      0
+    );
+    const totalStopsAll = toursToExport.reduce((sum, tour) => {
+      if (Array.isArray(tour.stops) && tour.stops.length > 0) {
+        return sum + tour.stops.length;
+      }
+      if (Array.isArray(tour.trajets) && tour.trajets.length > 0) {
+        return sum + tour.trajets.length + 1;
+      }
+      return sum;
+    }, 0);
+    const totalSegmentsAll = toursToExport.reduce(
+      (sum, tour) => sum + (Array.isArray(tour.trajets) ? tour.trajets.length : 0),
+      0
+    );
 
-        // advance current time by travel time
+    let content = '=== ITINÉRAIRES DE LIVRAISON ===\n\n';
+    content += `Nombre de coursiers: ${toursToExport.length}\n`;
+    content += `Distance totale: ${totalDistanceAll.toFixed(2)} m\n`;
+    content += `Nombre de stops: ${totalStopsAll}\n`;
+    content += `Nombre de segments: ${totalSegmentsAll}\n\n`;
+
+    toursToExport.forEach((tour, courierIndex) => {
+      const trajets = Array.isArray(tour.trajets) ? tour.trajets : [];
+      const baseDistance = tour.totalDistance || sumTrajetsDistance(trajets);
+      const baseStopCount =
+        (Array.isArray(tour.stops) && tour.stops.length) ||
+        (trajets.length ? trajets.length + 1 : 0);
+
+      content += `${'='.repeat(70)}\n`;
+      content += `COURSIER ${tour.courierId ?? courierIndex + 1}\n`;
+      content += `${'='.repeat(70)}\n`;
+      content += `Distance totale: ${baseDistance.toFixed(2)} m\n`;
+      content += `Durée totale estimée: ${
+        tour.totalDurationSec ? (tour.totalDurationSec / 3600).toFixed(2) + ' h' : 'N/A'
+      }\n`;
+      content += `Nombre de stops: ${baseStopCount}\n`;
+      content += `Nombre de segments: ${trajets.length}\n\n`;
+      content += '=== DÉTAIL DES TRAJETS ET STOPS ===\n\n';
+
+      // Déterminer l'heure de départ (en minutes depuis minuit)
+      let currentTimeMinutes = 8 * 60; // fallback 08:00
+      if (deliveryRequestSet?.warehouse?.departureTime) {
+        const parts = deliveryRequestSet.warehouse.departureTime.split(':').map(Number);
+        if (parts.length === 2) currentTimeMinutes = parts[0] * 60 + parts[1];
+      }
+
+      if (deliveryRequestSet?.warehouse) {
+        content += `Départ Entrepôt (${deliveryRequestSet.warehouse.nodeId || 'N/A'}) - départ: ${formatTime(currentTimeMinutes)}\n\n`;
+      }
+
+      trajets.forEach((trajet, index) => {
+        const totalDistanceTrajet = computeTrajetDistance(trajet);
+
+        const travelTimeMinutes =
+          totalDistanceTrajet > 0
+            ? totalDistanceTrajet / COURIER_SPEED_M_PER_MIN
+            : trajet?.durationSec
+              ? trajet.durationSec / 60
+              : 0;
+
+        const streets = Array.isArray(trajet.segments)
+          ? trajet.segments
+              .map((s) => s.name || s.nomRue || s.street || s.streetName)
+              .filter(Boolean)
+          : [];
+
+        const stopNode =
+          trajet.stopArrivee?.idNode ||
+          trajet.stopArrivee?.nodeId ||
+          trajet.stopArrivee ||
+          'N/A';
+        const stopType =
+          trajet.stopArrivee?.typeStop ||
+          trajet.stopArrivee?.type ||
+          trajet.stopArrivee?.stopType ||
+          null;
+        const stopDemandId =
+          trajet.stopArrivee?.idDemande ||
+          trajet.stopArrivee?.demandId ||
+          null;
+
         if (travelTimeMinutes > 0) {
           currentTimeMinutes += travelTimeMinutes;
         }
 
         content += `Trajet ${index + 1}: De ${trajet.stopDepart?.idNode || 'N/A'} à ${stopNode} — ${totalDistanceTrajet.toFixed(2)} m — temps trajet ~ ${travelTimeMinutes.toFixed(2)} min\n`;
         if (streets.length > 0) {
-          content += `\tRues à parcourir: \n${[...new Set(streets)].join('\n\t')}\n`;
+          content += `Rues à parcourir: \n\t${[...new Set(streets)].join('\n\t')}\n`;
         }
 
-        // If it's a pickup or delivery, find the demand to get durations
+        const demand = getDemandForStop(stopNode, stopDemandId, stopType);
+
         if (stopType === 'PICKUP') {
-          const demand = deliveryRequestSet?.demands?.find(d => d.pickupNodeId === stopNode);
           const pickupDurMin = demand ? (demand.pickupDurationSec || 0) / 60 : 0;
-          content += `  → PICKUP (node ${stopNode}) — heure estimée: ${formatTimeRange(currentTimeMinutes, pickupDurMin)} — durée: ${pickupDurMin.toFixed(2)} min\n\n`;
+          content += `  → PICKUP${demand?.id ? ` (demande ${demand.id})` : ''} — heure estimée: ${formatTimeRange(currentTimeMinutes, pickupDurMin)} — durée: ${pickupDurMin.toFixed(2)} min\n\n`;
           currentTimeMinutes += pickupDurMin;
         } else if (stopType === 'DELIVERY') {
-          const demand = deliveryRequestSet?.demands?.find(d => d.deliveryNodeId === stopNode);
           const deliveryDurMin = demand ? (demand.deliveryDurationSec || 0) / 60 : 0;
-          content += `  → DELIVERY (node ${stopNode}) — heure estimée: ${formatTimeRange(currentTimeMinutes, deliveryDurMin)} — durée: ${deliveryDurMin.toFixed(2)} min\n\n`;
+          content += `  → DELIVERY${demand?.id ? ` (demande ${demand.id})` : ''} — heure estimée: ${formatTimeRange(currentTimeMinutes, deliveryDurMin)} — durée: ${deliveryDurMin.toFixed(2)} min\n\n`;
           currentTimeMinutes += deliveryDurMin;
-        } else if (stopType === 'WAREHOUSE' && index === tourData.tour.length - 1) {
+        } else if (stopType === 'WAREHOUSE' && index === trajets.length - 1) {
           content += `  → Retour Entrepôt (${stopNode}) — arrivée approximative: ${formatTime(currentTimeMinutes)}\n\n`;
         } else {
-          // unknown stop type - just print arrival time
           content += `  → Arrivée approximative: ${formatTime(currentTimeMinutes)}\n\n`;
         }
       });
-    }
+    });
 
     const blob = new Blob([content], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
@@ -153,14 +287,58 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     
     console.log('💾 Sauvegarde de la tournée:', tourData);
 
-    // Nettoyer et sérialiser la tournée pour ne garder que les données essentielles
-    const cleanedTourData = {
-      tour: tourData.tour || [],
-      metrics: tourData.metrics || {},
-      savedAt: new Date().toISOString()
+    // Normaliser le format (mono ou multi-coursier) pour sauvegarder tout ce qui est utile à la restauration
+    const normalizeToursForSave = () => {
+      if (Array.isArray(tourData)) {
+        return tourData.map((tour) => ({
+          ...tour,
+          trajets: tour.trajets || tour.tour || tour, // compatibilité éventuelle
+        }));
+      }
+      if (tourData?.trajets || tourData?.tour || tourData?.stops) {
+        return [{
+          ...tourData,
+          trajets: tourData.trajets || tourData.tour || [],
+          stops: tourData.stops || [],
+        }];
+      }
+      return [];
     };
 
-    const tourJson = JSON.stringify(cleanedTourData, null, 2);
+    const toursToSave = normalizeToursForSave();
+    if (!toursToSave.length) {
+      alert('Aucune tournée à sauvegarder');
+      return;
+    }
+
+    // Inclure les demandes pour pouvoir les réinjecter au backend lors d'une restauration
+    const demandsToSave = (deliveryRequestSet?.demands || []).map((d) => ({
+      id: d.id,
+      pickupNodeId: d.pickupNodeId,
+      deliveryNodeId: d.deliveryNodeId,
+      pickupDurationSec: d.pickupDurationSec,
+      deliveryDurationSec: d.deliveryDurationSec,
+      courierId: d.courierId || null,
+    }));
+
+    const payload = {
+      version: 'v1',
+      savedAt: new Date().toISOString(),
+      courierCount: Math.max(toursToSave.length, 1),
+      warehouse: deliveryRequestSet?.warehouse || null,
+      demands: demandsToSave,
+      tours: toursToSave,
+    };
+
+    // Ajout d'un champ legacy pour les anciens JSON basés sur une seule tournée
+    if (!Array.isArray(tourData) && Array.isArray(tourData?.tour)) {
+      payload.tour = tourData.tour;
+      if (tourData.metrics) {
+        payload.metrics = tourData.metrics;
+      }
+    }
+
+    const tourJson = JSON.stringify(payload, null, 2);
     const blob = new Blob([tourJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
@@ -172,7 +350,7 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    console.log('✅ Tournée sauvegardée avec', cleanedTourData.tour.length, 'trajets');
+    console.log('✅ Tournée sauvegardée avec', toursToSave.length, 'tournée(s)');
 
     setShowJsonModal(false);
     if (onSaveTour) onSaveTour();

@@ -22,74 +22,116 @@ export default function RestoreTourModal({ isOpen, onClose, onRestore }) {
         if (!content) throw new Error('Fichier vide');
 
         const jsonData = JSON.parse(content);
-        
-        // Valider la structure du JSON
-        if (!jsonData.tour || !Array.isArray(jsonData.tour)) {
-          throw new Error('Format invalide : "tour" doit être un tableau');
+
+        // Accepter soit le nouveau format (tours + demands) soit l'ancien (tour)
+        let tours = [];
+        if (Array.isArray(jsonData?.tours)) {
+          tours = jsonData.tours;
+        } else if (Array.isArray(jsonData?.tour)) {
+          tours = [{
+            trajets: jsonData.tour,
+            stops: jsonData.stops || [],
+          }];
+        } else if (Array.isArray(jsonData)) {
+          tours = jsonData;
         }
 
-        // Transformer les données pour correspondre au format attendu
-        const transformedTourData = {
-          tour: jsonData.tour.map(trajet => ({
-            segments: trajet.segments || []
-          })),
-          metrics: {
-            stopCount: jsonData.tour.reduce((count, trajet) => {
-              count += (trajet.stopDepart ? 1 : 0) + (trajet.stopArrivee ? 1 : 0);
-              return count;
-            }, 0),
-            totalDistance: jsonData.tour.reduce((total, trajet) => total + (trajet.distance || 0), 0),
-            segmentCount: jsonData.tour.reduce((count, trajet) => count + (trajet.segments?.length || 0), 0)
-          }
+        if (!tours.length) {
+          throw new Error('Format invalide : aucune tournée trouvée dans le fichier');
+        }
+
+        // Récupérer les demandes : priorité aux données explicites, sinon dériver des stops
+        const deriveDemandsFromTours = (toursArray) => {
+          const demands = [];
+          const demandesMap = new Map();
+
+          toursArray.forEach((tour) => {
+            const trajets = tour?.trajets || tour?.tour || [];
+            if (Array.isArray(trajets)) {
+              trajets.forEach((trajet) => {
+                [trajet.stopDepart, trajet.stopArrivee].forEach((stop) => {
+                  if (stop?.idDemande) {
+                    if (!demandesMap.has(stop.idDemande)) {
+                      demandesMap.set(stop.idDemande, { id: stop.idDemande });
+                    }
+                    const demand = demandesMap.get(stop.idDemande);
+                    if (stop.typeStop === 'PICKUP') {
+                      demand.pickupNodeId = stop.idNode;
+                    } else if (stop.typeStop === 'DELIVERY') {
+                      demand.deliveryNodeId = stop.idNode;
+                    }
+                  }
+                });
+              });
+            }
+
+            // Inspecter aussi la liste des stops si présente
+            (tour?.stops || []).forEach((stop) => {
+              if (stop?.idDemande) {
+                if (!demandesMap.has(stop.idDemande)) {
+                  demandesMap.set(stop.idDemande, { id: stop.idDemande });
+                }
+                const demand = demandesMap.get(stop.idDemande);
+                if (stop.typeStop === 'PICKUP') {
+                  demand.pickupNodeId = stop.idNode;
+                } else if (stop.typeStop === 'DELIVERY') {
+                  demand.deliveryNodeId = stop.idNode;
+                }
+              }
+            });
+          });
+
+          demandesMap.forEach((demand) => {
+            if (demand.pickupNodeId && demand.deliveryNodeId) {
+              demands.push({
+                id: demand.id,
+                pickupNodeId: demand.pickupNodeId,
+                deliveryNodeId: demand.deliveryNodeId,
+                pickupDurationSec: demand.pickupDurationSec || 300,
+                deliveryDurationSec: demand.deliveryDurationSec || 300,
+              });
+            }
+          });
+
+          return demands;
         };
 
-        // Extraire les demandes de livraison depuis les stops
-        const demands = [];
-        const demandesMap = new Map(); // Map pour grouper pickup et delivery par ID demande
+        let demands = Array.isArray(jsonData.demands) ? jsonData.demands : [];
+        if (!demands.length) {
+          demands = deriveDemandsFromTours(tours);
+        }
 
-        // Collecter tous les stops (PICKUP et DELIVERY)
-        jsonData.tour.forEach(trajet => {
-          if (trajet.stopDepart?.idDemande) {
-            if (!demandesMap.has(trajet.stopDepart.idDemande)) {
-              demandesMap.set(trajet.stopDepart.idDemande, {});
-            }
-            const demand = demandesMap.get(trajet.stopDepart.idDemande);
-            if (trajet.stopDepart.typeStop === 'PICKUP') {
-              demand.pickupNodeId = trajet.stopDepart.idNode;
-              demand.id = trajet.stopDepart.idDemande;
-            }
-          }
+        if (!demands.length) {
+          throw new Error('Impossible de déterminer les demandes à partir du fichier');
+        }
 
-          if (trajet.stopArrivee?.idDemande) {
-            if (!demandesMap.has(trajet.stopArrivee.idDemande)) {
-              demandesMap.set(trajet.stopArrivee.idDemande, {});
-            }
-            const demand = demandesMap.get(trajet.stopArrivee.idDemande);
-            if (trajet.stopArrivee.typeStop === 'PICKUP') {
-              demand.pickupNodeId = trajet.stopArrivee.idNode;
-              demand.id = trajet.stopArrivee.idDemande;
-            } else if (trajet.stopArrivee.typeStop === 'DELIVERY') {
-              demand.deliveryNodeId = trajet.stopArrivee.idNode;
-              demand.id = trajet.stopArrivee.idDemande;
-            }
-          }
-        });
+        const computeMetrics = (toursArray) => {
+          return toursArray.reduce(
+            (acc, tour) => {
+              acc.stopCount += tour?.stops?.length || 0;
+              acc.totalDistance += tour?.totalDistance || 0;
+              const trajets = tour?.trajets || tour?.tour || [];
+              acc.segmentCount += Array.isArray(trajets)
+                ? trajets.reduce((c, t) => c + (t?.segments?.length || 0), 0)
+                : 0;
+              return acc;
+            },
+            { stopCount: 0, totalDistance: 0, segmentCount: 0 }
+          );
+        };
 
-        // Convertir la map en array et filtrer les demandes complètes
-        demandesMap.forEach((demand, id) => {
-          if (demand.pickupNodeId && demand.deliveryNodeId) {
-            demands.push({
-              id: demand.id,
-              pickupNodeId: demand.pickupNodeId,
-              deliveryNodeId: demand.deliveryNodeId,
-              pickupDurationSec: 300,
-              deliveryDurationSec: 300
-            });
-          }
-        });
+        const payload = {
+          tours,
+          demands,
+          warehouse: jsonData.warehouse || null,
+          courierCount: jsonData.courierCount || tours.length || 1,
+          metrics: jsonData.metrics || computeMetrics(tours),
+          savedAt: jsonData.savedAt,
+          version: jsonData.version || 'v1',
+        };
 
-        // Appeler le callback avec les données transformées ET les demandes
-        onRestore(transformedTourData, demands);
+        // Appeler le callback avec les données normalisées + les demandes
+        onRestore(payload, demands);
         handleClose();
       } catch (err) {
         setError(`Erreur : ${err.message}`);
