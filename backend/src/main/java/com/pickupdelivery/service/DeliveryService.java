@@ -63,12 +63,6 @@ public class DeliveryService {
         if (currentRequestSet == null) {
             currentRequestSet = new DeliveryRequestSet();
             currentRequestSet.setDemands(new ArrayList<>());
-            // Créer un warehouse par défaut si pas d'entrepôt
-            if (currentRequestSet.getWarehouse() == null) {
-                com.pickupdelivery.model.Warehouse warehouse = new com.pickupdelivery.model.Warehouse();
-                warehouse.setNodeId("0"); // ID par défaut du warehouse
-                currentRequestSet.setWarehouse(warehouse);
-            }
             System.out.println("[ADD] Création de currentRequestSet");
         }
         
@@ -90,6 +84,29 @@ public class DeliveryService {
         currentRequestSet.getDemands().add(demand);
         
         System.out.println("[ADD] Total demandes dans currentRequestSet: " + currentRequestSet.getDemands().size());
+    }
+
+    /**
+     * Définit/Met à jour l'entrepôt (warehouse) courant
+     * @param nodeId id du nœud entrepôt
+     * @param departureTime heure de départ (optionnelle)
+     */
+    public void setWarehouse(String nodeId, String departureTime) {
+        if (nodeId == null || nodeId.isBlank()) {
+            throw new IllegalArgumentException("nodeId du warehouse requis");
+        }
+
+        if (currentRequestSet == null) {
+            currentRequestSet = new DeliveryRequestSet();
+            currentRequestSet.setDemands(new ArrayList<>());
+        }
+
+        com.pickupdelivery.model.Warehouse warehouse = new com.pickupdelivery.model.Warehouse();
+        warehouse.setNodeId(nodeId);
+        warehouse.setDepartureTime(departureTime != null ? departureTime : "08:00");
+        currentRequestSet.setWarehouse(warehouse);
+
+        System.out.println("[WAREHOUSE] Entrepôt défini: nodeId=" + nodeId + ", departureTime=" + warehouse.getDepartureTime());
     }
 
     /**

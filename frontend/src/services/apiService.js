@@ -135,6 +135,25 @@ class ApiService {
   }
 
   /**
+   * Définit/Met à jour l'entrepôt courant
+   * @param {Object} warehouse - { nodeId, departureTime }
+   */
+  async setWarehouse(warehouse) {
+    const response = await fetch(`${API_BASE_URL}/deliveries/warehouse`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(warehouse),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || 'Erreur lors de la mise à jour du warehouse');
+    }
+
+    return response.json();
+  }
+
+  /**
    * Calcule une tournée optimisée pour un nombre de livreurs donné
    * @param {number} courierCount - Nombre de livreurs (actuellement seul 1 est supporté)
    * @returns {Promise} La tournée calculée avec tous les trajets

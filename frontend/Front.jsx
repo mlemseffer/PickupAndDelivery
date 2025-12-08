@@ -641,6 +641,35 @@ export default function PickupDeliveryUI() {
       return;
     }
 
+    // Nettoyer l'état actuel pour éviter les doublons (backend + frontend)
+    try {
+      await apiService.clearDeliveryRequests();
+    } catch (e) {
+      console.warn('⚠️ Impossible de vider les demandes avant restauration:', e.message);
+    }
+    setDeliveryRequestSet(null);
+    setTourData(null);
+    setUnassignedDemands([]);
+
+    // Vérifier que les nœuds des demandes existent dans la carte chargée
+    const nodeSet = new Set((mapData?.nodes || []).map((n) => String(n.id)));
+    const validDemands = demandsFromFile.filter(
+      (d) => nodeSet.has(String(d.pickupNodeId)) && nodeSet.has(String(d.deliveryNodeId))
+    );
+    const skippedDemands = demandsFromFile.length - validDemands.length;
+
+    if (!validDemands.length) {
+      alert('Aucune demande du fichier ne correspond à la carte chargée (nœuds introuvables)');
+      return;
+    }
+
+    if (skippedDemands > 0) {
+      console.warn(`⚠️ ${skippedDemands} demande(s) ignorée(s) car nœuds absents de la carte`);
+      alert(
+        `${skippedDemands} demande(s) ignorée(s) car leurs nœuds ne sont pas présents dans la carte chargée.`
+      );
+    }
+
     const deriveWarehouseNode = () => {
       if (restorePayload?.warehouse?.nodeId) return restorePayload.warehouse.nodeId;
 
@@ -662,7 +691,8 @@ export default function PickupDeliveryUI() {
         }
       }
 
-      return mapData?.nodes?.[0]?.id || null;
+      const fallbackNode = mapData?.nodes?.[0]?.id || null;
+      return fallbackNode;
     };
 
     try {
@@ -671,7 +701,7 @@ export default function PickupDeliveryUI() {
       // Ajouter les demandes au backend et récupérer les IDs générés
       const addedDemandsWithIds = [];
       
-      for (const demand of demandsFromFile) {
+      for (const demand of validDemands) {
         const response = await apiService.addDeliveryRequest({
           pickupAddress: demand.pickupNodeId,
           deliveryAddress: demand.deliveryNodeId,
@@ -690,13 +720,29 @@ export default function PickupDeliveryUI() {
 
       console.log('✅ Toutes les demandes ont été ajoutées au backend');
 
-      const warehouseNodeId = deriveWarehouseNode();
+      let warehouseNodeId = deriveWarehouseNode();
+      if (warehouseNodeId && !nodeSet.has(String(warehouseNodeId))) {
+        console.warn(`⚠️ Entrepôt ${warehouseNodeId} introuvable dans la carte, utilisation du premier nœud de la carte`);
+        warehouseNodeId = mapData?.nodes?.[0]?.id || null;
+      }
       const warehouse = warehouseNodeId
         ? {
             nodeId: warehouseNodeId,
             departureTime: restorePayload?.warehouse?.departureTime || '08:00',
           }
         : null;
+
+      // Pousser l'entrepôt côté backend pour éviter l'ID par défaut "0"
+      if (warehouseNodeId) {
+        try {
+          await apiService.setWarehouse({
+            nodeId: warehouseNodeId,
+            departureTime: restorePayload?.warehouse?.departureTime || '08:00',
+          });
+        } catch (e) {
+          console.warn('⚠️ Impossible de définir le warehouse côté backend:', e.message);
+        }
+      }
 
       const demandsWithColors = addedDemandsWithIds.map((demand, index) => ({
         ...demand,
