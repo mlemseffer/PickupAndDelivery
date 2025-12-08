@@ -346,4 +346,285 @@ class DeliveryServiceTest {
         assertNotNull(result);
         assertEquals(mockRequestSet, result);
     }
+
+    // ---------------------------------------------------------
+    // 7. Tests addDeliveryRequest
+    // ---------------------------------------------------------
+    @Test
+    void addDeliveryRequest_ShouldAddRequestToCurrentList() {
+        // Arrange
+        DeliveryRequest request = new DeliveryRequest();
+        request.setId("req1");
+        request.setPickupAddress("100");
+        request.setDeliveryAddress("200");
+        request.setPickupDuration(300);
+        request.setDeliveryDuration(240);
+
+        // Act
+        deliveryService.addDeliveryRequest(request);
+
+        // Assert
+        DemandeSet result = deliveryService.getCurrentRequestSet();
+        assertNotNull(result);
+        assertEquals(1, result.getDemands().size());
+        assertEquals("100", result.getDemands().get(0).getPickupNodeId());
+        assertEquals("200", result.getDemands().get(0).getDeliveryNodeId());
+    }
+
+    @Test
+    void addDeliveryRequest_WithoutId_ShouldGenerateUUID() {
+        // Arrange
+        DeliveryRequest request = new DeliveryRequest();
+        request.setPickupAddress("100");
+        request.setDeliveryAddress("200");
+        request.setPickupDuration(300);
+        request.setDeliveryDuration(240);
+
+        // Act
+        deliveryService.addDeliveryRequest(request);
+
+        // Assert
+        DemandeSet result = deliveryService.getCurrentRequestSet();
+        assertNotNull(result);
+        assertEquals(1, result.getDemands().size());
+        assertNotNull(result.getDemands().get(0).getId());
+        assertFalse(result.getDemands().get(0).getId().isEmpty());
+    }
+
+    @Test
+    void addDeliveryRequest_MultipleRequests_ShouldAddAll() {
+        // Arrange
+        DeliveryRequest request1 = new DeliveryRequest();
+        request1.setId("req1");
+        request1.setPickupAddress("100");
+        request1.setDeliveryAddress("200");
+
+        DeliveryRequest request2 = new DeliveryRequest();
+        request2.setId("req2");
+        request2.setPickupAddress("300");
+        request2.setDeliveryAddress("400");
+
+        // Act
+        deliveryService.addDeliveryRequest(request1);
+        deliveryService.addDeliveryRequest(request2);
+
+        // Assert
+        DemandeSet result = deliveryService.getCurrentRequestSet();
+        assertNotNull(result);
+        assertEquals(2, result.getDemands().size());
+    }
+
+    // ---------------------------------------------------------
+    // 8. Tests setWarehouse
+    // ---------------------------------------------------------
+    @Test
+    void setWarehouse_WithValidNodeId_ShouldSetWarehouse() {
+        // Act
+        deliveryService.setWarehouse("warehouse1", "08:00");
+
+        // Assert
+        DemandeSet result = deliveryService.getCurrentRequestSet();
+        assertNotNull(result);
+        assertNotNull(result.getWarehouse());
+        assertEquals("warehouse1", result.getWarehouse().getNodeId());
+        assertEquals("08:00", result.getWarehouse().getDepartureTime());
+    }
+
+    @Test
+    void setWarehouse_WithoutDepartureTime_ShouldUseDefaultTime() {
+        // Act
+        deliveryService.setWarehouse("warehouse1", null);
+
+        // Assert
+        DemandeSet result = deliveryService.getCurrentRequestSet();
+        assertNotNull(result);
+        assertEquals("08:00", result.getWarehouse().getDepartureTime());
+    }
+
+    @Test
+    void setWarehouse_WithNullNodeId_ShouldThrowException() {
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> {
+            deliveryService.setWarehouse(null, "08:00");
+        });
+    }
+
+    @Test
+    void setWarehouse_WithEmptyNodeId_ShouldThrowException() {
+        // Act & Assert
+        assertThrows(IllegalArgumentException.class, () -> {
+            deliveryService.setWarehouse("", "08:00");
+        });
+    }
+
+    // ---------------------------------------------------------
+    // 9. Tests removeDemand
+    // ---------------------------------------------------------
+    @Test
+    void removeDemand_WithValidId_ShouldRemoveDemand() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "demande.xml",
+            "text/xml",
+            "xml content".getBytes()
+        );
+
+        CityMap cityMap = new CityMap();
+        cityMap.getNodes().add(new Node("1", 45.75, 4.85));
+        cityMap.getNodes().add(new Node("2", 45.76, 4.86));
+
+        DemandeSet mockRequestSet = new DemandeSet();
+        Warehouse warehouse = new Warehouse();
+        warehouse.setNodeId("1");
+        mockRequestSet.setWarehouse(warehouse);
+
+        List<Demand> demands = new ArrayList<>();
+        Demand demand1 = new Demand();
+        demand1.setId("d1");
+        demand1.setPickupNodeId("1");
+        demand1.setDeliveryNodeId("2");
+        demands.add(demand1);
+        mockRequestSet.setDemands(demands);
+
+        when(deliveryRequestXmlParser.parseDeliveryRequestFromXML(any())).thenReturn(mockRequestSet);
+        when(mapService.getCurrentMap()).thenReturn(cityMap);
+
+        deliveryService.loadDeliveryRequests(file);
+
+        // Act
+        DemandeSet result = deliveryService.removeDemand("d1");
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(0, result.getDemands().size());
+    }
+
+    @Test
+    void removeDemand_WithInvalidId_ShouldThrowException() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "demande.xml",
+            "text/xml",
+            "xml content".getBytes()
+        );
+
+        CityMap cityMap = new CityMap();
+        cityMap.getNodes().add(new Node("1", 45.75, 4.85));
+
+        DemandeSet mockRequestSet = new DemandeSet();
+        Warehouse warehouse = new Warehouse();
+        warehouse.setNodeId("1");
+        mockRequestSet.setWarehouse(warehouse);
+        mockRequestSet.setDemands(new ArrayList<>());
+
+        when(deliveryRequestXmlParser.parseDeliveryRequestFromXML(any())).thenReturn(mockRequestSet);
+        when(mapService.getCurrentMap()).thenReturn(cityMap);
+
+        deliveryService.loadDeliveryRequests(file);
+
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> {
+            deliveryService.removeDemand("nonexistent");
+        });
+    }
+
+    @Test
+    void removeDemand_WithNullRequestSet_ShouldThrowException() {
+        // Act & Assert
+        assertThrows(IllegalStateException.class, () -> {
+            deliveryService.removeDemand("anyId");
+        });
+    }
+
+    // ---------------------------------------------------------
+    // 10. Tests clearRequests
+    // ---------------------------------------------------------
+    @Test
+    void clearRequests_ShouldResetAllData() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "demande.xml",
+            "text/xml",
+            "xml content".getBytes()
+        );
+
+        CityMap cityMap = new CityMap();
+        cityMap.getNodes().add(new Node("1", 45.75, 4.85));
+
+        DemandeSet mockRequestSet = new DemandeSet();
+        Warehouse warehouse = new Warehouse();
+        warehouse.setNodeId("1");
+        mockRequestSet.setWarehouse(warehouse);
+        mockRequestSet.setDemands(new ArrayList<>());
+
+        when(deliveryRequestXmlParser.parseDeliveryRequestFromXML(any())).thenReturn(mockRequestSet);
+        when(mapService.getCurrentMap()).thenReturn(cityMap);
+
+        deliveryService.loadDeliveryRequests(file);
+
+        // Act
+        deliveryService.clearRequests();
+
+        // Assert
+        assertNull(deliveryService.getCurrentRequestSet());
+    }
+
+    // ---------------------------------------------------------
+    // 11. Tests parseDeliveryRequestsFromXML (méthode legacy)
+    // ---------------------------------------------------------
+    @Test
+    void parseDeliveryRequestsFromXML_ShouldReturnListOfRequests() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "demande.xml",
+            "text/xml",
+            "xml content".getBytes()
+        );
+
+        List<DeliveryRequest> mockRequests = new ArrayList<>();
+        DeliveryRequest req1 = new DeliveryRequest();
+        req1.setId("req1");
+        mockRequests.add(req1);
+
+        when(deliveryRequestXmlParser.parseDeliveryRequestsFromXML(any())).thenReturn(mockRequests);
+
+        // Act
+        List<DeliveryRequest> result = deliveryService.parseDeliveryRequestsFromXML(file);
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals("req1", result.get(0).getId());
+    }
+
+    @Test
+    void getCurrentRequests_AfterParsing_ShouldReturnSameList() throws Exception {
+        // Arrange
+        MockMultipartFile file = new MockMultipartFile(
+            "file",
+            "demande.xml",
+            "text/xml",
+            "xml content".getBytes()
+        );
+
+        List<DeliveryRequest> mockRequests = new ArrayList<>();
+        DeliveryRequest req1 = new DeliveryRequest();
+        req1.setId("req1");
+        mockRequests.add(req1);
+
+        when(deliveryRequestXmlParser.parseDeliveryRequestsFromXML(any())).thenReturn(mockRequests);
+
+        // Act
+        deliveryService.parseDeliveryRequestsFromXML(file);
+        List<DeliveryRequest> result = deliveryService.getCurrentRequests();
+
+        // Assert
+        assertNotNull(result);
+        assertEquals(1, result.size());
+        assertEquals(mockRequests, result);
+    }
 }
