@@ -615,24 +615,68 @@ export default function PickupDeliveryUI() {
   };
 
   // Gestion de la restauration d'une tournée depuis un fichier JSON
-  const handleRestoreTour = async (restoredTourData, demands = []) => {
+  const handleRestoreTour = async (restorePayload, legacyDemands = []) => {
     if (!mapData) {
       alert('Veuillez d\'abord charger une carte');
       return;
     }
 
+    // Normaliser les données du fichier (nouveau format ou ancien)
+    const toursFromFile = Array.isArray(restorePayload?.tours)
+      ? restorePayload.tours
+      : Array.isArray(restorePayload)
+        ? restorePayload
+        : Array.isArray(restorePayload?.tour)
+          ? [{ trajets: restorePayload.tour, stops: restorePayload.stops || [] }]
+          : [];
+
+    const demandsFromFile = Array.isArray(restorePayload?.demands) && restorePayload.demands.length > 0
+      ? restorePayload.demands
+      : Array.isArray(legacyDemands)
+        ? legacyDemands
+        : [];
+
+    if (!demandsFromFile.length) {
+      alert('Aucune demande trouvée dans le fichier à restaurer');
+      return;
+    }
+
+    const deriveWarehouseNode = () => {
+      if (restorePayload?.warehouse?.nodeId) return restorePayload.warehouse.nodeId;
+
+      for (const tour of toursFromFile || []) {
+        if (tour?.stops?.length) {
+          const firstStop = tour.stops[0];
+          if (firstStop?.typeStop === 'WAREHOUSE' && firstStop.idNode) {
+            return firstStop.idNode;
+          }
+        }
+
+        const trajets = tour?.trajets || tour?.tour || [];
+        if (Array.isArray(trajets) && trajets.length > 0) {
+          const firstTrajet = trajets[0];
+          if (firstTrajet?.stopDepart?.idNode) return firstTrajet.stopDepart.idNode;
+          if (firstTrajet?.segments?.length && firstTrajet.segments[0]?.origin) {
+            return firstTrajet.segments[0].origin;
+          }
+        }
+      }
+
+      return mapData?.nodes?.[0]?.id || null;
+    };
+
     try {
-      console.log('🔄 Restauration de tournée avec', demands.length, 'demandes');
+      console.log('🔄 Restauration de tournée avec', demandsFromFile.length, 'demandes');
 
       // Ajouter les demandes au backend et récupérer les IDs générés
       const addedDemandsWithIds = [];
       
-      for (const demand of demands) {
+      for (const demand of demandsFromFile) {
         const response = await apiService.addDeliveryRequest({
           pickupAddress: demand.pickupNodeId,
           deliveryAddress: demand.deliveryNodeId,
-          pickupDuration: demand.pickupDurationSec,
-          deliveryDuration: demand.deliveryDurationSec
+          pickupDuration: demand.pickupDurationSec ?? 300,
+          deliveryDuration: demand.deliveryDurationSec ?? 300,
         });
         
         // Récupérer l'ID retourné par le backend
@@ -640,69 +684,78 @@ export default function PickupDeliveryUI() {
         
         addedDemandsWithIds.push({
           ...demand,
-          id: backendId || demand.id // Utiliser l'ID du backend, sinon l'ancien ID
+          id: backendId || demand.id, // Utiliser l'ID du backend, sinon l'ancien ID
         });
       }
 
       console.log('✅ Toutes les demandes ont été ajoutées au backend');
 
-      // Utiliser les demandes avec les IDs du backend
-      if (addedDemandsWithIds && addedDemandsWithIds.length > 0) {
-        console.log(`📊 ${addedDemandsWithIds.length} demandes avec IDs backend`);
-        
-        // Trouver le warehouse (premier nœud du premier segment)
-        const firstSegment = restoredTourData.tour[0]?.segments[0];
-        const warehouseNodeId = firstSegment?.origin || (mapData.nodes?.[0]?.id);
-        
-        const demandsWithColors = addedDemandsWithIds.map((demand, index) => ({
-          ...demand,
-          color: getColorFromPalette(index)
-        }));
-        
-        setDeliveryRequestSet({
-          warehouse: {
+      const warehouseNodeId = deriveWarehouseNode();
+      const warehouse = warehouseNodeId
+        ? {
             nodeId: warehouseNodeId,
-            departureTime: '08:00'
-          },
-          demands: demandsWithColors
-        });
-
-        console.log('✅ DeliveryRequestSet défini avec IDs du backend');
-        
-        // 🔄 Recalculer la tournée automatiquement pour avoir la bonne structure
-        setIsCalculatingTour(true);
-        try {
-          const result = await apiService.calculateTour(courierCount);
-          
-          if (result.success && result.data && result.data.length > 0) {
-            const tour = result.data[0];
-            const newTourData = {
-              tour: tour.trajets || tour.segments || tour.path || [],
-              metrics: {
-                stopCount: tour.stops?.length || 0,
-                totalDistance: tour.totalDistance || 0,
-                segmentCount: (tour.trajets || tour.segments || tour.path || []).length
-              }
-            };
-            
-            setTourData(newTourData);
-            console.log('✅ Tournée recalculée après restauration');
+            departureTime: restorePayload?.warehouse?.departureTime || '08:00',
           }
-        } catch (error) {
-          console.error('❌ Erreur lors du recalcul:', error);
-          // En cas d'erreur, garder la tournée restaurée
-          setTourData(restoredTourData);
-        } finally {
-          setIsCalculatingTour(false);
+        : null;
+
+      const demandsWithColors = addedDemandsWithIds.map((demand, index) => ({
+        ...demand,
+        color: getColorFromPalette(index),
+      }));
+      
+      setDeliveryRequestSet({
+        warehouse,
+        demands: demandsWithColors,
+      });
+
+      console.log('✅ DeliveryRequestSet défini avec IDs du backend');
+      
+      // 🔄 Recalculer la tournée automatiquement pour avoir la bonne structure
+      setIsCalculatingTour(true);
+      let recalculatedTours = null;
+      let recalculatedUnassigned = [];
+
+      try {
+        const couriersToUse = restorePayload?.courierCount || courierCount;
+        const result = await apiService.calculateTour(couriersToUse);
+        
+        if (result.success && result.data && Array.isArray(result.data.tours)) {
+          recalculatedTours = result.data.tours || [];
+          recalculatedUnassigned = result.data.unassignedDemands || [];
+          console.log('✅ Tournée recalculée après restauration');
         }
+      } catch (error) {
+        console.error('❌ Erreur lors du recalcul:', error);
+      } finally {
+        setIsCalculatingTour(false);
       }
+
+      const toursToApply = (Array.isArray(recalculatedTours) && recalculatedTours.length > 0)
+        ? recalculatedTours
+        : (Array.isArray(toursFromFile) && toursFromFile.length > 0 ? toursFromFile : null);
+
+      setTourData(toursToApply);
+      setUnassignedDemands((Array.isArray(recalculatedTours) && recalculatedTours.length > 0) ? recalculatedUnassigned : []);
 
       setActiveTab('map');
       
+      // Choisir les métriques pour l'alerte finale
+      const toursForMetrics = Array.isArray(toursToApply) && toursToApply.length > 0
+        ? toursToApply
+        : toursFromFile;
+
+      const metrics = toursForMetrics && toursForMetrics.length > 0
+        ? {
+            stopCount: toursForMetrics.reduce((sum, t) => sum + (t.stops?.length || 0), 0),
+            totalDistance: toursForMetrics.reduce((sum, t) => sum + (t.totalDistance || 0), 0),
+            segmentCount: toursForMetrics.reduce((sum, t) => sum + ((t.trajets || t.segments || t.path || []).length), 0),
+          }
+        : restorePayload?.metrics;
+
       alert(`Tournée restaurée avec succès !\n\n` +
-            `📍 Stops: ${restoredTourData.metrics.stopCount}\n` +
-            `📏 Distance: ${restoredTourData.metrics.totalDistance.toFixed(2)} m\n` +
-            `🛣️  Segments: ${restoredTourData.metrics.segmentCount}\n` +
+            `📍 Stops: ${metrics?.stopCount || 0}\n` +
+            `📏 Distance: ${Number(metrics?.totalDistance || 0).toFixed(2)} m\n` +
+            `🛣️  Segments: ${metrics?.segmentCount || 0}\n` +
             `📦 Demandes: ${addedDemandsWithIds.length}`);
     } catch (error) {
       console.error('❌ Erreur lors de la restauration de la tournée:', error);
@@ -832,23 +885,39 @@ export default function PickupDeliveryUI() {
                           isBusy={isCalculatingTour}
                           isEditing={isEditingAssignments}
                           onValidateEdit={async () => {
-                            // Recalcul complet via nouvel endpoint
                             try {
                               setIsCalculatingTour(true);
-                              // Construire assignments pour toutes les demandes courantes
-                              const assignments = (filteredDeliveryRequestSet?.demands || []).map((d) => ({
+
+                              // 1) Supprimer réellement les demandes marquées côté backend et frontend
+                              let remainingDemands = deliveryRequestSet?.demands || [];
+                              if (Array.isArray(stagedRemovals) && stagedRemovals.length > 0) {
+                                await Promise.all(stagedRemovals.map((id) => apiService.removeDemand(id)));
+                                remainingDemands = remainingDemands.filter((d) => !stagedRemovals.includes(d.id));
+
+                                // Réappliquer les couleurs localement après suppression
+                                const demandsWithColors = remainingDemands.map((demand, index) => ({
+                                  ...demand,
+                                  color: getColorFromPalette(index),
+                                }));
+
+                                setDeliveryRequestSet((prev) => ({
+                                  ...(prev || {}),
+                                  warehouse: deliveryRequestSet?.warehouse || prev?.warehouse || null,
+                                  demands: demandsWithColors,
+                                }));
+                              }
+
+                              // 2) Construire les assignments uniquement avec les demandes restantes
+                              const assignments = (remainingDemands || []).map((d) => ({
                                 demandId: d.id,
-                                courierId: (stagedAssignments && stagedAssignments[d.id] !== undefined)
-                                  ? stagedAssignments[d.id]
-                                  : (demandAssignments?.[d.id] ?? null),
+                                courierId:
+                                  stagedAssignments && stagedAssignments[d.id] !== undefined
+                                    ? stagedAssignments[d.id]
+                                    : demandAssignments?.[d.id] ?? null,
                               }));
 
-                              // Inclure les suppressions : on exclut simplement ces demandes
-                              const finalAssignments = assignments.filter(
-                                (a) => !(stagedRemovals || []).includes(a.demandId)
-                              );
-
-                              const result = await apiService.recalculateAssignments(finalAssignments);
+                              // 3) Recalcul complet via nouvel endpoint
+                              const result = await apiService.recalculateAssignments(assignments);
                               if (result?.success && result.data) {
                                 const resp = result.data;
                                 const incomingTours = resp.tours || [];

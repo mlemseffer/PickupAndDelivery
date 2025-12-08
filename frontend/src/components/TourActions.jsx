@@ -153,14 +153,58 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     
     console.log('💾 Sauvegarde de la tournée:', tourData);
 
-    // Nettoyer et sérialiser la tournée pour ne garder que les données essentielles
-    const cleanedTourData = {
-      tour: tourData.tour || [],
-      metrics: tourData.metrics || {},
-      savedAt: new Date().toISOString()
+    // Normaliser le format (mono ou multi-coursier) pour sauvegarder tout ce qui est utile à la restauration
+    const normalizeToursForSave = () => {
+      if (Array.isArray(tourData)) {
+        return tourData.map((tour) => ({
+          ...tour,
+          trajets: tour.trajets || tour.tour || tour, // compatibilité éventuelle
+        }));
+      }
+      if (tourData?.trajets || tourData?.tour || tourData?.stops) {
+        return [{
+          ...tourData,
+          trajets: tourData.trajets || tourData.tour || [],
+          stops: tourData.stops || [],
+        }];
+      }
+      return [];
     };
 
-    const tourJson = JSON.stringify(cleanedTourData, null, 2);
+    const toursToSave = normalizeToursForSave();
+    if (!toursToSave.length) {
+      alert('Aucune tournée à sauvegarder');
+      return;
+    }
+
+    // Inclure les demandes pour pouvoir les réinjecter au backend lors d'une restauration
+    const demandsToSave = (deliveryRequestSet?.demands || []).map((d) => ({
+      id: d.id,
+      pickupNodeId: d.pickupNodeId,
+      deliveryNodeId: d.deliveryNodeId,
+      pickupDurationSec: d.pickupDurationSec,
+      deliveryDurationSec: d.deliveryDurationSec,
+      courierId: d.courierId || null,
+    }));
+
+    const payload = {
+      version: 'v1',
+      savedAt: new Date().toISOString(),
+      courierCount: Math.max(toursToSave.length, 1),
+      warehouse: deliveryRequestSet?.warehouse || null,
+      demands: demandsToSave,
+      tours: toursToSave,
+    };
+
+    // Ajout d'un champ legacy pour les anciens JSON basés sur une seule tournée
+    if (!Array.isArray(tourData) && Array.isArray(tourData?.tour)) {
+      payload.tour = tourData.tour;
+      if (tourData.metrics) {
+        payload.metrics = tourData.metrics;
+      }
+    }
+
+    const tourJson = JSON.stringify(payload, null, 2);
     const blob = new Blob([tourJson], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
 
@@ -172,7 +216,7 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    console.log('✅ Tournée sauvegardée avec', cleanedTourData.tour.length, 'trajets');
+    console.log('✅ Tournée sauvegardée avec', toursToSave.length, 'tournée(s)');
 
     setShowJsonModal(false);
     if (onSaveTour) onSaveTour();
