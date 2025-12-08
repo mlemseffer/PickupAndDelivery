@@ -51,18 +51,10 @@ function SegmentRenderer({ segments, nodesById, isMapSelectionActive, onSegmentC
     return null;
   }
   
-  // Si le nombre de segments est trop élevé et le zoom trop bas, ne rien afficher
-  const shouldRenderSegments = segments.length <= maxSegments || zoom >= 14;
+  // Afficher tous les segments sans limite
+  const segmentsToRender = segments;
   
-  if (!shouldRenderSegments) {
-    console.log(`⚠️ SegmentRenderer - Zoom trop bas (${zoom}) pour ${segments.length} segments`);
-    return null;
-  }
-  
-  // Limiter le nombre de segments affichés si zoom faible
-  const segmentsToRender = zoom >= 14 ? segments : segments.slice(0, maxSegments);
-  
-  console.log(`✅ SegmentRenderer - Affichage de ${segmentsToRender.length}/${segments.length} segments`);
+  console.log(`✅ SegmentRenderer - Affichage de ${segmentsToRender.length} segments`);
   
   return (
     <>
@@ -252,12 +244,7 @@ export default function MapViewer({
         </div>
       )}
       
-      {/* Message d'information pour les grandes cartes */}
-      {mapData?.segments && mapData.segments.length > 500 && (
-        <div className="bg-blue-600 text-white p-2 text-center text-sm">
-          ℹ️ Carte volumineuse ({mapData.segments.length} segments) - Zoomez pour voir tous les détails
-        </div>
-      )}
+
       
       <div className="p-3 bg-gray-600 border-b border-gray-500">
         <div className="flex justify-between items-center">
