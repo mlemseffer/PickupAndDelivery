@@ -354,6 +354,20 @@ export default function PickupDeliveryUI() {
   // Plus besoin de filtrer les demandes puisqu'on ne les supprime plus
   const filteredDeliveryRequestSet = deliveryRequestSet;
 
+  // Calculer les demandes non assignées effectives en tenant compte des modifications en cours
+  const effectiveUnassignedDemands = useMemo(() => {
+    if (!isEditingAssignments) {
+      return unassignedDemands;
+    }
+    
+    // En mode édition, filtrer les demandes qui ont été assignées temporairement
+    return unassignedDemands.filter((demand) => {
+      const assignedCourierId = effectiveAssignments[demand.id];
+      // Garder seulement les demandes qui restent non assignées (null ou undefined)
+      return assignedCourierId === null || assignedCourierId === undefined;
+    });
+  }, [unassignedDemands, isEditingAssignments, effectiveAssignments]);
+
   const recalculateToursSilent = async () => {
     setIsCalculatingTour(true);
     try {
@@ -907,7 +921,7 @@ export default function PickupDeliveryUI() {
                           deliveryRequestSet={filteredDeliveryRequestSet}
                           onTourSelect={(tour) => setSelectedCourierId(tour?.courierId || null)}
                           demandAssignments={effectiveAssignments}
-                          unassignedDemands={unassignedDemands}
+                          unassignedDemands={effectiveUnassignedDemands}
                           onReassignDemand={handleReassignDemand}
                           onRemoveDemand={handleRemoveDemandById}
                           isBusy={isCalculatingTour}
