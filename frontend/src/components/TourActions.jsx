@@ -289,20 +289,36 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
 
     // Normaliser le format (mono ou multi-coursier) pour sauvegarder tout ce qui est utile à la restauration
     const normalizeToursForSave = () => {
-      if (Array.isArray(tourData)) {
-        return tourData.map((tour) => ({
+      const baseTours = (() => {
+        if (Array.isArray(tourData)) {
+          return tourData.map((tour) => ({
+            ...tour,
+            trajets: tour.trajets || tour.tour || tour, // compatibilité éventuelle
+          }));
+        }
+        if (tourData?.trajets || tourData?.tour || tourData?.stops) {
+          return [{
+            ...tourData,
+            trajets: tourData.trajets || tourData.tour || [],
+            stops: tourData.stops || [],
+          }];
+        }
+        return [];
+      })();
+
+      // 👉 Single source of truth: courierId comes from the tour itself (fallback = index)
+      return baseTours.map((tour, idx) => {
+        const normalizedCourierId = Number.isFinite(Number(tour?.courierId))
+          ? Number(tour.courierId)
+          : idx + 1;
+
+        return {
           ...tour,
-          trajets: tour.trajets || tour.tour || tour, // compatibilité éventuelle
-        }));
-      }
-      if (tourData?.trajets || tourData?.tour || tourData?.stops) {
-        return [{
-          ...tourData,
-          trajets: tourData.trajets || tourData.tour || [],
-          stops: tourData.stops || [],
-        }];
-      }
-      return [];
+          courierId: normalizedCourierId,
+          trajets: tour?.trajets || tour?.tour || tour?.segments || tour?.path || [],
+          stops: tour?.stops || [],
+        };
+      });
     };
 
     const toursToSave = normalizeToursForSave();
@@ -318,7 +334,6 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
       deliveryNodeId: d.deliveryNodeId,
       pickupDurationSec: d.pickupDurationSec,
       deliveryDurationSec: d.deliveryDurationSec,
-      courierId: d.courierId || null,
     }));
 
     const payload = {

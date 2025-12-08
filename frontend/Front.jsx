@@ -618,13 +618,28 @@ export default function PickupDeliveryUI() {
     }
 
     // Normaliser les données du fichier (nouveau format ou ancien)
-    const toursFromFile = Array.isArray(restorePayload?.tours)
+    const normalizeToursFromFile = (rawTours) =>
+      (rawTours || []).map((tour, idx) => {
+        const resolvedCourierId = Number.isFinite(Number(tour?.courierId))
+          ? Number(tour.courierId)
+          : idx + 1;
+        return {
+          ...tour,
+          courierId: resolvedCourierId,
+          trajets: tour?.trajets || tour?.tour || tour?.segments || tour?.path || [],
+          stops: tour?.stops || [],
+        };
+      });
+
+    const toursFromFileRaw = Array.isArray(restorePayload?.tours)
       ? restorePayload.tours
       : Array.isArray(restorePayload)
         ? restorePayload
         : Array.isArray(restorePayload?.tour)
           ? [{ trajets: restorePayload.tour, stops: restorePayload.stops || [] }]
           : [];
+
+    const toursFromFile = normalizeToursFromFile(toursFromFileRaw);
 
     const demandsFromFile = Array.isArray(restorePayload?.demands) && restorePayload.demands.length > 0
       ? restorePayload.demands
@@ -696,6 +711,7 @@ export default function PickupDeliveryUI() {
 
       // Ajouter les demandes au backend et récupérer les IDs générés
       const addedDemandsWithIds = [];
+      const demandIdMap = new Map(); // ancienId -> nouvelId (backend)
       
       for (const demand of validDemands) {
         const response = await apiService.addDeliveryRequest({
@@ -708,6 +724,10 @@ export default function PickupDeliveryUI() {
         // Récupérer l'ID retourné par le backend
         const backendId = response.data?.id || response.id;
         
+        if (demand.id) {
+          demandIdMap.set(String(demand.id), backendId || demand.id);
+        }
+
         addedDemandsWithIds.push({
           ...demand,
           id: backendId || demand.id, // Utiliser l'ID du backend, sinon l'ancien ID
@@ -751,23 +771,86 @@ export default function PickupDeliveryUI() {
       });
 
       console.log('✅ DeliveryRequestSet défini avec IDs du backend');
-      
-      // 🔄 Recalculer la tournée automatiquement pour avoir la bonne structure
+
+      // Construire les assignments à partir des tournées fournies (respecter les réassignations)
+      const deriveAssignmentsFromTours = (tours, demandsList, idMap) => {
+        const mapping = {};
+        demandsList.forEach((d) => {
+          mapping[String(d.id)] = null;
+        });
+
+        const setCourierForDemandId = (rawId, courierId) => {
+          const mappedId = idMap.get(String(rawId)) || String(rawId);
+          if (mapping.hasOwnProperty(mappedId)) {
+            mapping[mappedId] = courierId;
+          }
+        };
+
+        (tours || []).forEach((tour) => {
+          const cid = tour?.courierId;
+          if (cid === null || cid === undefined) return;
+
+          const nodes = new Set();
+          (tour?.trajets || tour?.tour || []).forEach((trajet) => {
+            if (trajet?.stopArrivee?.idNode) nodes.add(String(trajet.stopArrivee.idNode));
+            if (trajet?.stopDepart?.idNode) nodes.add(String(trajet.stopDepart.idNode));
+            if (trajet?.stopArrivee?.idDemande) setCourierForDemandId(trajet.stopArrivee.idDemande, cid);
+            if (trajet?.stopDepart?.idDemande) setCourierForDemandId(trajet.stopDepart.idDemande, cid);
+          });
+          (tour?.stops || []).forEach((stop) => {
+            if (stop?.idNode) nodes.add(String(stop.idNode));
+            if (stop?.idDemande) setCourierForDemandId(stop.idDemande, cid);
+          });
+
+          demandsList.forEach((d) => {
+            const pickupMatch = d.pickupNodeId !== undefined && nodes.has(String(d.pickupNodeId));
+            const deliveryMatch = d.deliveryNodeId !== undefined && nodes.has(String(d.deliveryNodeId));
+            if (pickupMatch || deliveryMatch) {
+              mapping[String(d.id)] = cid;
+            }
+          });
+        });
+
+        return Object.entries(mapping).map(([demandId, assignedCourierId]) => ({
+          demandId,
+          courierId: assignedCourierId,
+        }));
+      };
+
+      // 🔄 Recalculer la tournée en respectant les assignments restaurés
       setIsCalculatingTour(true);
       let recalculatedTours = null;
       let recalculatedUnassigned = [];
 
+      const couriersToUse = restorePayload?.courierCount
+        || new Set(toursFromFile.map((t) => t.courierId)).size
+        || toursFromFile.length
+        || courierCount;
+      setCourierCount(couriersToUse);
+
       try {
-        const couriersToUse = restorePayload?.courierCount || courierCount;
-        const result = await apiService.calculateTour(couriersToUse);
-        
-        if (result.success && result.data && Array.isArray(result.data.tours)) {
+        const assignments = deriveAssignmentsFromTours(toursFromFile, addedDemandsWithIds, demandIdMap);
+        let result = null;
+
+        if (assignments.some((a) => a.courierId !== null && a.courierId !== undefined)) {
+          result = await apiService.recalculateAssignments(assignments);
+        }
+
+        if (result?.success && result.data && Array.isArray(result.data.tours)) {
           recalculatedTours = result.data.tours || [];
           recalculatedUnassigned = result.data.unassignedDemands || [];
-          console.log('✅ Tournée recalculée après restauration');
+          console.log('✅ Tournée recalculée avec assignments restaurés');
+        } else {
+          // Fallback: recalcul standard si les assignments n'ont pas été pris en compte
+          const fallback = await apiService.calculateTour(couriersToUse);
+          if (fallback.success && fallback.data && Array.isArray(fallback.data.tours)) {
+            recalculatedTours = fallback.data.tours || [];
+            recalculatedUnassigned = fallback.data.unassignedDemands || [];
+            console.log('ℹ️ Fallback calculateTour utilisé après restauration');
+          }
         }
       } catch (error) {
-        console.error('❌ Erreur lors du recalcul:', error);
+        console.error('❌ Erreur lors du recalcul avec assignments:', error);
       } finally {
         setIsCalculatingTour(false);
       }
