@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { MapContainer, TileLayer, Polyline, Popup, useMap } from 'react-leaflet';
-import { Maximize2, Minimize2 } from 'lucide-react';
+import { Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
 import TourSegments from './TourSegments';
 import MultiTourPolylines from './MultiTourPolylines';
@@ -113,6 +113,7 @@ export default function MapViewer({
   isAddingManually 
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showSegments, setShowSegments] = useState(true);
   const mapContainerRef = useRef(null);
 
   // Debug : vérifier les données reçues
@@ -265,6 +266,14 @@ export default function MapViewer({
           </div>
           <div className="flex gap-2">
             <button
+              onClick={() => setShowSegments(!showSegments)}
+              className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center gap-1"
+              title={showSegments ? "Masquer les segments" : "Afficher les segments"}
+            >
+              {showSegments ? <Eye size={16} /> : <EyeOff size={16} />}
+              {showSegments ? "Segments" : "Segments"}
+            </button>
+            <button
               onClick={toggleFullscreen}
               className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-sm transition-colors flex items-center gap-1"
               title={isFullscreen ? "Quitter le plein écran" : "Plein écran"}
@@ -300,7 +309,7 @@ export default function MapViewer({
           />
           
           {/* Affichage des tronçons (segments/rues) avec optimisation */}
-          {mapData.segments && (
+          {showSegments && mapData.segments && (
             <SegmentRenderer 
               segments={mapData.segments}
               nodesById={nodesById}
