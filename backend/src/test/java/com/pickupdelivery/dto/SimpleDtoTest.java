@@ -129,4 +129,143 @@ public class SimpleDtoTest {
         assertEquals(3, warnings.getMessages().size());
         assertTrue(warnings.hasWarnings());
     }
+
+    // Tests pour AddDeliveryRequest
+    @Test
+    @DisplayName("AddDeliveryRequest constructeur complet")
+    void testAddDeliveryRequest() {
+        AddDeliveryRequest request = new AddDeliveryRequest("C1", "Address1", "Address2", 300, 240);
+        
+        assertEquals("C1", request.getCourierId());
+        assertEquals("Address1", request.getPickupAddress());
+        assertEquals("Address2", request.getDeliveryAddress());
+        assertEquals(300, request.getPickupDuration());
+        assertEquals(240, request.getDeliveryDuration());
+    }
+
+    @Test
+    @DisplayName("AddDeliveryRequest setters")
+    void testAddDeliveryRequestSetters() {
+        AddDeliveryRequest request = new AddDeliveryRequest();
+        request.setCourierId("C2");
+        request.setPickupAddress("Pickup Addr");
+        request.setDeliveryAddress("Delivery Addr");
+        request.setPickupDuration(600);
+        request.setDeliveryDuration(480);
+        
+        assertEquals("C2", request.getCourierId());
+        assertEquals("Pickup Addr", request.getPickupAddress());
+        assertEquals("Delivery Addr", request.getDeliveryAddress());
+        assertEquals(600, request.getPickupDuration());
+        assertEquals(480, request.getDeliveryDuration());
+    }
+
+    // Tests pour TourCalculationResponse
+    @Test
+    @DisplayName("TourCalculationResponse constructeur par défaut")
+    void testTourCalculationResponseDefaultConstructor() {
+        TourCalculationResponse response = new TourCalculationResponse();
+        
+        assertNotNull(response.getTours());
+        assertNotNull(response.getUnassignedDemands());
+        assertNotNull(response.getWarnings());
+        assertEquals(0, response.getTourCount());
+        assertEquals(0, response.getUnassignedCount());
+        assertFalse(response.hasUnassignedDemands());
+    }
+
+    @Test
+    @DisplayName("TourCalculationResponse addWarning")
+    void testTourCalculationResponseAddWarning() {
+        TourCalculationResponse response = new TourCalculationResponse();
+        response.addWarning("Test warning");
+        
+        assertEquals(1, response.getWarnings().size());
+        assertTrue(response.getWarnings().contains("Test warning"));
+    }
+
+    @Test
+    @DisplayName("TourCalculationResponse hasUnassignedDemands")
+    void testTourCalculationResponseHasUnassignedDemands() {
+        TourCalculationResponse response = new TourCalculationResponse();
+        assertFalse(response.hasUnassignedDemands());
+        
+        response.getUnassignedDemands().add(new com.pickupdelivery.model.Demand());
+        assertTrue(response.hasUnassignedDemands());
+    }
+
+    @Test
+    @DisplayName("TourCalculationResponse getTourCount")
+    void testTourCalculationResponseGetTourCount() {
+        TourCalculationResponse response = new TourCalculationResponse();
+        assertEquals(0, response.getTourCount());
+        
+        response.getTours().add(new com.pickupdelivery.model.AlgorithmModel.Tour());
+        assertEquals(1, response.getTourCount());
+    }
+
+    // Tests pour TourDistributionResult
+    @Test
+    @DisplayName("TourDistributionResult getCourierCount")
+    void testTourDistributionResultGetCourierCount() {
+        TourDistributionResult result = new TourDistributionResult();
+        assertEquals(0, result.getCourierCount());
+        
+        result.getTours().add(new com.pickupdelivery.model.AlgorithmModel.Tour());
+        result.getTours().add(new com.pickupdelivery.model.AlgorithmModel.Tour());
+        assertEquals(2, result.getCourierCount());
+    }
+
+    @Test
+    @DisplayName("TourDistributionResult getTotalDistance")
+    void testTourDistributionResultGetTotalDistance() {
+        TourDistributionResult result = new TourDistributionResult();
+        assertEquals(0.0, result.getTotalDistance(), 0.001);
+    }
+
+    @Test
+    @DisplayName("TourDistributionResult getMaxDuration")
+    void testTourDistributionResultGetMaxDuration() {
+        TourDistributionResult result = new TourDistributionResult();
+        assertEquals(0.0, result.getMaxDuration(), 0.001);
+    }
+
+    @Test
+    @DisplayName("TourDistributionResult avec métriques")
+    void testTourDistributionResultWithMetrics() {
+        TourDistributionResult result = new TourDistributionResult();
+        TourMetrics metrics1 = new TourMetrics(1, 1000.0, 1800.0, 2, 6, false);
+        TourMetrics metrics2 = new TourMetrics(2, 1500.0, 2400.0, 3, 8, false);
+        
+        result.getMetricsByCourier().put(1, metrics1);
+        result.getMetricsByCourier().put(2, metrics2);
+        
+        assertEquals(2, result.getMetricsByCourier().size());
+        assertEquals(1000.0, result.getMetricsByCourier().get(1).getTotalDistance(), 0.001);
+        assertEquals(3, result.getMetricsByCourier().get(2).getRequestCount());
+    }
+
+    @Test
+    @DisplayName("TourDistributionResult avec demandes non assignées")
+    void testTourDistributionResultWithUnassignedDemands() {
+        TourDistributionResult result = new TourDistributionResult();
+        result.getUnassignedDemandIds().add("D1");
+        result.getUnassignedDemandIds().add("D2");
+        
+        assertEquals(2, result.getUnassignedDemandIds().size());
+        assertTrue(result.getUnassignedDemandIds().contains("D1"));
+    }
+
+    @Test
+    @DisplayName("TourDistributionResult avec warnings")
+    void testTourDistributionResultWithWarnings() {
+        TourDistributionResult result = new TourDistributionResult();
+        DistributionWarnings warnings = new DistributionWarnings();
+        warnings.setHasUnassignedDemands(true);
+        warnings.addMessage("Some demands could not be assigned");
+        result.setWarnings(warnings);
+        
+        assertTrue(result.getWarnings().isHasUnassignedDemands());
+        assertEquals(1, result.getWarnings().getMessages().size());
+    }
 }
