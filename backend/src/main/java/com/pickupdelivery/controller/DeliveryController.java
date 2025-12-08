@@ -135,6 +135,32 @@ public class DeliveryController {
     }
 
     /**
+     * Définit ou met à jour l'entrepôt courant
+     * POST /api/deliveries/warehouse
+     */
+    @PostMapping("/warehouse")
+    public ResponseEntity<ApiResponse<Void>> setWarehouse(@RequestBody WarehouseRequest request) {
+        try {
+            if (request == null || request.nodeId == null || request.nodeId.isBlank()) {
+                return ResponseEntity.badRequest()
+                        .body(ApiResponse.error("nodeId du warehouse est requis"));
+            }
+            deliveryService.setWarehouse(request.nodeId, request.departureTime);
+            return ResponseEntity.ok(ApiResponse.success("Entrepôt mis à jour", null));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(ApiResponse.error(e.getMessage()));
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(ApiResponse.error("Erreur lors de la mise à jour du warehouse: " + e.getMessage()));
+        }
+    }
+
+    public static class WarehouseRequest {
+        public String nodeId;
+        public String departureTime;
+    }
+
+    /**
      * Supprime une demande de livraison par son index
      * DELETE /api/deliveries/{index}
      * @param index L'index de la demande à supprimer
