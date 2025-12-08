@@ -40,6 +40,22 @@ export default function RestoreTourModal({ isOpen, onClose, onRestore }) {
           throw new Error('Format invalide : aucune tournée trouvée dans le fichier');
         }
 
+        // Normaliser les tournées et garantir un courierId unique (source de vérité)
+        const normalizeTours = (toursArray) =>
+          (toursArray || []).map((tour, idx) => {
+            const resolvedCourierId = Number.isFinite(Number(tour?.courierId))
+              ? Number(tour.courierId)
+              : idx + 1;
+            return {
+              ...tour,
+              courierId: resolvedCourierId,
+              trajets: tour?.trajets || tour?.tour || tour?.segments || tour?.path || [],
+              stops: tour?.stops || [],
+            };
+          });
+
+        const normalizedTours = normalizeTours(tours);
+
         // Récupérer les demandes : priorité aux données explicites, sinon dériver des stops
         const deriveDemandsFromTours = (toursArray) => {
           const demands = [];
@@ -98,7 +114,7 @@ export default function RestoreTourModal({ isOpen, onClose, onRestore }) {
 
         let demands = Array.isArray(jsonData.demands) ? jsonData.demands : [];
         if (!demands.length) {
-          demands = deriveDemandsFromTours(tours);
+          demands = deriveDemandsFromTours(normalizedTours);
         }
 
         if (!demands.length) {
@@ -121,11 +137,11 @@ export default function RestoreTourModal({ isOpen, onClose, onRestore }) {
         };
 
         const payload = {
-          tours,
+          tours: normalizedTours,
           demands,
           warehouse: jsonData.warehouse || null,
-          courierCount: jsonData.courierCount || tours.length || 1,
-          metrics: jsonData.metrics || computeMetrics(tours),
+          courierCount: jsonData.courierCount || normalizedTours.length || 1,
+          metrics: jsonData.metrics || computeMetrics(normalizedTours),
           savedAt: jsonData.savedAt,
           version: jsonData.version || 'v1',
         };
