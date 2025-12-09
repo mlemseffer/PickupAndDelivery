@@ -66,6 +66,8 @@ export default function TourTabs({
     if (onTourSelect) {
       if (courierId === null) {
         onTourSelect(null); // Vue globale : afficher tous les tours
+      } else if (courierId === 'unassigned') {
+        onTourSelect({ courierId: 'unassigned' });
       } else {
         const selectedTour = displayTours.find(t => t.courierId === courierId);
         onTourSelect(selectedTour);
@@ -142,6 +144,19 @@ export default function TourTabs({
     return Array.from(union.values());
   }, [allDemands, demandAssignments, unassignedDemands]);
 
+  const hasUnassigned = derivedUnassigned.length > 0;
+
+  // Si l'onglet N/A est sélectionné mais qu'il n'y a plus de demandes non assignées,
+  // revenir automatiquement à la vue globale pour éviter un onglet vide.
+  useEffect(() => {
+    if (selectedCourierId === 'unassigned' && !hasUnassigned) {
+      setSelectedCourierId(null);
+      if (onTourSelect) {
+        onTourSelect(null);
+      }
+    }
+  }, [selectedCourierId, hasUnassigned, onTourSelect]);
+
   const demandsForCourier = (courierId) =>
     allDemands.filter((d) => (demandAssignments?.[d.id] ?? null) === courierId);
 
@@ -184,9 +199,12 @@ export default function TourTabs({
     setShowAssignModal(false);
   };
 
-  const handleRemove = async (demand) => {
+  const handleRemove = async (demandOrId) => {
     if (!onRemoveDemand) return;
-    await onRemoveDemand(demand.id);
+    const demandId =
+      demandOrId && typeof demandOrId === 'object' ? demandOrId.id : demandOrId;
+    if (!demandId) return;
+    await onRemoveDemand(demandId);
   };
 
   return (
@@ -234,6 +252,22 @@ export default function TourTabs({
             Vue globale
           </span>
         </button>
+        {/* Onglet Non assignées (affiché uniquement s'il existe des demandes non assignées) */}
+        {hasUnassigned && (
+          <button
+            onClick={() => handleTabClick('unassigned')}
+            className={`px-4 py-3 font-medium whitespace-nowrap transition-colors flex-shrink-0 ${
+              selectedCourierId === 'unassigned'
+                ? 'border-b-2 border-blue-500 text-blue-400'
+                : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
+            }`}
+          >
+            <span className="inline-flex items-center gap-2">
+              <Icon name="x-circle" className="text-blue-400" />
+              N/A
+            </span>
+          </button>
+        )}
         
         {/* Onglets par coursier */}
         {displayTours.map(tour => (
@@ -277,6 +311,22 @@ export default function TourTabs({
                 emptyMessage="Aucune demande chargée"
               />
             )}
+          </div>
+        ) : selectedCourierId === 'unassigned' && hasUnassigned ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-gray-500" />
+              <h3 className="text-lg font-semibold text-white">Demandes non assignées</h3>
+            </div>
+            <DemandAssignmentTable
+              demands={derivedUnassigned}
+              assignments={demandAssignments}
+              courierOptions={courierOptions}
+              onReassign={handleRequestReassign}
+              onRemove={handleRemove}
+              isBusy={isBusy}
+              emptyMessage="Aucune demande non assignée"
+            />
           </div>
         ) : (
           <div className="space-y-4">
