@@ -6,6 +6,7 @@ import com.pickupdelivery.dto.ApiResponse;
 import com.pickupdelivery.model.AlgorithmModel.Graph;
 import com.pickupdelivery.model.AlgorithmModel.StopSet;
 import com.pickupdelivery.model.AlgorithmModel.Tour;
+import com.pickupdelivery.model.AlgorithmModel.Stop;
 import com.pickupdelivery.model.CityMap;
 import com.pickupdelivery.model.DemandeSet;
 import com.pickupdelivery.model.Demand;
@@ -114,6 +115,96 @@ public class TourController {
             System.out.println("   - Demandes: " + DemandeSet.getDemands().size());
             
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+            // 2️⃣ DÉTECTION D'AFFECTATIONS EXISTANTES
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+            boolean hasExistingAssignments = DemandeSet.getDemands().stream()
+                    .anyMatch(d -> d.getCourierId() != null && !d.getCourierId().isBlank());
+
+            if (hasExistingAssignments) {
+                // Cas d'ajout/suppression: on respecte les affectations déjà présentes
+                System.out.println("\n🎯 Mode recalcul conservatif: on respecte les affectations existantes");
+
+                Map<String, List<Demand>> demandsByCourier = new HashMap<>();
+                List<Demand> unassigned = new ArrayList<>();
+
+                for (Demand d : DemandeSet.getDemands()) {
+                    if (d.getCourierId() == null || d.getCourierId().isBlank()) {
+                        unassigned.add(d);
+                    } else {
+                        demandsByCourier.computeIfAbsent(d.getCourierId(), k -> new ArrayList<>()).add(d);
+                    }
+                }
+
+                List<Tour> tours = new ArrayList<>();
+                List<String> warnings = new ArrayList<>();
+
+                for (Map.Entry<String, List<Demand>> entry : demandsByCourier.entrySet()) {
+                    String courierIdStr = entry.getKey();
+                    List<Demand> demandsForCourier = entry.getValue();
+                    if (demandsForCourier.isEmpty()) continue;
+
+                    DemandeSet subset = new DemandeSet();
+                    subset.setWarehouse(DemandeSet.getWarehouse());
+                    subset.setDemands(demandsForCourier);
+
+                    StopSet stopSet = serviceAlgo.getStopSet(subset);
+                    Graph graph = serviceAlgo.buildGraph(stopSet, cityMap);
+
+                    Map<String, Demand> demandMap = new HashMap<>();
+                    for (Demand d : demandsForCourier) {
+                        demandMap.put(d.getId(), d);
+                        if (d.getId() != null && d.getId().length() > 1) {
+                            demandMap.put(d.getId().substring(1), d);
+                        }
+                    }
+                    graph.setDemandMap(demandMap);
+
+                    TourDistributionResult dist = serviceAlgo.calculateOptimalTours(graph, 1);
+                    List<Tour> computed = dist.getTours();
+                    if (computed != null) {
+                        for (Tour t : computed) {
+                            try {
+                                t.setCourierId(Integer.valueOf(courierIdStr));
+                            } catch (NumberFormatException nfe) {
+                                // conserver si non numérique
+                            }
+                            if (t.getTotalDurationSec() > 4 * 3600) {
+                                warnings.add("Tournée coursier " + courierIdStr + " dépasse 4h, demandes remises en non assignées");
+                                unassigned.addAll(demandsForCourier);
+                            } else {
+                                tours.add(t);
+                            }
+                        }
+                    }
+                    if (dist.getWarnings() != null && dist.getWarnings().getMessages() != null) {
+                        warnings.addAll(dist.getWarnings().getMessages());
+                    }
+                }
+
+                // Mettre à jour les courierId dans le DemandeSet pour persister l'état
+                // Sans effacer les affectations non numériques (ex: "extra")
+                applyAssignmentsToDemands(tours, DemandeSet, false);
+                // Réinitialiser seulement les affectations vides
+                for (Demand d : DemandeSet.getDemands()) {
+                    if (d.getCourierId() != null && d.getCourierId().isBlank()) {
+                        d.setCourierId(null);
+                    }
+                }
+
+                TourCalculationResponse resp = new TourCalculationResponse(tours, unassigned, warnings);
+                if (tourService != null) {
+                    tourService.setAlgoTours(tours);
+                }
+
+                String msg = tours.isEmpty()
+                        ? "Aucune tournée valide (contrainte 4h)"
+                        : tours.size() + " tournée(s) recalculées en conservant les affectations";
+
+                return ResponseEntity.ok(ApiResponse.success(msg, resp));
+            }
+
+            // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             // 2️⃣ CONSTRUCTION DU STOPSET
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             
@@ -155,6 +246,9 @@ public class TourController {
             
             long tourElapsedTime = System.currentTimeMillis() - tourStartTime;
             long totalTime = System.currentTimeMillis() - graphStartTime;
+            
+            // Persister les affectations calculées pour les prochains recalculs
+            applyAssignmentsToDemands(tours, DemandeSet, true);
             
             // ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
             // 5️⃣ RÉSULTAT ET STATISTIQUES
@@ -402,25 +496,60 @@ public class TourController {
                         .body(ApiResponse.error("Aucun entrepôt défini."));
             }
 
+            // DEBUG: Log les demandes et leurs courierId actuels
+            System.out.println("\n🔍 [RECALCULATE-ASSIGNMENTS] État actuel des demandes:");
+            for (Demand d : DemandeSet.getDemands()) {
+                System.out.println("   - " + d.getId() + " -> courierId=" + d.getCourierId());
+            }
+
             Map<String, String> assignmentMap = new HashMap<>();
             if (request != null && request.getAssignments() != null) {
+                System.out.println("\n🔍 [RECALCULATE-ASSIGNMENTS] Assignments reçus du frontend:");
                 for (UpdateAssignmentsRequest.Assignment a : request.getAssignments()) {
+                    System.out.println("   - " + a.getDemandId() + " -> " + a.getCourierId());
                     if (a.getDemandId() != null) {
-                        assignmentMap.put(a.getDemandId(), (a.getCourierId() == null || a.getCourierId().isBlank()) ? null : a.getCourierId());
+                        assignmentMap.put(a.getDemandId(),
+                                (a.getCourierId() == null || a.getCourierId().isBlank()) ? null : a.getCourierId());
                     }
                 }
             }
-
             Map<String, List<Demand>> demandsByCourier = new HashMap<>();
             List<Demand> unassigned = new ArrayList<>();
 
             for (Demand d : DemandeSet.getDemands()) {
-                String assigned = assignmentMap.getOrDefault(d.getId(), null);
-                if (assigned == null) {
+                // Priorité: 1) assignment explicite du frontend, 2) courierId existant de la demande
+                String fromRequest = assignmentMap.get(d.getId());
+                String existing = d.getCourierId();
+                
+                String assigned;
+                if (assignmentMap.containsKey(d.getId())) {
+                    // Le frontend a explicitement envoyé une valeur (même null)
+                    // Mais si c'est null et qu'on a une affectation existante, on la garde
+                    if (fromRequest == null && existing != null && !existing.isBlank()) {
+                        // Frontend a envoyé null mais demande a déjà un courier -> garder l'existant
+                        assigned = existing;
+                        System.out.println("   📌 " + d.getId() + ": frontend=null, existant=" + existing + " -> GARDE existant");
+                    } else {
+                        assigned = fromRequest;
+                        System.out.println("   📌 " + d.getId() + ": frontend=" + fromRequest + " -> UTILISE frontend");
+                    }
+                } else {
+                    // Pas dans la requête du frontend, garder l'existant
+                    assigned = existing;
+                    System.out.println("   📌 " + d.getId() + ": NON dans requête, existant=" + existing + " -> GARDE existant");
+                }
+                
+                if (assigned == null || assigned.isBlank()) {
                     unassigned.add(d);
                 } else {
                     demandsByCourier.computeIfAbsent(assigned, k -> new ArrayList<>()).add(d);
                 }
+            }
+            
+            System.out.println("\n🔍 [RECALCULATE-ASSIGNMENTS] Résultat du groupement:");
+            System.out.println("   Non assignées: " + unassigned.size());
+            for (String cid : demandsByCourier.keySet()) {
+                System.out.println("   Coursier " + cid + ": " + demandsByCourier.get(cid).size() + " demandes");
             }
 
             List<Tour> tours = new ArrayList<>();
@@ -472,6 +601,23 @@ public class TourController {
             }
 
             TourCalculationResponse resp = new TourCalculationResponse(tours, unassigned, warnings);
+
+            // Persister les affectations calculées dans le DemandeSet, y compris les ids non numériques
+            if (DemandeSet != null && DemandeSet.getDemands() != null) {
+                // Réinitialiser
+                for (Demand d : DemandeSet.getDemands()) {
+                    d.setCourierId(null);
+                }
+                // Réaffecter selon la clé courierIdStr (string) utilisée pour le sous-calcul
+                for (Map.Entry<String, List<Demand>> entry : demandsByCourier.entrySet()) {
+                    String cid = entry.getKey();
+                    for (Demand d : entry.getValue()) {
+                        d.setCourierId(cid);
+                    }
+                }
+                // Les demandes restées dans unassigned demeurent à null
+            }
+
             if (tourService != null) {
                 tourService.setAlgoTours(tours);
             }
@@ -554,5 +700,39 @@ public class TourController {
                 info
             )
         );
+    }
+
+    /**
+     * Persiste les affectations coursier → demande dans le DemandeSet
+     * pour que les recalculs suivants respectent l'état courant.
+     */
+    private void applyAssignmentsToDemands(List<Tour> tours, DemandeSet requestSet, boolean clearExisting) {
+        if (requestSet == null || requestSet.getDemands() == null || tours == null) {
+            return;
+        }
+
+        Map<String, Demand> demandMap = requestSet.getDemands().stream()
+                .collect(Collectors.toMap(Demand::getId, d -> d, (a, b) -> a));
+
+        // Optionnel: réinitialiser toutes les affectations
+        if (clearExisting) {
+            for (Demand d : requestSet.getDemands()) {
+                d.setCourierId(null);
+            }
+        }
+
+        for (Tour tour : tours) {
+            if (tour == null || tour.getStops() == null) continue;
+            String courierIdStr = tour.getCourierId() != null ? String.valueOf(tour.getCourierId()) : null;
+            // Si courierIdStr est null (ex: id non numérique), ne pas écraser l'affectation existante
+
+            for (Stop stop : tour.getStops()) {
+                if (stop == null || stop.getIdDemande() == null) continue;
+                Demand d = demandMap.get(stop.getIdDemande());
+                if (d != null && courierIdStr != null) {
+                    d.setCourierId(courierIdStr);
+                }
+            }
+        }
     }
 }

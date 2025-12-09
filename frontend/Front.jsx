@@ -1267,6 +1267,7 @@ export default function PickupDeliveryUI() {
                   onSegmentClick={handleMapSegmentClick}
                   isMapSelectionActive={isMapSelectionActive}
                   isAddingManually={isAddingManually}
+                  isEditingTour={isEditingAssignments}
                 />
               </div>
               
