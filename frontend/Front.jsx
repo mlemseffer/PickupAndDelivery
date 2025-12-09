@@ -930,7 +930,7 @@ export default function PickupDeliveryUI() {
   };
 
   return (
-    <div className="h-screen bg-gray-900 text-slate-100 flex flex-col overflow-hidden font-sans antialiased">
+    <div className="h-screen bg-[#0c111d] text-slate-100 flex flex-col overflow-hidden font-sans antialiased">
       {/* Navigation Bar avec titre intégré */}
       <div className={isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}>
         <Navigation 
@@ -1016,7 +1016,7 @@ export default function PickupDeliveryUI() {
             {/* Ligne principale : Carte + Panneau d'informations */}
             <div className="flex-1 flex gap-4 min-h-0">
               {/* Carte sur la gauche - plus grande */}
-              <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden min-w-0">
+              <div className="w-2/3 flex flex-col bg-slate-900/70 border border-slate-800 rounded-xl overflow-hidden min-w-0 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                 <MapViewer 
                   mapData={mapData}
                   onClearMap={handleClearMap}
@@ -1033,7 +1033,7 @@ export default function PickupDeliveryUI() {
               {/* Panneau droit avec informations et boutons */}
               <div className={`flex-1 flex flex-col gap-4 min-h-0 min-w-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
                 {/* Tableau de tournée ou onglets multi-tours */}
-                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-6 flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                   <h3 className="panel-title mb-4 flex-shrink-0 tracking-tight">
                     {tourData ? (Array.isArray(tourData) && tourData.length > 1 ? 'Tournées Multi-Coursiers' : 'Tournée Calculée') : 'Informations'}
                   </h3>
@@ -1118,7 +1118,7 @@ export default function PickupDeliveryUI() {
                 </div>
                 
                 {/* Boutons d'action */}
-                <div className="bg-gray-700 rounded-lg p-4 flex-shrink-0">
+                <div className="bg-slate-900/70 border border-slate-800 rounded-xl p-4 flex-shrink-0 shadow-[0_10px_40px_rgba(0,0,0,0.35)] backdrop-blur-sm">
                   {!tourData ? (
                     // Avant calcul de tournée : Sélecteur + Boutons
                     <div className="flex flex-col gap-4">
