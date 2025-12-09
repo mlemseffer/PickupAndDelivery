@@ -424,6 +424,28 @@ export default function PickupDeliveryUI() {
   // Les suppressions étant appliquées au backend, on garde l'ensemble tel quel
   const filteredDeliveryRequestSet = deliveryRequestSet;
 
+  // Jeu de demandes affiché sur la carte : en vue coursier, ne montrer que ses demandes
+  const visibleDeliveryRequestSet = useMemo(() => {
+    if (!deliveryRequestSet) return null;
+    if (selectedCourierId === null) return deliveryRequestSet;
+
+    const targetId = String(selectedCourierId);
+    const assignments = effectiveAssignments || {};
+
+    const filteredDemands = (deliveryRequestSet.demands || []).filter((demand) => {
+      const assignedCourierId = assignments[demand.id];
+      if (assignedCourierId === null || assignedCourierId === undefined) {
+        return false;
+      }
+      return String(assignedCourierId) === targetId;
+    });
+
+    return {
+      ...deliveryRequestSet,
+      demands: filteredDemands,
+    };
+  }, [deliveryRequestSet, selectedCourierId, effectiveAssignments]);
+
   // Calculer les demandes non assignées effectives en tenant compte des modifications en cours
   const effectiveUnassignedDemands = useMemo(() => {
     if (!isEditingAssignments) {
@@ -1222,7 +1244,7 @@ export default function PickupDeliveryUI() {
                 <MapViewer 
                   mapData={mapData}
                   onClearMap={handleClearMap}
-                  deliveryRequestSet={deliveryRequestSet}
+                  deliveryRequestSet={visibleDeliveryRequestSet}
                   onDeliveryRequestSetUpdated={handleDeliveryRequestSetUpdated}
                   tourData={tourData}
                   selectedCourierId={selectedCourierId}
