@@ -18,5 +18,4 @@ public class Demand {
     private int pickupDurationSec;    // dureePickupSec : int
     private int deliveryDurationSec;  // dureeDeliverySec : int
     private String courierId;         // idCourier : FK→Courier (nullable)
-    // Note: Les couleurs sont gérées uniquement dans le frontend
 }
