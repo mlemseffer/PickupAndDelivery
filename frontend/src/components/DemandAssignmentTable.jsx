@@ -73,7 +73,7 @@ export default function DemandAssignmentTable({
                       </button>
                     )}
                     <button
-                      onClick={() => onRemove && onRemove(demand)}
+                      onClick={() => onRemove && onRemove(demand?.id ?? demand)}
                       disabled={isBusy}
                       className="flex items-center gap-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-3 py-2 rounded-lg text-sm font-semibold transition-colors"
                     >

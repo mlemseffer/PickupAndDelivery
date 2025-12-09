@@ -424,7 +424,7 @@ export default function PickupDeliveryUI() {
 
       if (nextRequestSet?.demands?.length) {
         if (hadTourData) {
-          await recalculateToursSilent();
+        await recalculateToursSilent();
         }
       } else {
         setIsEditingAssignments(false);
