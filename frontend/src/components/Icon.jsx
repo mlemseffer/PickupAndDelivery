@@ -38,6 +38,8 @@ const iconMap = {
   warning: faTriangleExclamation,
   success: faCircleCheck,
   error: faCircleXmark,
+  na: faCircleXmark,
+  'x-circle': faCircleXmark,
   info: faCircleInfo,
   rocket: faRocket,
   box: faBox,

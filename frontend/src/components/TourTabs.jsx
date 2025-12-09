@@ -263,7 +263,7 @@ export default function TourTabs({
             }`}
           >
             <span className="inline-flex items-center gap-2">
-              <Icon name="x-circle" className="text-blue-400" />
+              <Icon name="na" className="text-blue-400" />
               N/A
             </span>
           </button>
