@@ -429,8 +429,21 @@ export default function PickupDeliveryUI() {
     if (!deliveryRequestSet) return null;
     if (selectedCourierId === null) return deliveryRequestSet;
 
-    const targetId = String(selectedCourierId);
     const assignments = effectiveAssignments || {};
+
+    if (selectedCourierId === 'unassigned') {
+      const filteredDemands = (deliveryRequestSet.demands || []).filter((demand) => {
+        const assignedCourierId = assignments[demand.id];
+        return assignedCourierId === null || assignedCourierId === undefined;
+      });
+
+      return {
+        ...deliveryRequestSet,
+        demands: filteredDemands,
+      };
+    }
+
+    const targetId = String(selectedCourierId);
 
     const filteredDemands = (deliveryRequestSet.demands || []).filter((demand) => {
       const assignedCourierId = assignments[demand.id];
@@ -574,11 +587,14 @@ export default function PickupDeliveryUI() {
 
     try {
       setIsCalculatingTour(true);
+      const currentAssignment = demandAssignments?.[demandId];
+      const contextCourier =
+        selectedCourierId === 'unassigned' ? null : selectedCourierId;
       await apiService.updateCourierAssignment({
         demandId,
         newCourierId: targetCourierId !== null && targetCourierId !== undefined ? String(targetCourierId) : null,
-        oldCourierId: (demandAssignments?.[demandId] ?? selectedCourierId ?? null) !== null
-          ? String(demandAssignments?.[demandId] ?? selectedCourierId)
+        oldCourierId: (currentAssignment ?? contextCourier ?? null) !== null
+          ? String(currentAssignment ?? contextCourier)
           : null,
         deliveryIndex: null,
       });
@@ -1267,7 +1283,7 @@ export default function PickupDeliveryUI() {
                         <TourTabs
                           tours={tourData}
                           deliveryRequestSet={filteredDeliveryRequestSet}
-                          onTourSelect={(tour) => setSelectedCourierId(tour?.courierId || null)}
+                            onTourSelect={(tour) => setSelectedCourierId(tour?.courierId ?? null)}
                           demandAssignments={effectiveAssignments}
                           unassignedDemands={effectiveUnassignedDemands}
                           onReassignDemand={handleReassignDemand}
