@@ -215,6 +215,34 @@ export default function PickupDeliveryUI() {
     setAlertConfig(null);
   };
 
+  /**
+   * Synchronise le frontend avec l'état réel des demandes côté backend.
+   * Évite les divergences (ex: anciennes demandes encore présentes côté serveur).
+   */
+  const syncDeliveryRequests = async () => {
+    try {
+      const resp = await apiService.getCurrentRequestSet();
+      const requestSet = resp?.data || resp;
+      if (!requestSet || (!requestSet.demands && !requestSet.warehouse)) {
+        // Rien côté backend: on nettoie localement
+        setDeliveryRequestSet(null);
+        return;
+      }
+
+      const demandsWithColors = (requestSet.demands || []).map((demand, index) => ({
+        ...demand,
+        color: getColorFromPalette(index),
+      }));
+
+      setDeliveryRequestSet({
+        ...requestSet,
+        demands: demandsWithColors,
+      });
+    } catch (err) {
+      console.warn('[PickupDeliveryUI] Impossible de synchroniser les demandes backend:', err?.message || err);
+    }
+  };
+
   // Gestion du changement d'onglet
   const handleTabChange = (tab) => {
     setActiveTab(tab);
@@ -234,6 +262,8 @@ export default function PickupDeliveryUI() {
     setShowMapUpload(false);
     setShowMessage(false);
     setActiveTab('map');
+    // Lorsqu'on charge une carte, on synchronise aussi les demandes côté backend
+    syncDeliveryRequests();
   };
 
   // Gestion de l'annulation du chargement
@@ -248,6 +278,7 @@ export default function PickupDeliveryUI() {
   const handleClearMap = async () => {
     try {
       await apiService.clearMap();
+      await apiService.clearDeliveryRequests();
       setMapData(null);
       setDeliveryRequestSet(null);
       setTourData(null);
@@ -657,20 +688,8 @@ export default function PickupDeliveryUI() {
         deliveryDurationSec: demand.deliveryDurationSec
       };
 
-      // Ajouter à la liste existante
-      const updatedDemands = [...(deliveryRequestSet?.demands || []), newDemand];
-      const demandsWithColors = updatedDemands.map((d, index) => ({
-        ...d,
-        color: getColorFromPalette(index)
-      }));
-
-      const updatedRequestSet = {
-        warehouse: deliveryRequestSet?.warehouse || null,
-        demands: demandsWithColors
-      };
-
-      // Appeler le callback pour mettre à jour le state et recalculer si besoin
-      handleDeliveryRequestSetUpdated(updatedRequestSet);
+      // Re-synchroniser entièrement avec le backend pour éviter les divergences
+      await syncDeliveryRequests();
     } catch (err) {
       showAlert('error', 'Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
