@@ -1,6 +1,7 @@
 import React from 'react';
 import { Polyline, Popup, CircleMarker } from 'react-leaflet';
 import L from 'leaflet';
+import Icon from './Icon';
 
 /**
  * Composant pour afficher la tournée calculée sur la carte
@@ -65,7 +66,10 @@ export default function TourPolylines({ tourData, nodesById }) {
           >
             <Popup>
               <div>
-                <strong>🚴 Trajet {trajetIndex + 1}</strong><br />
+                <strong className="inline-flex items-center gap-2">
+                  <Icon name="bike" />
+                  Trajet {trajetIndex + 1}
+                </strong><br />
                 <strong>Distance:</strong> {trajet.longueurTotale.toFixed(2)} m<br />
                 <strong>Segments:</strong> {trajet.listeSegment.length}
               </div>
@@ -95,7 +99,10 @@ export default function TourPolylines({ tourData, nodesById }) {
           >
             <Popup>
               <div>
-                <strong>🎯 Étape {order}</strong><br />
+                <strong className="inline-flex items-center gap-2">
+                  <Icon name="bullseye" />
+                  Étape {order}
+                </strong><br />
                 <strong>Nœud:</strong> {nodeId}
               </div>
             </Popup>
@@ -133,7 +140,10 @@ export default function TourPolylines({ tourData, nodesById }) {
           >
             <Popup>
               <div>
-                <strong>🏭 Entrepôt</strong><br />
+                <strong className="inline-flex items-center gap-2">
+                  <Icon name="warehouse" />
+                  Entrepôt
+                </strong><br />
                 <strong>Nœud:</strong> {warehouseNodeId}<br />
                 <em>Point de départ et d'arrivée</em>
               </div>

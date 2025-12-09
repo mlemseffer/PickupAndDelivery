@@ -10,8 +10,10 @@ import TourActions from './src/components/TourActions';
 import RestoreTourModal from './src/components/RestoreTourModal';
 import CourierCountSelector from './src/components/CourierCountSelector';
 import TourTabs from './src/components/TourTabs';
+import DemandAssignmentTable from './src/components/DemandAssignmentTable';
 import CustomAlert from './src/components/CustomAlert';
 import UnassignedDemands from './src/components/UnassignedDemands';
+import Icon from './src/components/Icon';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -65,6 +67,9 @@ function generateItineraryText(tourData) {
 
   return content;
 }
+
+const MAX_COURIERS = 10;
+const clampCourierCount = (count) => Math.max(1, Math.min(MAX_COURIERS, Number(count) || 1));
 
 /**
  * Convertit une couleur HSL en format hexadécimal
@@ -170,6 +175,7 @@ export default function PickupDeliveryUI() {
   const [showManualForm, setShowManualForm] = useState(false);
   const [showCourierModal, setShowCourierModal] = useState(false);
   const [showRestoreTourModal, setShowRestoreTourModal] = useState(false);
+  const [showDemandManager, setShowDemandManager] = useState(false);
   const [mapData, setMapData] = useState(null);
   const [deliveryRequestSet, setDeliveryRequestSet] = useState(null);
   const [courierCount, setCourierCount] = useState(1);
@@ -238,6 +244,7 @@ export default function PickupDeliveryUI() {
       setMapData(null);
       setDeliveryRequestSet(null);
       setTourData(null);
+      setShowDemandManager(false);
       setShowMapUpload(true);
     } catch (error) {
       console.error('Erreur lors de la suppression de la carte:', error);
@@ -248,62 +255,36 @@ export default function PickupDeliveryUI() {
   const handleDeliveryRequestSetUpdated = async (updatedSet) => {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
     
-    // Réassigner les couleurs dans le bon ordre après modification
-    if (updatedSet?.demands && updatedSet.demands.length > 0) {
-      const demandsWithColors = updatedSet.demands.map((demand, index) => ({
+    const demands = updatedSet?.demands || [];
+
+    if (demands.length > 0) {
+      // Réassigner les couleurs dans le bon ordre après modification
+      const demandsWithColors = demands.map((demand, index) => ({
         ...demand,
         color: getColorFromPalette(index)
       }));
-      
-      setDeliveryRequestSet({
-        ...updatedSet,
-        demands: demandsWithColors
-      });
 
-      // ✅ Recalculer automatiquement si une tournée était déjà calculée
+      const nextSet = { ...updatedSet, demands: demandsWithColors };
+      setDeliveryRequestSet(nextSet);
+
+      // Nettoyer les demandes non assignées supprimées
+      setUnassignedDemands((prev) =>
+        (prev || []).filter((d) => demandsWithColors.some((nd) => nd.id === d.id))
+      );
+
+      // Si une tournée était affichée, recalculer avec l'ensemble mis à jour
       if (tourData) {
-        console.log('🔄 Recalcul automatique de la tournée après modification des demandes...');
-        console.log('📊 Nombre de demandes après modification:', demandsWithColors.length);
-        setIsCalculatingTour(true);
-        
-        try {
-          const result = await apiService.calculateTour(courierCount);
-          console.log('📦 Résultat du recalcul:', result);
-          
-          if (result.success && result.data && result.data.length > 0) {
-            const tour = result.data[0];
-            console.log('✅ Tour recalculé:', tour);
-            console.log('📍 Stops dans le nouveau tour:', tour.stops?.length || 0);
-            
-            const newTourData = {
-              tour: tour.trajets || tour.segments || tour.path || [],
-              metrics: {
-                stopCount: tour.stops?.length || 0,
-                totalDistance: tour.totalDistance || 0,
-                segmentCount: (tour.trajets || tour.segments || tour.path || []).length
-              }
-            };
-            
-            console.log('📊 Nouveau tourData créé:', newTourData);
-            console.log('🛣️  Nombre de trajets:', newTourData.tour.length);
-            setTourData(newTourData);
-            console.log('✅ Tournée recalculée automatiquement avec', newTourData.tour.length, 'trajets');
-          } else {
-            console.warn('⚠️ Pas de données valides dans le résultat du recalcul');
-            setTourData(null);
-          }
-        } catch (error) {
-          console.error('❌ Erreur lors du recalcul automatique:', error);
-          setTourData(null);
-        } finally {
-          setIsCalculatingTour(false);
-        }
+        await recalculateToursSilent();
       }
     } else {
       // Si plus aucune demande, réinitialiser la tournée ET le deliveryRequestSet
-      console.log('⚠️ Aucune demande restante, réinitialisation de la tournée');
-      setDeliveryRequestSet(updatedSet || null);
+      console.log('[PickupDeliveryUI] Aucune demande restante, réinitialisation de la tournée');
+      setDeliveryRequestSet(null);
       setTourData(null);
+      setUnassignedDemands([]);
+      setIsEditingAssignments(false);
+      setStagedAssignments(null);
+      setShowDemandManager(false);
     }
   };
 
@@ -351,7 +332,7 @@ export default function PickupDeliveryUI() {
 
   const effectiveAssignments = isEditingAssignments && stagedAssignments ? stagedAssignments : demandAssignments;
 
-  // Plus besoin de filtrer les demandes puisqu'on ne les supprime plus
+  // Les suppressions étant appliquées au backend, on garde l'ensemble tel quel
   const filteredDeliveryRequestSet = deliveryRequestSet;
 
   // Calculer les demandes non assignées effectives en tenant compte des modifications en cours
@@ -379,11 +360,11 @@ export default function PickupDeliveryUI() {
         setTourData(tours);
         setUnassignedDemands(unassigned);
       } else {
-        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
+        showAlert('error', 'Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
-      console.error('💥 Erreur lors du recalcul de la tournée:', error);
-      showAlert('error', '❌ Erreur', error.message);
+      console.error('[PickupDeliveryUI] Erreur lors du recalcul de la tournée:', error);
+      showAlert('error', 'Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -391,18 +372,76 @@ export default function PickupDeliveryUI() {
 
   const handleRemoveDemandById = async (demandId) => {
     if (!demandId) return;
-    if (isEditingAssignments) {
-      // En mode édition : désassigner la demande (la mettre à null)
-      setStagedAssignments((prev) => {
-        const base = prev || effectiveAssignments || {};
-        return { ...base, [demandId]: null };
-      });
+    const hadTourData = Boolean(tourData);
+
+    if (!deliveryRequestSet?.demands || deliveryRequestSet.demands.length === 0) {
+      showAlert('warning', 'Attention', 'Aucune demande disponible à supprimer.');
       return;
     }
 
-    // Hors mode édition : impossible de supprimer directement
-    // L'utilisateur doit passer par le mode édition
-    showAlert('warning', '⚠️ Attention', 'Pour retirer une demande de la tournée, utilisez le bouton "Modifier Tournée"');
+    const confirmed = window.confirm(
+      'Êtes-vous sûr de vouloir supprimer définitivement cette demande ?\n' +
+      'Elle sera retirée de la liste, de la carte et des futures sauvegardes.'
+    );
+    if (!confirmed) return;
+
+    setIsCalculatingTour(true);
+
+    try {
+      const response = await apiService.removeDemand(demandId);
+
+      if (!response?.success) {
+        throw new Error(response?.message || 'Erreur lors de la suppression de la demande');
+      }
+
+      const backendSet = response.data;
+
+      // Normaliser les demandes depuis le backend, sinon fallback local
+      const normalizedDemands = backendSet?.demands && Array.isArray(backendSet.demands)
+        ? backendSet.demands
+        : (deliveryRequestSet?.demands || []).filter((d) => d.id !== demandId);
+
+      let nextRequestSet = null;
+      if (normalizedDemands.length > 0) {
+        const demandsWithColors = normalizedDemands.map((demand, index) => ({
+          ...demand,
+          color: getColorFromPalette(index),
+        }));
+
+        const baseSet = backendSet ? { ...backendSet } : { ...(deliveryRequestSet || {}) };
+        nextRequestSet = { ...baseSet, demands: demandsWithColors };
+      }
+
+      setDeliveryRequestSet(nextRequestSet);
+      setUnassignedDemands((prev) => (prev || []).filter((d) => d.id !== demandId));
+      if (!nextRequestSet?.demands?.length) {
+        setShowDemandManager(false);
+      }
+      setStagedAssignments((prev) => {
+        if (!prev) return prev;
+        const { [demandId]: _removed, ...rest } = prev;
+        return rest;
+      });
+
+      // Nettoyer l'affichage courant pour éviter de montrer une tournée obsolète
+      setTourData(null);
+
+      if (nextRequestSet?.demands?.length) {
+        if (hadTourData) {
+        await recalculateToursSilent();
+        }
+      } else {
+        setIsEditingAssignments(false);
+        setUnassignedDemands([]);
+      }
+
+      showAlert('success', 'Demande supprimée', 'La demande a été retirée de la tournée.');
+    } catch (err) {
+      console.error('Erreur lors de la suppression de la demande:', err);
+      showAlert('error', 'Erreur', err.message || 'Erreur lors de la suppression');
+    } finally {
+      setIsCalculatingTour(false);
+    }
   };
 
   const handleReassignDemand = async (demandId, targetCourierId) => {
@@ -427,7 +466,7 @@ export default function PickupDeliveryUI() {
       });
       await recalculateToursSilent();
     } catch (err) {
-      showAlert('error', '❌ Erreur', err.message);
+      showAlert('error', 'Erreur', err.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -447,6 +486,7 @@ export default function PickupDeliveryUI() {
     });
     setTourData(null); // Réinitialiser la tournée si on charge de nouvelles demandes
     setShowDeliveryUpload(false);
+    setShowDemandManager(false);
 };
 
 
@@ -458,17 +498,17 @@ export default function PickupDeliveryUI() {
   // Gestion du calcul de la tournée
   const handleCalculateTour = async () => {
     if (!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0) {
-      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger des demandes de livraison');
+      showAlert('warning', 'Attention', 'Veuillez d\'abord charger des demandes de livraison');
       return;
     }
 
     setIsCalculatingTour(true);
     
     try {
-      console.log(`🚀 Calcul de la tournée pour ${courierCount} livreur(s)...`);
+      console.log(`[PickupDeliveryUI] Calcul de la tournée pour ${courierCount} livreur(s)...`);
       const result = await apiService.calculateTour(courierCount);
       
-      console.log('📦 Résultat complet:', result);
+      console.log('[PickupDeliveryUI] Résultat complet:', result);
       
       if (result.success) {
         // Nouvelle structure de réponse avec TourCalculationResponse
@@ -478,23 +518,23 @@ export default function PickupDeliveryUI() {
         
         // Cas où aucune tournée n'a été créée (toutes les demandes rejetées)
         if (tours.length === 0) {
-          alert('⚠️ ATTENTION: Aucune tournée n\'a pu être calculée !\n\n' +
+          alert('ATTENTION: Aucune tournée n\'a pu être calculée !\n\n' +
                 `Avec ${courierCount} coursier(s), la contrainte des 4h est trop restrictive.\n` +
                 'Toutes les demandes ont été rejetées.\n\n' +
-                '💡 Solution: Augmentez le nombre de coursiers.');
+                'Suggestion: augmentez le nombre de coursiers.');
           return;
         }
         
         // Stocker les tournées et demandes non assignées
-        console.log('✅ Tournées calculées avec succès:', tours);
-        console.log('⚠️  Demandes non assignées:', unassignedDemands);
+        console.log('[PickupDeliveryUI] Tournées calculées avec succès:', tours);
+        console.log('[PickupDeliveryUI] Demandes non assignées:', unassignedDemands);
         
-        // 🔍 DEBUG: Vérifier les IDs des coursiers
-        console.log('🔍 CourierIds reçus:', tours.map(t => t.courierId));
+        // DEBUG: Vérifier les IDs des coursiers
+        console.log('[PickupDeliveryUI] CourierIds reçus:', tours.map(t => t.courierId));
         const courierIds = tours.map(t => t.courierId);
         const uniqueIds = new Set(courierIds);
         if (courierIds.length !== uniqueIds.size) {
-          console.warn('⚠️ ATTENTION: Doublons de courierIds détectés!', courierIds);
+          console.warn('[PickupDeliveryUI] ATTENTION: Doublons de courierIds détectés!', courierIds);
         }
         
         setTourData(tours); // Array de tours
@@ -516,19 +556,19 @@ export default function PickupDeliveryUI() {
         );
 
         alert(
-          `✅ Tournée calculée avec succès !\n\n` +
-          `👥 Coursiers: ${tours.length}\n` +
-          `📍 Stops: ${totalStops}\n` +
-          `📏 Distance: ${Number(totalDistance || 0).toFixed(2)} m\n` +
-          `🛣️  Segments: ${totalSegments}`
+          `Tournée calculée avec succès !\n\n` +
+          `Coursiers: ${tours.length}\n` +
+          `Stops: ${totalStops}\n` +
+          `Distance: ${Number(totalDistance || 0).toFixed(2)} m\n` +
+          `Segments: ${totalSegments}`
         );
       } else {
-        console.error('❌ Réponse invalide:', result);
-        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
+        console.error('Réponse invalide:', result);
+        showAlert('error', 'Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
-      console.error('💥 Erreur lors du calcul de la tournée:', error);
-      showAlert('error', '❌ Erreur', error.message);
+      console.error('[PickupDeliveryUI] Erreur lors du calcul de la tournée:', error);
+      showAlert('error', 'Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -542,7 +582,7 @@ export default function PickupDeliveryUI() {
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
-      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger une carte');
+      showAlert('warning', 'Attention', 'Veuillez d\'abord charger une carte');
       return;
     }
     setShowManualForm(true);
@@ -585,7 +625,7 @@ export default function PickupDeliveryUI() {
       // Appeler le callback pour mettre à jour le state et recalculer si besoin
       handleDeliveryRequestSetUpdated(updatedRequestSet);
     } catch (err) {
-      showAlert('error', '❌ Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
+      showAlert('error', 'Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
     setSelectedNodeId(null);
@@ -656,7 +696,7 @@ export default function PickupDeliveryUI() {
     try {
       await apiService.clearDeliveryRequests();
     } catch (e) {
-      console.warn('⚠️ Impossible de vider les demandes avant restauration:', e.message);
+      console.warn('[PickupDeliveryUI] Impossible de vider les demandes avant restauration:', e.message);
     }
     setDeliveryRequestSet(null);
     setTourData(null);
@@ -675,7 +715,7 @@ export default function PickupDeliveryUI() {
     }
 
     if (skippedDemands > 0) {
-      console.warn(`⚠️ ${skippedDemands} demande(s) ignorée(s) car nœuds absents de la carte`);
+      console.warn(`[PickupDeliveryUI] ${skippedDemands} demande(s) ignorée(s) car nœuds absents de la carte`);
       alert(
         `${skippedDemands} demande(s) ignorée(s) car leurs nœuds ne sont pas présents dans la carte chargée.`
       );
@@ -707,7 +747,7 @@ export default function PickupDeliveryUI() {
     };
 
     try {
-      console.log('🔄 Restauration de tournée avec', demandsFromFile.length, 'demandes');
+      console.log('[PickupDeliveryUI] Restauration de tournée avec', demandsFromFile.length, 'demandes');
 
       // Ajouter les demandes au backend et récupérer les IDs générés
       const addedDemandsWithIds = [];
@@ -734,11 +774,11 @@ export default function PickupDeliveryUI() {
         });
       }
 
-      console.log('✅ Toutes les demandes ont été ajoutées au backend');
+      console.log('[PickupDeliveryUI] Toutes les demandes ont été ajoutées au backend');
 
       let warehouseNodeId = deriveWarehouseNode();
       if (warehouseNodeId && !nodeSet.has(String(warehouseNodeId))) {
-        console.warn(`⚠️ Entrepôt ${warehouseNodeId} introuvable dans la carte, utilisation du premier nœud de la carte`);
+        console.warn(`[PickupDeliveryUI] Entrepôt ${warehouseNodeId} introuvable dans la carte, utilisation du premier nœud de la carte`);
         warehouseNodeId = mapData?.nodes?.[0]?.id || null;
       }
       const warehouse = warehouseNodeId
@@ -756,7 +796,7 @@ export default function PickupDeliveryUI() {
             departureTime: restorePayload?.warehouse?.departureTime || '08:00',
           });
         } catch (e) {
-          console.warn('⚠️ Impossible de définir le warehouse côté backend:', e.message);
+          console.warn('[PickupDeliveryUI] Impossible de définir le warehouse côté backend:', e.message);
         }
       }
 
@@ -770,7 +810,7 @@ export default function PickupDeliveryUI() {
         demands: demandsWithColors,
       });
 
-      console.log('✅ DeliveryRequestSet défini avec IDs du backend');
+      console.log('[PickupDeliveryUI] DeliveryRequestSet défini avec IDs du backend');
 
       // Construire les assignments à partir des tournées fournies (respecter les réassignations)
       const deriveAssignmentsFromTours = (tours, demandsList, idMap) => {
@@ -817,7 +857,7 @@ export default function PickupDeliveryUI() {
         }));
       };
 
-      // 🔄 Recalculer la tournée en respectant les assignments restaurés
+      // Recalculer la tournée en respectant les assignments restaurés
       setIsCalculatingTour(true);
       let recalculatedTours = null;
       let recalculatedUnassigned = [];
@@ -826,7 +866,8 @@ export default function PickupDeliveryUI() {
         || new Set(toursFromFile.map((t) => t.courierId)).size
         || toursFromFile.length
         || courierCount;
-      setCourierCount(couriersToUse);
+      const boundedCouriers = clampCourierCount(couriersToUse);
+      setCourierCount(boundedCouriers);
 
       try {
         const assignments = deriveAssignmentsFromTours(toursFromFile, addedDemandsWithIds, demandIdMap);
@@ -839,18 +880,18 @@ export default function PickupDeliveryUI() {
         if (result?.success && result.data && Array.isArray(result.data.tours)) {
           recalculatedTours = result.data.tours || [];
           recalculatedUnassigned = result.data.unassignedDemands || [];
-          console.log('✅ Tournée recalculée avec assignments restaurés');
+          console.log('[PickupDeliveryUI] Tournée recalculée avec assignments restaurés');
         } else {
           // Fallback: recalcul standard si les assignments n'ont pas été pris en compte
-          const fallback = await apiService.calculateTour(couriersToUse);
+          const fallback = await apiService.calculateTour(boundedCouriers);
           if (fallback.success && fallback.data && Array.isArray(fallback.data.tours)) {
             recalculatedTours = fallback.data.tours || [];
             recalculatedUnassigned = fallback.data.unassignedDemands || [];
-            console.log('ℹ️ Fallback calculateTour utilisé après restauration');
+            console.log('[PickupDeliveryUI] Fallback calculateTour utilisé après restauration');
           }
         }
       } catch (error) {
-        console.error('❌ Erreur lors du recalcul avec assignments:', error);
+        console.error('[PickupDeliveryUI] Erreur lors du recalcul avec assignments:', error);
       } finally {
         setIsCalculatingTour(false);
       }
@@ -878,12 +919,12 @@ export default function PickupDeliveryUI() {
         : restorePayload?.metrics;
 
       alert(`Tournée restaurée avec succès !\n\n` +
-            `📍 Stops: ${metrics?.stopCount || 0}\n` +
-            `📏 Distance: ${Number(metrics?.totalDistance || 0).toFixed(2)} m\n` +
-            `🛣️  Segments: ${metrics?.segmentCount || 0}\n` +
-            `📦 Demandes: ${addedDemandsWithIds.length}`);
+            `Stops: ${metrics?.stopCount || 0}\n` +
+            `Distance: ${Number(metrics?.totalDistance || 0).toFixed(2)} m\n` +
+            `Segments: ${metrics?.segmentCount || 0}\n` +
+            `Demandes: ${addedDemandsWithIds.length}`);
     } catch (error) {
-      console.error('❌ Erreur lors de la restauration de la tournée:', error);
+      console.error('[PickupDeliveryUI] Erreur lors de la restauration de la tournée:', error);
       alert(`Erreur lors de la restauration : ${error.message}`);
     }
   };
@@ -963,7 +1004,7 @@ export default function PickupDeliveryUI() {
           isOpen={showCourierModal}
           onClose={() => setShowCourierModal(false)}
           onConfirm={(count) => {
-            setCourierCount(count);
+            setCourierCount(clampCourierCount(count));
             console.log(`Nombre de livreurs défini à: ${count}`);
           }}
           currentCount={courierCount}
@@ -971,11 +1012,11 @@ export default function PickupDeliveryUI() {
 
         {/* Map View */}
         {mapData && activeTab === 'map' && !showDeliveryUpload && (
-          <div className="flex-1 flex flex-col overflow-hidden p-4 gap-4 min-h-0">
+          <div className="flex-1 flex flex-col overflow-hidden p-4 gap-4 min-h-0 min-w-0">
             {/* Ligne principale : Carte + Panneau d'informations */}
             <div className="flex-1 flex gap-4 min-h-0">
               {/* Carte sur la gauche - plus grande */}
-              <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
+              <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden min-w-0">
                 <MapViewer 
                   mapData={mapData}
                   onClearMap={handleClearMap}
@@ -990,9 +1031,9 @@ export default function PickupDeliveryUI() {
               </div>
               
               {/* Panneau droit avec informations et boutons */}
-              <div className={`flex-1 flex flex-col gap-4 min-h-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
+              <div className={`flex-1 flex flex-col gap-4 min-h-0 min-w-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
                 {/* Tableau de tournée ou onglets multi-tours */}
-                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
                   <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
                     {tourData ? (Array.isArray(tourData) && tourData.length > 1 ? 'Tournées Multi-Coursiers' : 'Tournée Calculée') : 'Informations'}
                   </h3>
@@ -1050,7 +1091,7 @@ export default function PickupDeliveryUI() {
                                 throw new Error(result?.message || 'Réponse invalide du serveur');
                               }
                             } catch (err) {
-                              showAlert('error', '❌ Erreur', err.message);
+                              showAlert('error', 'Erreur', err.message);
                             } finally {
                               setIsCalculatingTour(false);
                               setIsEditingAssignments(false);
@@ -1085,7 +1126,7 @@ export default function PickupDeliveryUI() {
                       {deliveryRequestSet && deliveryRequestSet.demands && deliveryRequestSet.demands.length > 0 && (
                         <CourierCountSelector
                           value={courierCount}
-                          onChange={setCourierCount}
+                          onChange={(value) => setCourierCount(clampCourierCount(value))}
                           disabled={isCalculatingTour}
                         />
                       )}
@@ -1113,6 +1154,47 @@ export default function PickupDeliveryUI() {
                           {isCalculatingTour ? 'Calcul en cours...' : 'Calculer tournée'}
                         </button>
                       </div>
+
+                      {/* Gestion des demandes avant calcul */}
+                      <div className="flex flex-col gap-3">
+                        <button
+                          onClick={() => setShowDemandManager((prev) => !prev)}
+                          disabled={!deliveryRequestSet?.demands?.length || isCalculatingTour}
+                          className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg"
+                          title="Supprimer ou gérer les demandes avant de calculer la tournée"
+                        >
+                          <span className="inline-flex items-center gap-2">
+                            <Icon name="trash" className="text-white" />
+                            Modifier demandes
+                          </span>
+                        </button>
+
+                        {showDemandManager && (
+                          <div className="bg-gray-800 border border-gray-700 rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between gap-3">
+                              <p className="text-sm font-semibold text-white">
+                                Demandes chargées ({deliveryRequestSet?.demands?.length || 0})
+                              </p>
+                              <button
+                                onClick={() => setShowDemandManager(false)}
+                                className="text-xs px-3 py-1.5 rounded-md bg-gray-700 hover:bg-gray-600 text-white font-semibold"
+                              >
+                                Fermer
+                              </button>
+                            </div>
+                            <DemandAssignmentTable
+                              demands={deliveryRequestSet?.demands || []}
+                              assignments={demandAssignments}
+                              courierOptions={[]}
+                              onRemove={handleRemoveDemandById}
+                              hideReassign
+                              listMaxHeight="max-h-80"
+                              isBusy={isCalculatingTour}
+                              emptyMessage="Aucune demande chargée"
+                            />
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ) : (
                     // Boutons après calcul de tournée (4 boutons sur 2 lignes)
@@ -1125,7 +1207,10 @@ export default function PickupDeliveryUI() {
                                    flex items-center justify-center gap-2"
                           title="Ajouter une nouvelle demande de livraison"
                         >
-                          ➕ Ajouter Pickup&Delivery
+                          <span className="inline-flex items-center gap-2">
+                            <Icon name="plus" className="text-white" />
+                            Ajouter Pickup&Delivery
+                          </span>
                         </button>
 
                         <button
@@ -1141,7 +1226,10 @@ export default function PickupDeliveryUI() {
                                    flex items-center justify-center gap-2"
                           title="Modifier la tournée calculée"
                         >
-                          ✏️ Modifier Tournée
+                          <span className="inline-flex items-center gap-2">
+                            <Icon name="pen" className="text-white" />
+                            Modifier Tournée
+                          </span>
                         </button>
                       </div>
                       
@@ -1176,7 +1264,10 @@ export default function PickupDeliveryUI() {
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
             <h2 className="text-2xl font-bold mb-6">
-              📋 Demandes non traitées
+              <span className="inline-flex items-center gap-2">
+                <Icon name="clipboard" className="text-white" />
+                Demandes non traitées
+              </span>
             </h2>
             <UnassignedDemands 
               unassignedDemands={unassignedDemands}

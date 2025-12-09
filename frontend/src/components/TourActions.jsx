@@ -285,7 +285,7 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
   const performJsonSave = (filename) => {
     if (!filename) return;
     
-    console.log('💾 Sauvegarde de la tournée:', tourData);
+    console.log('[TourActions] Sauvegarde de la tournée:', tourData);
 
     // Normaliser le format (mono ou multi-coursier) pour sauvegarder tout ce qui est utile à la restauration
     const normalizeToursForSave = () => {
@@ -306,7 +306,7 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
         return [];
       })();
 
-      // 👉 Single source of truth: courierId comes from the tour itself (fallback = index)
+      // Single source of truth: courierId comes from the tour itself (fallback = index)
       return baseTours.map((tour, idx) => {
         const normalizedCourierId = Number.isFinite(Number(tour?.courierId))
           ? Number(tour.courierId)
@@ -365,7 +365,7 @@ export default function TourActions({ tourData, onSaveItinerary, onSaveTour, del
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
 
-    console.log('✅ Tournée sauvegardée avec', toursToSave.length, 'tournée(s)');
+    console.log('[TourActions] Tournée sauvegardée avec', toursToSave.length, 'tournée(s)');
 
     setShowJsonModal(false);
     if (onSaveTour) onSaveTour();

@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon';
 
 /**
  * Composant pour afficher les demandes qui n'ont pas pu être assignées
@@ -16,7 +17,10 @@ const UnassignedDemands = ({ unassignedDemands, deliveryRequestSet, courierCount
           </div>
           <div>
             <h3 className="text-lg font-semibold text-green-800">
-              ✅ Toutes les demandes ont été assignées !
+              <span className="inline-flex items-center gap-2">
+                <Icon name="success" className="text-green-700" />
+                Toutes les demandes ont été assignées !
+              </span>
             </h3>
             <p className="text-sm text-green-600 mt-1">
               Les {courierCount} coursier{courierCount > 1 ? 's' : ''} {courierCount > 1 ? 'ont' : 'a'} pu traiter toutes les demandes dans la contrainte des 4 heures.
@@ -43,14 +47,20 @@ const UnassignedDemands = ({ unassignedDemands, deliveryRequestSet, courierCount
           </div>
           <div className="ml-3 flex-1">
             <h3 className="text-lg font-semibold text-orange-800">
-              ⚠️ Demandes non traitées : {unassignedDemands.length} sur {totalDemands}
+              <span className="inline-flex items-center gap-2">
+                <Icon name="warning" className="text-orange-500" />
+                Demandes non traitées : {unassignedDemands.length} sur {totalDemands}
+              </span>
             </h3>
             <div className="mt-2 text-sm text-orange-700">
               <p className="mb-2">
                 La contrainte des <strong>4 heures par coursier</strong> a empêché l'assignation de certaines demandes.
               </p>
               <p className="font-medium">
-                📊 Taux d'assignation : {assignmentRate}% ({assignedDemands}/{totalDemands} demandes)
+                <span className="inline-flex items-center gap-2">
+                  <Icon name="chart" className="text-orange-500" />
+                  Taux d'assignation : {assignmentRate}% ({assignedDemands}/{totalDemands} demandes)
+                </span>
               </p>
             </div>
           </div>
@@ -64,7 +74,10 @@ const UnassignedDemands = ({ unassignedDemands, deliveryRequestSet, courierCount
             <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
           </svg>
           <div>
-            <h4 className="font-semibold text-blue-800 mb-1">💡 Solution recommandée</h4>
+            <h4 className="font-semibold text-blue-800 mb-1 flex items-center gap-2">
+              <Icon name="lightbulb" className="text-blue-600" />
+              Solution recommandée
+            </h4>
             <p className="text-sm text-blue-700">
               Augmentez le nombre de coursiers à <strong className="text-blue-900">{courierCount + Math.ceil(unassignedDemands.length / 3)}</strong> ou plus 
               pour traiter toutes les demandes dans la contrainte des 4 heures.
@@ -77,7 +90,10 @@ const UnassignedDemands = ({ unassignedDemands, deliveryRequestSet, courierCount
       <div className="bg-white border border-gray-200 rounded-lg overflow-hidden">
         <div className="px-4 py-3 bg-gray-50 border-b border-gray-200">
           <h4 className="font-semibold text-gray-800">
-            📋 Liste des demandes non assignées ({unassignedDemands.length})
+            <span className="inline-flex items-center gap-2">
+              <Icon name="clipboard" className="text-gray-600" />
+              Liste des demandes non assignées ({unassignedDemands.length})
+            </span>
           </h4>
         </div>
         
@@ -89,13 +105,22 @@ const UnassignedDemands = ({ unassignedDemands, deliveryRequestSet, courierCount
                   ID Demande
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  📍 Pickup
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="location" className="text-gray-600" />
+                    Pickup
+                  </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  📦 Delivery
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="box" className="text-gray-600" />
+                    Delivery
+                  </span>
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  ⏱️ Durées
+                  <span className="inline-flex items-center gap-1">
+                    <Icon name="timer" className="text-gray-600" />
+                    Durées
+                  </span>
                 </th>
               </tr>
             </thead>
@@ -128,11 +153,17 @@ const UnassignedDemands = ({ unassignedDemands, deliveryRequestSet, courierCount
                   <td className="px-4 py-3 whitespace-nowrap">
                     <div className="text-sm text-gray-600">
                       <div className="flex items-center gap-1">
-                        <span className="text-xs">⏱️ Pickup:</span>
+                        <span className="text-xs inline-flex items-center gap-1">
+                          <Icon name="timer" className="text-gray-500" />
+                          Pickup:
+                        </span>
                         <span className="font-medium">{demand.pickupDuration}s</span>
                       </div>
                       <div className="flex items-center gap-1 mt-1">
-                        <span className="text-xs">⏱️ Delivery:</span>
+                        <span className="text-xs inline-flex items-center gap-1">
+                          <Icon name="timer" className="text-gray-500" />
+                          Delivery:
+                        </span>
                         <span className="font-medium">{demand.deliveryDuration}s</span>
                       </div>
                     </div>

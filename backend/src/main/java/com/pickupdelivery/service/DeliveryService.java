@@ -173,6 +173,9 @@ public class DeliveryService {
         throw new IllegalStateException("Livraison introuvable : " + deliveryId);
     }
 
+    // Garder currentRequests synchronisé avec currentRequestSet
+    currentRequests.removeIf(r -> deliveryId.equals(r.getId()));
+
     // Note: Les couleurs sont gérées uniquement dans le frontend
     // Le frontend réattribuera automatiquement les couleurs dans le bon ordre
 

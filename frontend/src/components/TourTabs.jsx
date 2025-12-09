@@ -6,6 +6,9 @@ import ReassignModal from './ReassignModal';
 import AssignDemandModal from './AssignDemandModal';
 import TourStatistics from './TourStatistics';
 import TourTable from './TourTable';
+import Icon from './Icon';
+
+const MAX_COURIERS = 10;
 
 /**
  * Composant pour naviguer entre les différents coursiers et la vue globale
@@ -90,6 +93,13 @@ export default function TourTabs({
     [extraCouriers, baseCouriers]
   );
 
+  const currentCourierCount = useMemo(
+    () => new Set([...baseCouriers, ...filteredExtraCouriers]).size,
+    [baseCouriers, filteredExtraCouriers]
+  );
+
+  const isAtCourierLimit = currentCourierCount >= MAX_COURIERS;
+
   // Nettoyer les doublons quand les tournées changent (évite la duplication d'un coursier existant)
   useEffect(() => {
     if (filteredExtraCouriers.length !== extraCouriers.length) {
@@ -136,6 +146,8 @@ export default function TourTabs({
     allDemands.filter((d) => (demandAssignments?.[d.id] ?? null) === courierId);
 
   const handleAddCourier = () => {
+    if (isAtCourierLimit) return;
+
     const maxId = [...baseCouriers, ...extraCouriers].reduce(
       (m, v) => (Number(v) > m ? Number(v) : m),
       0
@@ -178,13 +190,14 @@ export default function TourTabs({
   };
 
   return (
-    <div id="assignments-panel" className="tour-tabs flex flex-col h-full">
+    <div id="assignments-panel" className="tour-tabs flex flex-col h-full min-w-0">
       {isEditing && (
         <div className="flex items-center justify-between gap-2 mb-3">
           <button
             onClick={handleAddCourier}
             className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1.5 rounded text-sm font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
-            disabled={isBusy}
+            disabled={isBusy || isAtCourierLimit}
+            title={isAtCourierLimit ? 'Limite atteinte: maximum 10 coursiers' : undefined}
           >
             Ajouter coursier
           </button>
@@ -206,7 +219,7 @@ export default function TourTabs({
         </div>
       )}
       {/* Onglets en haut */}
-      <div className="flex border-b border-gray-600 mb-4 overflow-x-auto flex-shrink-0">
+      <div className="flex border-b border-gray-600 mb-4 overflow-x-auto flex-shrink-0 min-w-0 gap-1">
         {/* Onglet Vue Globale */}
         <button
           onClick={() => handleTabClick(null)}
@@ -216,7 +229,10 @@ export default function TourTabs({
               : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
           }`}
         >
-          📊 Vue globale
+          <span className="inline-flex items-center gap-2">
+            <Icon name="chart" className="text-blue-400" />
+            Vue globale
+          </span>
         </button>
         
         {/* Onglets par coursier */}
@@ -236,7 +252,9 @@ export default function TourTabs({
             />
             Coursier {tour.courierId}
             {tour.totalDurationSec > 4 * 3600 && (
-              <span className="text-red-400 text-xs ml-1">⚠️</span>
+              <span className="text-red-400 text-xs ml-1">
+                <Icon name="warning" className="text-red-400" />
+              </span>
             )}
           </button>
         ))}

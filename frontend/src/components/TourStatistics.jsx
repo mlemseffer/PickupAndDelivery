@@ -28,24 +28,24 @@ export default function TourStatistics({ tour }) {
       <StatCard 
         label="Distance" 
         value={`${distanceKm} km`} 
-        icon="📏"
+        icon="ruler"
       />
       <StatCard 
         label="Durée" 
         value={`${durationHours} h`}
-        icon="⏱️"
+        icon="timer"
         warning={exceedsLimit}
         warningMessage={exceedsLimit ? "Dépasse la limite de 4h" : null}
       />
       <StatCard 
         label="Demandes" 
         value={requestCount} 
-        icon="📦"
+        icon="box"
       />
       <StatCard 
         label="Stops" 
         value={stopCount} 
-        icon="📍"
+        icon="location"
       />
     </div>
   );
