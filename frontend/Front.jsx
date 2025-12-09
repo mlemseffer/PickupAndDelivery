@@ -930,7 +930,7 @@ export default function PickupDeliveryUI() {
   };
 
   return (
-    <div className="h-screen bg-gray-800 text-white flex flex-col overflow-hidden">
+    <div className="h-screen bg-gray-900 text-slate-100 flex flex-col overflow-hidden font-sans antialiased">
       {/* Navigation Bar avec titre intégré */}
       <div className={isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}>
         <Navigation 
@@ -954,11 +954,11 @@ export default function PickupDeliveryUI() {
       <main className="flex-1 flex flex-col min-h-0 overflow-hidden">
         {/* Home View */}
         {activeTab === 'home' && !showMapUpload && (
-          <div className="p-8 mt-20">
-            <h2 className="text-3xl font-bold text-center">
-              Bienvenue sur votre plateforme de gestion de tournées de livraison à vélo !
+          <div className="p-8 mt-20 text-center space-y-3">
+            <h2 className="text-3xl md:text-4xl font-semibold tracking-tight leading-tight text-slate-50">
+              Bienvenue sur votre plateforme de gestion de tournées de livraison à vélo
             </h2>
-            <p className="text-center text-gray-300 mt-4">
+            <p className="text-lg text-slate-300 leading-relaxed">
               Cliquez sur l'icône de localisation pour charger une carte.
             </p>
           </div>
@@ -1034,7 +1034,7 @@ export default function PickupDeliveryUI() {
               <div className={`flex-1 flex flex-col gap-4 min-h-0 min-w-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
                 {/* Tableau de tournée ou onglets multi-tours */}
                 <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
-                  <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
+                  <h3 className="panel-title mb-4 flex-shrink-0 tracking-tight">
                     {tourData ? (Array.isArray(tourData) && tourData.length > 1 ? 'Tournées Multi-Coursiers' : 'Tournée Calculée') : 'Informations'}
                   </h3>
                   <div className="flex-1 overflow-auto min-h-0">

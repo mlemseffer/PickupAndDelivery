@@ -1,0 +1,82 @@
+:root {
+  --font-sans: 'Inter', 'SF Pro Display', 'Segoe UI', system-ui, -apple-system, sans-serif;
+  --bg-body: #0c111d;
+  --text-strong: #e8edf5;
+  --text-soft: #cdd5e5;
+  --text-muted: #94a3b8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  color: var(--text-soft);
+  background-color: var(--bg-body);
+  line-height: 1.6;
+  letter-spacing: 0.01em;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  font-feature-settings: "liga" 1, "calt" 1;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+  font-family: var(--font-sans);
+  color: var(--text-strong);
+  letter-spacing: -0.015em;
+  line-height: 1.25;
+}
+
+p,
+span,
+label,
+input,
+textarea,
+button {
+  font-family: var(--font-sans);
+}
+
+p {
+  color: var(--text-soft);
+}
+
+small,
+.text-muted {
+  color: var(--text-muted);
+}
+
+.helper-eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.section-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  color: var(--text-strong);
+}
+
+.panel-title {
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  color: var(--text-strong);
+}
+
+.lead {
+  font-size: 1.05rem;
+  color: var(--text-soft);
+  letter-spacing: 0.005em;
+}
+

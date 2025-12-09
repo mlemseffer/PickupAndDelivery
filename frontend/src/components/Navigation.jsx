@@ -7,14 +7,18 @@ import Icon from './Icon';
  */
 export default function Navigation({ activeTab, onTabChange, showMapMessage, hasMap, onLoadDeliveryRequests, onRestoreTour }) {
   return (
-    <nav className="bg-gray-700 border-b border-gray-600">
+    <nav className="bg-slate-900/80 border-b border-slate-800 backdrop-blur">
       <div className="flex items-center justify-between px-6">
         {/* Titre de l'application à gauche */}
         <div className="flex items-center gap-3">
-          <Icon name="bike" className="text-3xl text-white" />
+          <Icon name="bike" className="text-3xl text-slate-100" />
           <div>
-            <h1 className="text-xl font-bold">Pickup & Delivery</h1>
-            <p className="text-sm text-gray-300">Optimisation des tournées de livraison à vélo</p>
+            <h1 className="text-2xl font-semibold tracking-tight leading-tight text-slate-50">
+              Pickup & Delivery
+            </h1>
+            <p className="text-sm text-slate-300 leading-snug">
+              Optimisation des tournées de livraison à vélo
+            </p>
           </div>
         </div>
         
