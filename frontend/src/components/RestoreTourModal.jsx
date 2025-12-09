@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Upload } from 'lucide-react';
+import Icon from './Icon';
 
 /**
  * Composant modal pour restaurer une tournée depuis un fichier JSON
@@ -196,7 +197,10 @@ export default function RestoreTourModal({ isOpen, onClose, onRestore }) {
             </p>
             {fileName && (
               <p className="text-green-400 text-sm mt-3 font-semibold">
-                ✓ {fileName}
+                <span className="inline-flex items-center gap-2">
+                  <Icon name="check" className="text-green-400" />
+                  {fileName}
+                </span>
               </p>
             )}
           </div>
@@ -219,7 +223,10 @@ export default function RestoreTourModal({ isOpen, onClose, onRestore }) {
 
           {/* Info box */}
           <div className="bg-blue-900/30 border border-blue-500/50 rounded p-4 text-sm text-blue-200">
-            <p className="font-semibold mb-2">📋 Format attendu :</p>
+            <p className="font-semibold mb-2 flex items-center gap-2">
+              <Icon name="clipboard" className="text-blue-300" />
+              Format attendu :
+            </p>
             <p className="text-xs text-blue-300">
               Le fichier JSON doit contenir un objet avec une clé "tour" contenant un tableau de trajets avec segments.
             </p>

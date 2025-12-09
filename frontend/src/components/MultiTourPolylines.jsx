@@ -22,7 +22,7 @@ export default function MultiTourPolylines({ tours, selectedCourierId, nodesById
     ? tours  // Afficher tous
     : tours.filter(t => t.courierId === selectedCourierId);
 
-  console.log('🗺️ MultiTourPolylines - Affichage de', toursToDisplay.length, 'tour(s)');
+  console.log('[MultiTourPolylines] Affichage de', toursToDisplay.length, 'tour(s)');
 
   return (
     <>

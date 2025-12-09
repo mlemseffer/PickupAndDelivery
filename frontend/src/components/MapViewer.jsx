@@ -4,6 +4,7 @@ import { Maximize2, Minimize2, Eye, EyeOff } from 'lucide-react';
 import DeliveryMarkers from './DeliveryMarkers';
 import TourSegments from './TourSegments';
 import MultiTourPolylines from './MultiTourPolylines';
+import Icon from './Icon';
 import 'leaflet/dist/leaflet.css';
 
 /**
@@ -67,14 +68,14 @@ function SegmentRenderer({ segments, nodesById, isMapSelectionActive, onSegmentC
   
   // Protection : vérifier que segments est un tableau
   if (!Array.isArray(segments) || segments.length === 0) {
-    console.log('⚠️ SegmentRenderer - Pas de segments à afficher');
+    console.log('[SegmentRenderer] Pas de segments à afficher');
     return null;
   }
   
   // Afficher tous les segments sans limite
   const segmentsToRender = segments;
   
-  console.log(`✅ SegmentRenderer - Affichage de ${segmentsToRender.length} segments`);
+  console.log(`[SegmentRenderer] Affichage de ${segmentsToRender.length} segments`);
   
   return (
     <>
@@ -140,7 +141,7 @@ export default function MapViewer({
   // Debug : vérifier les données reçues
   useEffect(() => {
     if (mapData) {
-      console.log('🗺️ MapViewer - Données reçues:', {
+      console.log('[MapViewer] Données reçues:', {
         nodes: mapData.nodes?.length || 0,
         segments: mapData.segments?.length || 0
       });
@@ -195,7 +196,7 @@ export default function MapViewer({
   // Calculer et mémoriser le centre de la carte basé sur les nœuds
   const mapCenter = React.useMemo(() => {
     if (!mapData || !mapData.nodes || mapData.nodes.length === 0) {
-      console.log('⚠️ MapViewer - Pas de nœuds, utilisation du centre par défaut');
+      console.log('[MapViewer] Pas de nœuds, utilisation du centre par défaut');
       return [45.75, 4.85];
     }
     
@@ -210,17 +211,17 @@ export default function MapViewer({
       );
       
       if (validNodes.length === 0) {
-        console.warn('⚠️ MapViewer - Aucun nœud valide trouvé');
+        console.warn('[MapViewer] Aucun nœud valide trouvé');
         return [45.75, 4.85];
       }
       
       const avgLat = validNodes.reduce((sum, node) => sum + node.latitude, 0) / validNodes.length;
       const avgLng = validNodes.reduce((sum, node) => sum + node.longitude, 0) / validNodes.length;
       
-      console.log('✅ MapViewer - Centre calculé:', [avgLat, avgLng]);
+      console.log('[MapViewer] Centre calculé:', [avgLat, avgLng]);
       return [avgLat, avgLng];
     } catch (error) {
-      console.error('❌ MapViewer - Erreur calcul centre:', error);
+      console.error('[MapViewer] Erreur calcul centre:', error);
       return [45.75, 4.85];
     }
   }, [mapData?.nodes]);
@@ -237,10 +238,10 @@ export default function MapViewer({
         return acc;
       }, {});
       
-      console.log('✅ MapViewer - Index nœuds créé:', Object.keys(index).length, 'nœuds');
+      console.log('[MapViewer] Index nœuds créé:', Object.keys(index).length, 'nœuds');
       return index;
     } catch (error) {
-      console.error('❌ MapViewer - Erreur création index:', error);
+      console.error('[MapViewer] Erreur création index:', error);
       return {};
     }
   }, [mapData?.nodes]);
@@ -250,7 +251,10 @@ export default function MapViewer({
     return (
       <div className="flex-1 flex items-center justify-center bg-gray-700">
         <div className="text-center text-gray-300">
-          <p className="text-xl mb-2">📍 Aucune carte chargée</p>
+          <p className="text-xl mb-2 flex items-center justify-center gap-2">
+            <Icon name="location" />
+            Aucune carte chargée
+          </p>
           <p className="text-sm">Chargez un fichier XML pour commencer</p>
         </div>
       </div>
@@ -262,7 +266,10 @@ export default function MapViewer({
       {/* Bannière de mode sélection */}
       {isMapSelectionActive && (
         <div className="bg-green-600 text-white p-3 text-center font-semibold animate-pulse">
-          📍 Mode sélection actif - Cliquez sur un segment de la carte pour sélectionner un nœud
+          <span className="flex items-center justify-center gap-2">
+            <Icon name="location" />
+            Mode sélection actif - Cliquez sur un segment de la carte pour sélectionner un nœud
+          </span>
         </div>
       )}
       
@@ -276,12 +283,18 @@ export default function MapViewer({
             </h3>
             {tourData && tourData.metrics && (
               <p className="text-xs text-green-400 mt-1">
-                🚴 Tournée: {tourData.metrics.stopCount} stops, {tourData.metrics.totalDistance.toFixed(2)} m
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="bike" className="text-green-400" />
+                  Tournée: {tourData.metrics.stopCount} stops, {tourData.metrics.totalDistance.toFixed(2)} m
+                </span>
               </p>
             )}
             {isMapSelectionActive && (
               <p className="text-xs text-green-300 mt-1 font-semibold">
-                ✨ Cliquez sur un segment vert pour le sélectionner
+                <span className="inline-flex items-center gap-1">
+                  <Icon name="sparkles" className="text-green-300" />
+                  Cliquez sur un segment vert pour le sélectionner
+                </span>
               </p>
             )}
           </div>

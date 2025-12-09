@@ -6,6 +6,7 @@ import ReassignModal from './ReassignModal';
 import AssignDemandModal from './AssignDemandModal';
 import TourStatistics from './TourStatistics';
 import TourTable from './TourTable';
+import Icon from './Icon';
 
 const MAX_COURIERS = 10;
 
@@ -228,7 +229,10 @@ export default function TourTabs({
               : 'text-gray-400 hover:text-white hover:bg-gray-700/50'
           }`}
         >
-          📊 Vue globale
+          <span className="inline-flex items-center gap-2">
+            <Icon name="chart" className="text-blue-400" />
+            Vue globale
+          </span>
         </button>
         
         {/* Onglets par coursier */}
@@ -248,7 +252,9 @@ export default function TourTabs({
             />
             Coursier {tour.courierId}
             {tour.totalDurationSec > 4 * 3600 && (
-              <span className="text-red-400 text-xs ml-1">⚠️</span>
+              <span className="text-red-400 text-xs ml-1">
+                <Icon name="warning" className="text-red-400" />
+              </span>
             )}
           </button>
         ))}

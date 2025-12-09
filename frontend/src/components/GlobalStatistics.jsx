@@ -1,5 +1,6 @@
 import React from 'react';
 import StatCard from './StatCard';
+import Icon from './Icon';
 import { getCourierColor } from '../utils/courierColors';
 
 /**
@@ -41,17 +42,17 @@ export default function GlobalStatistics({ tours }) {
         <StatCard 
           label="Coursiers" 
           value={tours.length} 
-          icon="🚴" 
+          icon="bike" 
         />
         <StatCard 
           label="Distance totale" 
           value={`${(totalDistance / 1000).toFixed(1)} km`} 
-          icon="📏" 
+          icon="ruler" 
         />
         <StatCard 
           label="Demandes" 
           value={totalRequests} 
-          icon="📦" 
+          icon="box" 
         />
       </div>
       
@@ -60,19 +61,19 @@ export default function GlobalStatistics({ tours }) {
         <StatCard 
           label="Durée moy." 
           value={`${avgDuration.toFixed(2)} h`} 
-          icon="⏱️" 
+          icon="timer" 
         />
         <StatCard 
           label="Durée max" 
           value={`${maxDuration.toFixed(2)} h`} 
-          icon="⬆️"
+          icon="arrowUp"
           warning={maxDuration > 4}
           warningMessage={maxDuration > 4 ? "Dépasse 4h" : null}
         />
         <StatCard 
           label="Durée min" 
           value={`${minDuration.toFixed(2)} h`} 
-          icon="⬇️" 
+          icon="arrowDown" 
         />
       </div>
       
@@ -125,7 +126,10 @@ export default function GlobalStatistics({ tours }) {
             {tour.totalDurationSec > 4 * 3600 && (
               <>
                 <span className="text-gray-500">·</span>
-                <span className="text-xs text-red-400 font-medium">⚠️ {'>'} 4h</span>
+                <span className="text-xs text-red-400 font-medium flex items-center gap-1">
+                  <Icon name="warning" className="text-red-400" />
+                  {'>'} 4h
+                </span>
               </>
             )}
           </div>

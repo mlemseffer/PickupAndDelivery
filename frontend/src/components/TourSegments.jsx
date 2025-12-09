@@ -1,6 +1,7 @@
 import React from 'react';
 import { Polyline, Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
+import Icon from './Icon';
 
 const computeScaleFromZoom = (zoom) => {
   const baseZoom = 13;
@@ -22,7 +23,7 @@ export default function TourSegments({ tourData, nodesById, mapZoom = 13 }) {
 
   
   if (!tourData || !tourData.tour || tourData.tour.length === 0) {
-    console.warn('⚠️ TourSegments: Pas de données de tournée');
+    console.warn('[TourSegments] Pas de données de tournée');
     return null;
   }
   
@@ -34,7 +35,7 @@ export default function TourSegments({ tourData, nodesById, mapZoom = 13 }) {
   
   tourData.tour.forEach((trajet, trajetIndex) => {
     if (!trajet.segments || trajet.segments.length === 0) {
-      console.warn(`⚠️ Trajet ${trajetIndex + 1} n'a pas de segments`);
+      console.warn(`[TourSegments] Trajet ${trajetIndex + 1} n'a pas de segments`);
       return;
     }
     
@@ -118,11 +119,11 @@ export default function TourSegments({ tourData, nodesById, mapZoom = 13 }) {
             >
               <Tooltip direction="center" offset={[0, 0]}>
                 <div className="text-sm">
-                  <strong>🔢 Segment {number}</strong><br />
-                  <strong>📍 Rue:</strong> {segment.name}<br />
-                  <strong>📏 Longueur:</strong> {segment.length.toFixed(2)} m<br />
-                  <strong>➡️ De:</strong> {segment.origin}<br />
-                  <strong>➡️ À:</strong> {segment.destination}
+                  <strong><Icon name="number" className="mr-1" />Segment {number}</strong><br />
+                  <strong><Icon name="location" className="mr-1" />Rue:</strong> {segment.name}<br />
+                  <strong><Icon name="ruler" className="mr-1" />Longueur:</strong> {segment.length.toFixed(2)} m<br />
+                  <strong><Icon name="arrowRight" className="mr-1" />De:</strong> {segment.origin}<br />
+                  <strong><Icon name="arrowRight" className="mr-1" />À:</strong> {segment.destination}
                 </div>
               </Tooltip>
             </Polyline>
@@ -142,9 +143,9 @@ export default function TourSegments({ tourData, nodesById, mapZoom = 13 }) {
             >
               <Tooltip direction="top" offset={[0, -8]} permanent={false}>
                 <div className="text-sm">
-                  <strong>🔢 Segment {number}</strong><br />
-                  <strong>📍 Rue:</strong> {segment.name}<br />
-                  <strong>📏 Longueur:</strong> {segment.length.toFixed(2)} m
+                  <strong><Icon name="number" className="mr-1" />Segment {number}</strong><br />
+                  <strong><Icon name="location" className="mr-1" />Rue:</strong> {segment.name}<br />
+                  <strong><Icon name="ruler" className="mr-1" />Longueur:</strong> {segment.length.toFixed(2)} m
                 </div>
               </Tooltip>
             </Marker>

@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon';
 
 /**
  * Composant Error Boundary pour capturer les erreurs de rendu React
@@ -14,7 +15,7 @@ class ErrorBoundary extends React.Component {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error('❌ ErrorBoundary - Erreur capturée:', error, errorInfo);
+    console.error('[ErrorBoundary] Erreur capturée:', error, errorInfo);
     this.setState({ error, errorInfo });
   }
 
@@ -23,7 +24,10 @@ class ErrorBoundary extends React.Component {
       return (
         <div className="flex-1 flex items-center justify-center bg-gray-800">
           <div className="bg-red-900/30 border border-red-500 rounded-lg p-6 max-w-2xl">
-            <h2 className="text-2xl font-bold text-red-400 mb-4">❌ Erreur de rendu</h2>
+            <h2 className="text-2xl font-bold text-red-400 mb-4 flex items-center gap-2">
+              <Icon name="error" className="text-red-400" />
+              Erreur de rendu
+            </h2>
             <p className="text-gray-300 mb-4">
               Une erreur s'est produite lors de l'affichage de la carte.
             </p>
@@ -41,7 +45,10 @@ class ErrorBoundary extends React.Component {
               }}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded"
             >
-              🔄 Recharger la page
+              <span className="inline-flex items-center gap-2">
+                <Icon name="rotate" className="text-white" />
+                Recharger la page
+              </span>
             </button>
           </div>
         </div>

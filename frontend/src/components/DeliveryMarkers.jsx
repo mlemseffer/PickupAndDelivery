@@ -1,6 +1,7 @@
 import React from 'react';
 import { Marker, Popup } from 'react-leaflet';
 import L from 'leaflet';
+import Icon from './Icon';
 
 const computeScaleFromZoom = (zoom) => {
   const baseZoom = 13;
@@ -117,7 +118,10 @@ export default function DeliveryMarkers({ requestSet, nodesById, mapZoom = 13 })
         >
           <Popup>
             <div style={{ color: '#1a202c' }}>
-              <strong className="text-lg">🏢 Entrepôt</strong><br />
+              <strong className="text-lg flex items-center gap-2">
+                <Icon name="warehouse" className="text-gray-800" />
+                Entrepôt
+              </strong><br />
               <strong style={{ color: '#ffffff' }}>Heure de départ:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.departureTime}</strong><br />
               <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.nodeId}</strong>
             </div>
@@ -141,8 +145,9 @@ export default function DeliveryMarkers({ requestSet, nodesById, mapZoom = 13 })
               >
                 <Popup>
                   <div style={{ color: '#1a202c' }}>
-                    <strong className="text-lg" style={{ color }}>
-                      📦 Pickup #{index + 1}
+                    <strong className="text-lg flex items-center gap-2" style={{ color }}>
+                      <Icon name="box" className="text-current" />
+                      Pickup #{index + 1}
                     </strong><br />
                     <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupDurationSec} sec</strong><br />
                     <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupNodeId}</strong>
@@ -159,8 +164,9 @@ export default function DeliveryMarkers({ requestSet, nodesById, mapZoom = 13 })
               >
                 <Popup>
                   <div style={{ color: '#1a202c' }}>
-                    <strong className="text-lg" style={{ color }}>
-                      📍 Delivery #{index + 1}
+                    <strong className="text-lg flex items-center gap-2" style={{ color }}>
+                      <Icon name="location" className="text-current" />
+                      Delivery #{index + 1}
                     </strong><br />
                     <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryDurationSec} sec</strong><br />
                     <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryNodeId}</strong>

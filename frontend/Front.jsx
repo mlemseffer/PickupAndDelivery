@@ -13,6 +13,7 @@ import TourTabs from './src/components/TourTabs';
 import DemandAssignmentTable from './src/components/DemandAssignmentTable';
 import CustomAlert from './src/components/CustomAlert';
 import UnassignedDemands from './src/components/UnassignedDemands';
+import Icon from './src/components/Icon';
 import apiService from './src/services/apiService';
 import './leaflet-custom.css';
 
@@ -277,7 +278,7 @@ export default function PickupDeliveryUI() {
       }
     } else {
       // Si plus aucune demande, réinitialiser la tournée ET le deliveryRequestSet
-      console.log('⚠️ Aucune demande restante, réinitialisation de la tournée');
+      console.log('[PickupDeliveryUI] Aucune demande restante, réinitialisation de la tournée');
       setDeliveryRequestSet(null);
       setTourData(null);
       setUnassignedDemands([]);
@@ -359,11 +360,11 @@ export default function PickupDeliveryUI() {
         setTourData(tours);
         setUnassignedDemands(unassigned);
       } else {
-        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
+        showAlert('error', 'Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
-      console.error('💥 Erreur lors du recalcul de la tournée:', error);
-      showAlert('error', '❌ Erreur', error.message);
+      console.error('[PickupDeliveryUI] Erreur lors du recalcul de la tournée:', error);
+      showAlert('error', 'Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -374,7 +375,7 @@ export default function PickupDeliveryUI() {
     const hadTourData = Boolean(tourData);
 
     if (!deliveryRequestSet?.demands || deliveryRequestSet.demands.length === 0) {
-      showAlert('warning', '⚠️ Attention', 'Aucune demande disponible à supprimer.');
+      showAlert('warning', 'Attention', 'Aucune demande disponible à supprimer.');
       return;
     }
 
@@ -434,10 +435,10 @@ export default function PickupDeliveryUI() {
         setUnassignedDemands([]);
       }
 
-      showAlert('success', '✅ Demande supprimée', 'La demande a été retirée de la tournée.');
+      showAlert('success', 'Demande supprimée', 'La demande a été retirée de la tournée.');
     } catch (err) {
       console.error('Erreur lors de la suppression de la demande:', err);
-      showAlert('error', '❌ Erreur', err.message || 'Erreur lors de la suppression');
+      showAlert('error', 'Erreur', err.message || 'Erreur lors de la suppression');
     } finally {
       setIsCalculatingTour(false);
     }
@@ -465,7 +466,7 @@ export default function PickupDeliveryUI() {
       });
       await recalculateToursSilent();
     } catch (err) {
-      showAlert('error', '❌ Erreur', err.message);
+      showAlert('error', 'Erreur', err.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -497,17 +498,17 @@ export default function PickupDeliveryUI() {
   // Gestion du calcul de la tournée
   const handleCalculateTour = async () => {
     if (!deliveryRequestSet || !deliveryRequestSet.demands || deliveryRequestSet.demands.length === 0) {
-      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger des demandes de livraison');
+      showAlert('warning', 'Attention', 'Veuillez d\'abord charger des demandes de livraison');
       return;
     }
 
     setIsCalculatingTour(true);
     
     try {
-      console.log(`🚀 Calcul de la tournée pour ${courierCount} livreur(s)...`);
+      console.log(`[PickupDeliveryUI] Calcul de la tournée pour ${courierCount} livreur(s)...`);
       const result = await apiService.calculateTour(courierCount);
       
-      console.log('📦 Résultat complet:', result);
+      console.log('[PickupDeliveryUI] Résultat complet:', result);
       
       if (result.success) {
         // Nouvelle structure de réponse avec TourCalculationResponse
@@ -517,23 +518,23 @@ export default function PickupDeliveryUI() {
         
         // Cas où aucune tournée n'a été créée (toutes les demandes rejetées)
         if (tours.length === 0) {
-          alert('⚠️ ATTENTION: Aucune tournée n\'a pu être calculée !\n\n' +
+          alert('ATTENTION: Aucune tournée n\'a pu être calculée !\n\n' +
                 `Avec ${courierCount} coursier(s), la contrainte des 4h est trop restrictive.\n` +
                 'Toutes les demandes ont été rejetées.\n\n' +
-                '💡 Solution: Augmentez le nombre de coursiers.');
+                'Suggestion: augmentez le nombre de coursiers.');
           return;
         }
         
         // Stocker les tournées et demandes non assignées
-        console.log('✅ Tournées calculées avec succès:', tours);
-        console.log('⚠️  Demandes non assignées:', unassignedDemands);
+        console.log('[PickupDeliveryUI] Tournées calculées avec succès:', tours);
+        console.log('[PickupDeliveryUI] Demandes non assignées:', unassignedDemands);
         
-        // 🔍 DEBUG: Vérifier les IDs des coursiers
-        console.log('🔍 CourierIds reçus:', tours.map(t => t.courierId));
+        // DEBUG: Vérifier les IDs des coursiers
+        console.log('[PickupDeliveryUI] CourierIds reçus:', tours.map(t => t.courierId));
         const courierIds = tours.map(t => t.courierId);
         const uniqueIds = new Set(courierIds);
         if (courierIds.length !== uniqueIds.size) {
-          console.warn('⚠️ ATTENTION: Doublons de courierIds détectés!', courierIds);
+          console.warn('[PickupDeliveryUI] ATTENTION: Doublons de courierIds détectés!', courierIds);
         }
         
         setTourData(tours); // Array de tours
@@ -555,19 +556,19 @@ export default function PickupDeliveryUI() {
         );
 
         alert(
-          `✅ Tournée calculée avec succès !\n\n` +
-          `👥 Coursiers: ${tours.length}\n` +
-          `📍 Stops: ${totalStops}\n` +
-          `📏 Distance: ${Number(totalDistance || 0).toFixed(2)} m\n` +
-          `🛣️  Segments: ${totalSegments}`
+          `Tournée calculée avec succès !\n\n` +
+          `Coursiers: ${tours.length}\n` +
+          `Stops: ${totalStops}\n` +
+          `Distance: ${Number(totalDistance || 0).toFixed(2)} m\n` +
+          `Segments: ${totalSegments}`
         );
       } else {
-        console.error('❌ Réponse invalide:', result);
-        showAlert('error', '❌ Erreur', result.message || 'Réponse invalide du serveur');
+        console.error('Réponse invalide:', result);
+        showAlert('error', 'Erreur', result.message || 'Réponse invalide du serveur');
       }
     } catch (error) {
-      console.error('💥 Erreur lors du calcul de la tournée:', error);
-      showAlert('error', '❌ Erreur', error.message);
+      console.error('[PickupDeliveryUI] Erreur lors du calcul de la tournée:', error);
+      showAlert('error', 'Erreur', error.message);
     } finally {
       setIsCalculatingTour(false);
     }
@@ -581,7 +582,7 @@ export default function PickupDeliveryUI() {
   // Gestion du clic sur "Ajouter Pickup&Delivery" (ajout manuel)
   const handleAddDeliveryManually = () => {
     if (!mapData) {
-      showAlert('warning', '⚠️ Attention', 'Veuillez d\'abord charger une carte');
+      showAlert('warning', 'Attention', 'Veuillez d\'abord charger une carte');
       return;
     }
     setShowManualForm(true);
@@ -624,7 +625,7 @@ export default function PickupDeliveryUI() {
       // Appeler le callback pour mettre à jour le state et recalculer si besoin
       handleDeliveryRequestSetUpdated(updatedRequestSet);
     } catch (err) {
-      showAlert('error', '❌ Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
+      showAlert('error', 'Erreur', 'Erreur lors de l\'ajout manuel : ' + err.message);
     }
     setShowManualForm(false);
     setSelectedNodeId(null);
@@ -695,7 +696,7 @@ export default function PickupDeliveryUI() {
     try {
       await apiService.clearDeliveryRequests();
     } catch (e) {
-      console.warn('⚠️ Impossible de vider les demandes avant restauration:', e.message);
+      console.warn('[PickupDeliveryUI] Impossible de vider les demandes avant restauration:', e.message);
     }
     setDeliveryRequestSet(null);
     setTourData(null);
@@ -714,7 +715,7 @@ export default function PickupDeliveryUI() {
     }
 
     if (skippedDemands > 0) {
-      console.warn(`⚠️ ${skippedDemands} demande(s) ignorée(s) car nœuds absents de la carte`);
+      console.warn(`[PickupDeliveryUI] ${skippedDemands} demande(s) ignorée(s) car nœuds absents de la carte`);
       alert(
         `${skippedDemands} demande(s) ignorée(s) car leurs nœuds ne sont pas présents dans la carte chargée.`
       );
@@ -746,7 +747,7 @@ export default function PickupDeliveryUI() {
     };
 
     try {
-      console.log('🔄 Restauration de tournée avec', demandsFromFile.length, 'demandes');
+      console.log('[PickupDeliveryUI] Restauration de tournée avec', demandsFromFile.length, 'demandes');
 
       // Ajouter les demandes au backend et récupérer les IDs générés
       const addedDemandsWithIds = [];
@@ -773,11 +774,11 @@ export default function PickupDeliveryUI() {
         });
       }
 
-      console.log('✅ Toutes les demandes ont été ajoutées au backend');
+      console.log('[PickupDeliveryUI] Toutes les demandes ont été ajoutées au backend');
 
       let warehouseNodeId = deriveWarehouseNode();
       if (warehouseNodeId && !nodeSet.has(String(warehouseNodeId))) {
-        console.warn(`⚠️ Entrepôt ${warehouseNodeId} introuvable dans la carte, utilisation du premier nœud de la carte`);
+        console.warn(`[PickupDeliveryUI] Entrepôt ${warehouseNodeId} introuvable dans la carte, utilisation du premier nœud de la carte`);
         warehouseNodeId = mapData?.nodes?.[0]?.id || null;
       }
       const warehouse = warehouseNodeId
@@ -795,7 +796,7 @@ export default function PickupDeliveryUI() {
             departureTime: restorePayload?.warehouse?.departureTime || '08:00',
           });
         } catch (e) {
-          console.warn('⚠️ Impossible de définir le warehouse côté backend:', e.message);
+          console.warn('[PickupDeliveryUI] Impossible de définir le warehouse côté backend:', e.message);
         }
       }
 
@@ -809,7 +810,7 @@ export default function PickupDeliveryUI() {
         demands: demandsWithColors,
       });
 
-      console.log('✅ DeliveryRequestSet défini avec IDs du backend');
+      console.log('[PickupDeliveryUI] DeliveryRequestSet défini avec IDs du backend');
 
       // Construire les assignments à partir des tournées fournies (respecter les réassignations)
       const deriveAssignmentsFromTours = (tours, demandsList, idMap) => {
@@ -856,7 +857,7 @@ export default function PickupDeliveryUI() {
         }));
       };
 
-      // 🔄 Recalculer la tournée en respectant les assignments restaurés
+      // Recalculer la tournée en respectant les assignments restaurés
       setIsCalculatingTour(true);
       let recalculatedTours = null;
       let recalculatedUnassigned = [];
@@ -879,18 +880,18 @@ export default function PickupDeliveryUI() {
         if (result?.success && result.data && Array.isArray(result.data.tours)) {
           recalculatedTours = result.data.tours || [];
           recalculatedUnassigned = result.data.unassignedDemands || [];
-          console.log('✅ Tournée recalculée avec assignments restaurés');
+          console.log('[PickupDeliveryUI] Tournée recalculée avec assignments restaurés');
         } else {
           // Fallback: recalcul standard si les assignments n'ont pas été pris en compte
           const fallback = await apiService.calculateTour(boundedCouriers);
           if (fallback.success && fallback.data && Array.isArray(fallback.data.tours)) {
             recalculatedTours = fallback.data.tours || [];
             recalculatedUnassigned = fallback.data.unassignedDemands || [];
-            console.log('ℹ️ Fallback calculateTour utilisé après restauration');
+            console.log('[PickupDeliveryUI] Fallback calculateTour utilisé après restauration');
           }
         }
       } catch (error) {
-        console.error('❌ Erreur lors du recalcul avec assignments:', error);
+        console.error('[PickupDeliveryUI] Erreur lors du recalcul avec assignments:', error);
       } finally {
         setIsCalculatingTour(false);
       }
@@ -918,12 +919,12 @@ export default function PickupDeliveryUI() {
         : restorePayload?.metrics;
 
       alert(`Tournée restaurée avec succès !\n\n` +
-            `📍 Stops: ${metrics?.stopCount || 0}\n` +
-            `📏 Distance: ${Number(metrics?.totalDistance || 0).toFixed(2)} m\n` +
-            `🛣️  Segments: ${metrics?.segmentCount || 0}\n` +
-            `📦 Demandes: ${addedDemandsWithIds.length}`);
+            `Stops: ${metrics?.stopCount || 0}\n` +
+            `Distance: ${Number(metrics?.totalDistance || 0).toFixed(2)} m\n` +
+            `Segments: ${metrics?.segmentCount || 0}\n` +
+            `Demandes: ${addedDemandsWithIds.length}`);
     } catch (error) {
-      console.error('❌ Erreur lors de la restauration de la tournée:', error);
+      console.error('[PickupDeliveryUI] Erreur lors de la restauration de la tournée:', error);
       alert(`Erreur lors de la restauration : ${error.message}`);
     }
   };
@@ -1090,7 +1091,7 @@ export default function PickupDeliveryUI() {
                                 throw new Error(result?.message || 'Réponse invalide du serveur');
                               }
                             } catch (err) {
-                              showAlert('error', '❌ Erreur', err.message);
+                              showAlert('error', 'Erreur', err.message);
                             } finally {
                               setIsCalculatingTour(false);
                               setIsEditingAssignments(false);
@@ -1162,7 +1163,10 @@ export default function PickupDeliveryUI() {
                           className="bg-orange-600 hover:bg-orange-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg"
                           title="Supprimer ou gérer les demandes avant de calculer la tournée"
                         >
-                          🗑️ Modifier demandes
+                          <span className="inline-flex items-center gap-2">
+                            <Icon name="trash" className="text-white" />
+                            Modifier demandes
+                          </span>
                         </button>
 
                         {showDemandManager && (
@@ -1203,7 +1207,10 @@ export default function PickupDeliveryUI() {
                                    flex items-center justify-center gap-2"
                           title="Ajouter une nouvelle demande de livraison"
                         >
-                          ➕ Ajouter Pickup&Delivery
+                          <span className="inline-flex items-center gap-2">
+                            <Icon name="plus" className="text-white" />
+                            Ajouter Pickup&Delivery
+                          </span>
                         </button>
 
                         <button
@@ -1219,7 +1226,10 @@ export default function PickupDeliveryUI() {
                                    flex items-center justify-center gap-2"
                           title="Modifier la tournée calculée"
                         >
-                          ✏️ Modifier Tournée
+                          <span className="inline-flex items-center gap-2">
+                            <Icon name="pen" className="text-white" />
+                            Modifier Tournée
+                          </span>
                         </button>
                       </div>
                       
@@ -1254,7 +1264,10 @@ export default function PickupDeliveryUI() {
         {activeTab === 'tours' && (
           <div className="p-8 mt-20">
             <h2 className="text-2xl font-bold mb-6">
-              📋 Demandes non traitées
+              <span className="inline-flex items-center gap-2">
+                <Icon name="clipboard" className="text-white" />
+                Demandes non traitées
+              </span>
             </h2>
             <UnassignedDemands 
               unassignedDemands={unassignedDemands}

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { X, Package, MapPin } from 'lucide-react';
+import Icon from './Icon';
 
 /**
  * Composant pour ajouter manuellement une demande de livraison
@@ -121,7 +122,10 @@ export default function ManualDeliveryForm({
                 }`}
                 title="Cliquer sur la carte pour sélectionner"
               >
-                📍 Carte
+                <span className="inline-flex items-center gap-2">
+                  <Icon name="location" className="text-white" />
+                  Carte
+                </span>
               </button>
             </div>
             <p className="text-sm text-gray-400 mt-1">
@@ -173,7 +177,10 @@ export default function ManualDeliveryForm({
                 }`}
                 title="Cliquer sur la carte pour sélectionner"
               >
-                📍 Carte
+                <span className="inline-flex items-center gap-2">
+                  <Icon name="location" className="text-white" />
+                  Carte
+                </span>
               </button>
             </div>
             <p className="text-sm text-gray-400 mt-1">
@@ -221,17 +228,27 @@ export default function ManualDeliveryForm({
         {/* Info box */}
         <div className="mt-6 bg-blue-900/30 border border-blue-500/50 rounded p-4 text-sm">
           <p className="text-blue-200">
-            <strong>💡 Astuce :</strong> Utilisez les boutons "📍 Carte" pour sélectionner les adresses directement en cliquant sur la carte. 
+            <strong className="inline-flex items-center gap-2">
+              <Icon name="lightbulb" className="text-blue-200" />
+              Astuce :
+            </strong>{' '}
+            Utilisez les boutons "Carte" pour sélectionner les adresses directement en cliquant sur la carte. 
             Lorsque vous cliquez sur un segment, le nœud le plus proche est automatiquement sélectionné.
           </p>
           {mapSelectionType === 'pickup' && (
             <p className="text-green-400 mt-2 font-semibold">
-              ✅ Mode sélection PICKUP actif - Cliquez sur un segment de la carte
+              <span className="inline-flex items-center gap-2">
+                <Icon name="success" className="text-green-400" />
+                Mode sélection PICKUP actif - Cliquez sur un segment de la carte
+              </span>
             </p>
           )}
           {mapSelectionType === 'delivery' && (
             <p className="text-blue-400 mt-2 font-semibold">
-              ✅ Mode sélection DELIVERY actif - Cliquez sur un segment de la carte
+              <span className="inline-flex items-center gap-2">
+                <Icon name="success" className="text-blue-400" />
+                Mode sélection DELIVERY actif - Cliquez sur un segment de la carte
+              </span>
             </p>
           )}
         </div>

@@ -19,22 +19,22 @@ export default function MapUploader({ onMapLoaded, onCancel }) {
       return;
     }
 
-    console.log('📤 Upload du fichier:', file.name, `(${(file.size / 1024).toFixed(2)} KB)`);
+    console.log('[MapUploader] Upload du fichier:', file.name, `(${(file.size / 1024).toFixed(2)} KB)`);
     
     setIsLoading(true);
     setError(null);
 
     try {
       // Upload du fichier vers le backend
-      console.log('⏳ Envoi du fichier au backend...');
+      console.log('[MapUploader] Envoi du fichier au backend...');
       const uploadResponse = await apiService.uploadMap(file);
-      console.log('✅ Réponse upload:', uploadResponse);
+      console.log('[MapUploader] Réponse upload:', uploadResponse);
       
       if (uploadResponse.success) {
         // Récupère les données de la carte complète
-        console.log('⏳ Récupération de la carte complète...');
+        console.log('[MapUploader] Récupération de la carte complète...');
         const mapResponse = await apiService.getCurrentMap();
-        console.log('✅ Carte reçue:', {
+        console.log('[MapUploader] Carte reçue:', {
           nodes: mapResponse.data?.nodes?.length || 0,
           segments: mapResponse.data?.segments?.length || 0
         });
@@ -48,7 +48,7 @@ export default function MapUploader({ onMapLoaded, onCancel }) {
         setError(uploadResponse.message || 'Erreur lors du chargement de la carte');
       }
     } catch (err) {
-      console.error('❌ Erreur MapUploader:', err);
+      console.error('[MapUploader] Erreur:', err);
       setError('Erreur: ' + (err.message || 'Erreur inconnue'));
     } finally {
       setIsLoading(false);

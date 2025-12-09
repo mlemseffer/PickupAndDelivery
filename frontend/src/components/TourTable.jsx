@@ -1,4 +1,5 @@
 import React from 'react';
+import Icon from './Icon';
 
 /**
  * Composant pour afficher le tableau récapitulatif de la tournée
@@ -32,7 +33,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
     stops.push({
       order: 1,
       type: 'E',
-      icon: '🏢',
+      icon: 'warehouse',
       time: formatTime(currentTimeMinutes),
       nodeId: deliveryRequestSet.warehouse.nodeId,
       demandId: null,
@@ -44,7 +45,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
   // Parser les trajets pour respecter l'ordre de passage réel
   if (tourData?.tour && tourData.tour.length > 0) {
     tourData.tour.forEach((trajet, index) => {
-      console.log(`📍 Trajet ${index + 1}:`, trajet);
+      console.log(`[TourTable] Trajet ${index + 1}:`, trajet);
       console.log(`  - longueurTotale: ${trajet.longueurTotale} m`);
       console.log(`  - segments: ${trajet.segments?.length || 0}`);
       
@@ -77,7 +78,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
           stops.push({
             order: stops.length + 1,
             type: 'P',
-            icon: '📦',
+            icon: 'box',
             time: formatTimeRange(currentTimeMinutes, pickupDurationMin),
             nodeId: stopNode,
             demandId: demand.id,
@@ -94,7 +95,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
           stops.push({
             order: stops.length + 1,
             type: 'D',
-            icon: '📍',
+            icon: 'location',
             time: formatTimeRange(currentTimeMinutes, deliveryDurationMin),
             nodeId: stopNode,
             demandId: demand.id,
@@ -108,7 +109,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
         stops.push({
           order: stops.length + 1,
           type: 'E',
-          icon: '🏢',
+          icon: 'warehouse',
           time: formatTime(currentTimeMinutes),
           nodeId: stopNode,
           demandId: null,
@@ -147,7 +148,7 @@ export default function TourTable({ tourData, deliveryRequestSet }) {
                     border: `2px solid ${stop.color}`
                   }}
                 >
-                  {stop.icon}
+                  <Icon name={stop.icon} />
                 </div>
               </td>
               
