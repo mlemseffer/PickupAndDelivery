@@ -27,6 +27,26 @@ function MapResizer({ center }) {
   return null;
 }
 
+function ZoomWatcher({ onZoomChange }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!map) {
+      return;
+    }
+
+    const handleZoom = () => onZoomChange(map.getZoom());
+    handleZoom();
+
+    map.on('zoomend', handleZoom);
+    return () => {
+      map.off('zoomend', handleZoom);
+    };
+  }, [map, onZoomChange]);
+
+  return null;
+}
+
 /**
  * Composant pour gérer le zoom et n'afficher les segments que si le zoom est suffisant
  */
@@ -114,6 +134,7 @@ export default function MapViewer({
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSegments, setShowSegments] = useState(true);
+  const [mapZoom, setMapZoom] = useState(13);
   const mapContainerRef = useRef(null);
 
   // Debug : vérifier les données reçues
@@ -303,6 +324,7 @@ export default function MapViewer({
           preferCanvas={true}
         >
           <MapResizer center={mapCenter} />
+          <ZoomWatcher onZoomChange={setMapZoom} />
           <TileLayer
             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
@@ -323,6 +345,7 @@ export default function MapViewer({
             <DeliveryMarkers 
               requestSet={deliveryRequestSet} 
               nodesById={nodesById}
+              mapZoom={mapZoom}
             />
           )}
 
@@ -340,6 +363,7 @@ export default function MapViewer({
               <TourSegments 
                 tourData={Array.isArray(tourData) ? { tour: tourData[0].trajets, metrics: { stopCount: tourData[0].stops?.length || 0, totalDistance: tourData[0].totalDistance || 0 }} : tourData}
                 nodesById={nodesById}
+                mapZoom={mapZoom}
               />
             )
           )}

@@ -2,10 +2,23 @@ import React from 'react';
 import { Polyline, Marker, Tooltip } from 'react-leaflet';
 import L from 'leaflet';
 
+const computeScaleFromZoom = (zoom) => {
+  const baseZoom = 13;
+  const step = 0.12;
+  const minScale = 0.6;
+  const maxScale = 1.8;
+
+  if (typeof zoom !== 'number') {
+    return 1;
+  }
+
+  return Math.min(maxScale, Math.max(minScale, 1 + (zoom - baseZoom) * step));
+};
+
 /**
  * Composant pour afficher les segments de la tournée en jaune avec numérotation et flèches
  */
-export default function TourSegments({ tourData, nodesById }) {
+export default function TourSegments({ tourData, nodesById, mapZoom = 13 }) {
 
   
   if (!tourData || !tourData.tour || tourData.tour.length === 0) {
@@ -13,6 +26,8 @@ export default function TourSegments({ tourData, nodesById }) {
     return null;
   }
   
+  const iconScale = computeScaleFromZoom(mapZoom);
+
   // Aplatir tous les segments de tous les trajets
   let segmentCounter = 0;
   const allSegmentsWithNumbers = [];
@@ -35,21 +50,26 @@ export default function TourSegments({ tourData, nodesById }) {
 
   // Créer une icône de flèche personnalisée (petite et simple)
   const createArrowIcon = (rotation) => {
+    const borderWidth = 5 * iconScale;
+    const borderHeight = 10 * iconScale;
+    const iconWidth = borderWidth * 2;
+    const iconHeight = borderHeight;
+
     return L.divIcon({
       html: `
         <div style="
           width: 0;
           height: 0;
-          border-left: 5px solid transparent;
-          border-right: 5px solid transparent;
-          border-bottom: 10px solid #FCD34D;
+          border-left: ${borderWidth}px solid transparent;
+          border-right: ${borderWidth}px solid transparent;
+          border-bottom: ${borderHeight}px solid #FCD34D;
           transform: rotate(${rotation}deg);
           filter: drop-shadow(0 0 1px rgba(0,0,0,0.5));
         "></div>
       `,
       className: 'arrow-icon',
-      iconSize: [10, 10],
-      iconAnchor: [5, 5]
+      iconSize: [iconWidth, iconHeight],
+      iconAnchor: [iconWidth / 2, iconHeight / 2]
     });
   };
 
