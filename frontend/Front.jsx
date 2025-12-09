@@ -215,6 +215,21 @@ export default function PickupDeliveryUI() {
     setAlertConfig(null);
   };
 
+  // Au chargement de l'app, on part d'un état propre côté backend (demandes vidées)
+  React.useEffect(() => {
+    const resetBackendDemands = async () => {
+      try {
+        await apiService.clearDeliveryRequests();
+        setDeliveryRequestSet(null);
+        setTourData(null);
+      } catch (err) {
+        console.warn('[PickupDeliveryUI] Impossible de vider les demandes au démarrage:', err?.message || err);
+      }
+    };
+    resetBackendDemands();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   /**
    * Synchronise le frontend avec l'état réel des demandes côté backend.
    * Évite les divergences (ex: anciennes demandes encore présentes côté serveur).
@@ -258,12 +273,24 @@ export default function PickupDeliveryUI() {
 
   // Gestion du chargement de la carte depuis le backend
   const handleMapLoaded = (map) => {
-    setMapData(map);
-    setShowMapUpload(false);
-    setShowMessage(false);
-    setActiveTab('map');
-    // Lorsqu'on charge une carte, on synchronise aussi les demandes côté backend
-    syncDeliveryRequests();
+    const afterMapLoad = async () => {
+      try {
+        // Nettoyer toutes les demandes backend pour repartir de zéro avec cette carte
+        await apiService.clearDeliveryRequests();
+        setDeliveryRequestSet(null);
+        setTourData(null);
+      } catch (err) {
+        console.warn('[PickupDeliveryUI] Impossible de vider les demandes après chargement carte:', err?.message || err);
+      } finally {
+        setMapData(map);
+        setShowMapUpload(false);
+        setShowMessage(false);
+        setActiveTab('map');
+        // Synchroniser l'état (sera vide après clear)
+        syncDeliveryRequests();
+      }
+    };
+    afterMapLoad();
   };
 
   // Gestion de l'annulation du chargement
