@@ -98,6 +98,15 @@ class ApiService {
   }
 
   /**
+   * Récupère l'ensemble des demandes (DemandeSet) avec entrepôt
+   * @returns {Promise} DemandeSet { warehouse, demands }
+   */
+  async getCurrentRequestSet() {
+    const response = await fetch(`${API_BASE_URL}/deliveries/current`);
+    return response.json();
+  }
+
+  /**
    * Ajoute une nouvelle demande de livraison
    * @param {Object} request - La demande de livraison
    * @returns {Promise} La confirmation d'ajout

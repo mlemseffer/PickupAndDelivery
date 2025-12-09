@@ -254,13 +254,20 @@ public class ServiceAlgo {
         Map<String, List<SegmentInfo>> adjacencyList = new HashMap<>();
 
         for (Segment segment : cityMap.getSegments()) {
-            // Direction origine → destination
+            // Direction origine → destination (segment tel quel)
             adjacencyList.computeIfAbsent(segment.getOrigin(), k -> new ArrayList<>())
                     .add(new SegmentInfo(segment.getDestination(), segment));
             
-            // Direction inverse: destination → origine (graphe non-dirigé)
-            adjacencyList.computeIfAbsent(segment.getDestination(), k -> new ArrayList<>())
-                    .add(new SegmentInfo(segment.getOrigin(), segment));
+            // Direction inverse: on crée un segment miroir pour que origin/destination reflètent
+            // le sens réellement parcouru (utile pour reconstruire et afficher le chemin sans zigzag)
+            Segment reverse = new Segment(
+                segment.getDestination(),
+                segment.getOrigin(),
+                segment.getLength(),
+                segment.getName()
+            );
+            adjacencyList.computeIfAbsent(reverse.getOrigin(), k -> new ArrayList<>())
+                    .add(new SegmentInfo(reverse.getDestination(), reverse));
         }
 
         return adjacencyList;

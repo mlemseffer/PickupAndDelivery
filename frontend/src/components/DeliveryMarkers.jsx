@@ -1,5 +1,5 @@
 import React from 'react';
-import { Marker, Popup } from 'react-leaflet';
+import { Marker, Popup, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import Icon from './Icon';
 
@@ -14,6 +14,39 @@ const computeScaleFromZoom = (zoom) => {
   }
 
   return Math.min(maxScale, Math.max(minScale, 1 + (zoom - baseZoom) * step));
+};
+
+/**
+ * Calcule des décalages en pixels pour un groupe de marqueurs sur le même nœud.
+ * Permet d'éviter la superposition tout en gardant des déplacements minimes.
+ */
+const computeClusterOffsets = (count, radiusPx = 14) => {
+  if (count <= 1) {
+    return [L.point(0, 0)];
+  }
+
+  const angleStep = (2 * Math.PI) / count;
+  return Array.from({ length: count }, (_, index) => {
+    const angle = index * angleStep;
+    return L.point(Math.cos(angle) * radiusPx, Math.sin(angle) * radiusPx);
+  });
+};
+
+/**
+ * Convertit un décalage en pixels en un léger décalage géographique pour l'affichage.
+ * Ne modifie pas les données métiers : uniquement la position d'affichage du marqueur.
+ */
+const applyOffset = (map, position, offsetPoint) => {
+  if (!map || !offsetPoint) {
+    return position;
+  }
+
+  const baseLatLng = L.latLng(position[0], position[1]);
+  const basePoint = map.latLngToLayerPoint(baseLatLng);
+  const shiftedPoint = basePoint.add(offsetPoint);
+  const shiftedLatLng = map.layerPointToLatLng(shiftedPoint);
+
+  return [shiftedLatLng.lat, shiftedLatLng.lng];
 };
 
 /**
@@ -95,6 +128,8 @@ const createDeliveryIcon = (color, scale) => {
  * Composant pour afficher les marqueurs de demandes de livraison sur la carte
  */
 export default function DeliveryMarkers({ requestSet, nodesById, mapZoom = 13 }) {
+  const map = useMap();
+
   if (!requestSet || !requestSet.warehouse || !requestSet.demands) {
     console.warn('DeliveryMarkers: requestSet incomplet', { requestSet, nodesById });
     return null;
@@ -104,78 +139,111 @@ export default function DeliveryMarkers({ requestSet, nodesById, mapZoom = 13 })
   const iconScale = computeScaleFromZoom(mapZoom);
   const warehouseIcon = React.useMemo(() => createWarehouseIcon(iconScale), [iconScale]);
 
-
   // Récupérer le nœud de l'entrepôt
   const warehouseNode = nodesById[warehouse.nodeId];
 
-  return (
-    <>
-      {/* Marqueur de l'entrepôt - Logo gris */}
-      {warehouseNode && (
-        <Marker
-          position={[warehouseNode.latitude, warehouseNode.longitude]}
-          icon={warehouseIcon}
-        >
+  // Construire une liste à plat de tous les marqueurs (entrepôt + pickups + deliveries)
+  const markers = [];
+
+  if (warehouseNode) {
+    markers.push({
+      key: `warehouse-${warehouse.nodeId}`,
+      nodeId: warehouse.nodeId,
+      position: [warehouseNode.latitude, warehouseNode.longitude],
+      icon: warehouseIcon,
+      popupContent: (
+        <Popup>
+          <div style={{ color: '#1a202c' }}>
+            <strong className="text-lg flex items-center gap-2">
+              <Icon name="warehouse" className="text-gray-800" />
+              Entrepôt
+            </strong><br />
+            <strong style={{ color: '#ffffff' }}>Heure de départ:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.departureTime}</strong><br />
+            <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.nodeId}</strong>
+          </div>
+        </Popup>
+      ),
+    });
+  }
+
+  demands.forEach((demand, index) => {
+    const pickupNode = nodesById[demand.pickupNodeId];
+    const deliveryNode = nodesById[demand.deliveryNodeId];
+    const color = demand.color || '#FF6B6B';
+    const markerIndex = demand.id || index;
+
+    if (pickupNode) {
+      markers.push({
+        key: `pickup-${markerIndex}`,
+        nodeId: demand.pickupNodeId,
+        position: [pickupNode.latitude, pickupNode.longitude],
+        icon: createPickupIcon(color, iconScale),
+        popupContent: (
           <Popup>
             <div style={{ color: '#1a202c' }}>
-              <strong className="text-lg flex items-center gap-2">
-                <Icon name="warehouse" className="text-gray-800" />
-                Entrepôt
+              <strong className="text-lg flex items-center gap-2" style={{ color }}>
+                <Icon name="box" className="text-current" />
+                Pickup #{index + 1}
               </strong><br />
-              <strong style={{ color: '#ffffff' }}>Heure de départ:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.departureTime}</strong><br />
-              <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{warehouse.nodeId}</strong>
+              <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupDurationSec} sec</strong><br />
+              <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupNodeId}</strong>
             </div>
           </Popup>
-        </Marker>
-      )}
+        ),
+      });
+    }
 
-      {/* Marqueurs des demandes - Logos colorés */}
-      {demands.map((demand, index) => {
-        const pickupNode = nodesById[demand.pickupNodeId];
-        const deliveryNode = nodesById[demand.deliveryNodeId];
-        const color = demand.color || '#FF6B6B';
+    if (deliveryNode) {
+      markers.push({
+        key: `delivery-${markerIndex}`,
+        nodeId: demand.deliveryNodeId,
+        position: [deliveryNode.latitude, deliveryNode.longitude],
+        icon: createDeliveryIcon(color, iconScale),
+        popupContent: (
+          <Popup>
+            <div style={{ color: '#1a202c' }}>
+              <strong className="text-lg flex items-center gap-2" style={{ color }}>
+                <Icon name="location" className="text-current" />
+                Delivery #{index + 1}
+              </strong><br />
+              <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryDurationSec} sec</strong><br />
+              <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryNodeId}</strong>
+            </div>
+          </Popup>
+        ),
+      });
+    }
+  });
 
-        return (
-          <React.Fragment key={demand.id || index}>
-            {/* Marqueur Pickup - Logo paquet coloré */}
-            {pickupNode && (
-              <Marker
-                position={[pickupNode.latitude, pickupNode.longitude]}
-                icon={createPickupIcon(color, iconScale)}
-              >
-                <Popup>
-                  <div style={{ color: '#1a202c' }}>
-                    <strong className="text-lg flex items-center gap-2" style={{ color }}>
-                      <Icon name="box" className="text-current" />
-                      Pickup #{index + 1}
-                    </strong><br />
-                    <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupDurationSec} sec</strong><br />
-                    <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.pickupNodeId}</strong>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
+  // Grouper les marqueurs par nœud afin d'appliquer un léger décalage visuel si plusieurs s'empilent
+  const markersByNode = markers.reduce((acc, marker) => {
+    const groupKey = marker.nodeId ?? `${marker.position[0]}-${marker.position[1]}`;
+    if (!acc[groupKey]) {
+      acc[groupKey] = [];
+    }
+    acc[groupKey].push(marker);
+    return acc;
+  }, {});
 
-            {/* Marqueur Delivery - Logo pin coloré */}
-            {deliveryNode && (
-              <Marker
-                position={[deliveryNode.latitude, deliveryNode.longitude]}
-                icon={createDeliveryIcon(color, iconScale)}
-              >
-                <Popup>
-                  <div style={{ color: '#1a202c' }}>
-                    <strong className="text-lg flex items-center gap-2" style={{ color }}>
-                      <Icon name="location" className="text-current" />
-                      Delivery #{index + 1}
-                    </strong><br />
-                    <strong style={{ color: '#ffffff' }}>Durée:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryDurationSec} sec</strong><br />
-                    <strong style={{ color: '#ffffff' }}>Nœud:</strong> <strong style={{ color: '#ffffff' }}>{demand.deliveryNodeId}</strong>
-                  </div>
-                </Popup>
-              </Marker>
-            )}
-          </React.Fragment>
-        );
+  return (
+    <>
+      {Object.values(markersByNode).flatMap((group) => {
+        const offsets = computeClusterOffsets(group.length);
+
+        return group.map((marker, groupIndex) => {
+          const displayPosition = applyOffset(map, marker.position, offsets[groupIndex]);
+
+          return (
+            <Marker
+              key={`${marker.key}-offset-${groupIndex}`}
+              position={displayPosition}
+              icon={marker.icon}
+              zIndexOffset={groupIndex * 10}
+            >
+              {marker.popupContent}
+            </Marker>
+          );
+        });
       })}
     </>
   );
