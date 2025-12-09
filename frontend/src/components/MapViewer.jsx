@@ -131,7 +131,8 @@ export default function MapViewer({
   onDeliveryRequestSetUpdated,
   onSegmentClick,
   isMapSelectionActive,
-  isAddingManually 
+  isAddingManually,
+  isEditingTour = false
 }) {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSegments, setShowSegments] = useState(true);
@@ -362,8 +363,8 @@ export default function MapViewer({
             />
           )}
 
-          {/* Affichage de la tournée ou des tournées multi-coursiers */}
-          {tourData && (
+          {/* Affichage de la tournée ou des tournées multi-coursiers (caché en mode édition ou sur l'onglet N/A) */}
+          {tourData && !isEditingTour && selectedCourierId !== 'unassigned' && (
             Array.isArray(tourData) && tourData.length > 1 ? (
               // Multi-tours avec couleurs
               <MultiTourPolylines 
@@ -372,12 +373,14 @@ export default function MapViewer({
                 selectedCourierId={selectedCourierId}
               />
             ) : (
-              // Single tour (ancien format)
-              <TourSegments 
-                tourData={Array.isArray(tourData) ? { tour: tourData[0].trajets, metrics: { stopCount: tourData[0].stops?.length || 0, totalDistance: tourData[0].totalDistance || 0 }} : tourData}
-                nodesById={nodesById}
-                mapZoom={mapZoom}
-              />
+              // Single tour - visible uniquement en vue globale ou sur l'onglet du coursier
+              (selectedCourierId === null || (Array.isArray(tourData) && tourData[0]?.courierId === selectedCourierId)) && (
+                <TourSegments 
+                  tourData={Array.isArray(tourData) ? { tour: tourData[0].trajets, metrics: { stopCount: tourData[0].stops?.length || 0, totalDistance: tourData[0].totalDistance || 0 }} : tourData}
+                  nodesById={nodesById}
+                  mapZoom={mapZoom}
+                />
+              )
             )
           )}
         </MapContainer>
