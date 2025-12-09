@@ -4,6 +4,7 @@ import MapUploader from './src/components/MapUploader';
 import MapViewer from './src/components/MapViewer';
 import DeliveryRequestUploader from './src/components/DeliveryRequestUploader';
 import ManualDeliveryForm from './src/components/ManualDeliveryForm';
+import ManualWarehouseForm from './src/components/ManualWarehouseForm';
 import CourierCountModal from './src/components/CourierCountModal';
 import TourTable from './src/components/TourTable';
 import TourActions from './src/components/TourActions';
@@ -70,6 +71,7 @@ function generateItineraryText(tourData) {
 
 const MAX_COURIERS = 10;
 const clampCourierCount = (count) => Math.max(1, Math.min(MAX_COURIERS, Number(count) || 1));
+const DEFAULT_DEPARTURE_TIME = '08:00';
 
 /**
  * Convertit une couleur HSL en format hexadécimal
@@ -173,6 +175,7 @@ export default function PickupDeliveryUI() {
   const [showMapUpload, setShowMapUpload] = useState(false);
   const [showDeliveryUpload, setShowDeliveryUpload] = useState(false);
   const [showManualForm, setShowManualForm] = useState(false);
+  const [showWarehouseForm, setShowWarehouseForm] = useState(false);
   const [showCourierModal, setShowCourierModal] = useState(false);
   const [showRestoreTourModal, setShowRestoreTourModal] = useState(false);
   const [showDemandManager, setShowDemandManager] = useState(false);
@@ -189,15 +192,19 @@ export default function PickupDeliveryUI() {
   
   // États pour la sélection sur la carte
   const [isMapSelectionActive, setIsMapSelectionActive] = useState(false);
-  const [mapSelectionType, setMapSelectionType] = useState(null); // 'pickup' ou 'delivery'
+  const [mapSelectionType, setMapSelectionType] = useState(null); // 'pickup' | 'delivery' | 'warehouse'
   const [selectedNodeId, setSelectedNodeId] = useState(null);
   const [savedFormData, setSavedFormData] = useState(null); // Pour sauvegarder les données du formulaire
+  const [savedWarehouseData, setSavedWarehouseData] = useState(null);
 
   // États pour CustomAlert
   const [alertConfig, setAlertConfig] = useState(null);
 
   // État pour savoir si on est en mode ajout manuel (formulaire ouvert ou sélection active)
-  const isAddingManually = showManualForm || isMapSelectionActive;
+  const isAddingManually = showManualForm || showWarehouseForm || isMapSelectionActive;
+
+  // État pour l'enregistrement de l'entrepôt
+  const [isSavingWarehouse, setIsSavingWarehouse] = useState(false);
 
   // Fonction helper pour afficher une alerte personnalisée
   const showAlert = (type, title, message, autoClose = false) => {
@@ -246,6 +253,13 @@ export default function PickupDeliveryUI() {
       setTourData(null);
       setShowDemandManager(false);
       setShowMapUpload(true);
+      setShowManualForm(false);
+      setShowWarehouseForm(false);
+      setShowDeliveryUpload(false);
+      setSavedWarehouseData(null);
+      setSelectedNodeId(null);
+      setMapSelectionType(null);
+      setIsMapSelectionActive(false);
     } catch (error) {
       console.error('Erreur lors de la suppression de la carte:', error);
     }
@@ -256,6 +270,7 @@ export default function PickupDeliveryUI() {
     console.log('handleDeliveryRequestSetUpdated reçoit:', updatedSet);
     
     const demands = updatedSet?.demands || [];
+    const hasWarehouse = Boolean(updatedSet?.warehouse);
 
     if (demands.length > 0) {
       // Réassigner les couleurs dans le bon ordre après modification
@@ -277,14 +292,30 @@ export default function PickupDeliveryUI() {
         await recalculateToursSilent();
       }
     } else {
-      // Si plus aucune demande, réinitialiser la tournée ET le deliveryRequestSet
-      console.log('[PickupDeliveryUI] Aucune demande restante, réinitialisation de la tournée');
-      setDeliveryRequestSet(null);
-      setTourData(null);
-      setUnassignedDemands([]);
-      setIsEditingAssignments(false);
-      setStagedAssignments(null);
-      setShowDemandManager(false);
+      // Aucun demande restante
+      if (hasWarehouse) {
+        // On conserve l'entrepôt pour permettre l'ajout manuel ultérieur
+        console.log('[PickupDeliveryUI] Aucune demande restante, conservation de l’entrepôt');
+        setDeliveryRequestSet({
+          ...updatedSet,
+          warehouse: updatedSet.warehouse,
+          demands: [],
+        });
+        setTourData(null);
+        setUnassignedDemands([]);
+        setIsEditingAssignments(false);
+        setStagedAssignments(null);
+        setShowDemandManager(false);
+      } else {
+        // Pas d'entrepôt -> reset complet
+        console.log('[PickupDeliveryUI] Aucune demande et pas d’entrepôt, réinitialisation');
+        setDeliveryRequestSet(null);
+        setTourData(null);
+        setUnassignedDemands([]);
+        setIsEditingAssignments(false);
+        setStagedAssignments(null);
+        setShowDemandManager(false);
+      }
     }
   };
 
@@ -401,6 +432,7 @@ export default function PickupDeliveryUI() {
         ? backendSet.demands
         : (deliveryRequestSet?.demands || []).filter((d) => d.id !== demandId);
 
+      const baseSet = backendSet ? { ...backendSet } : { ...(deliveryRequestSet || {}) };
       let nextRequestSet = null;
       if (normalizedDemands.length > 0) {
         const demandsWithColors = normalizedDemands.map((demand, index) => ({
@@ -408,8 +440,14 @@ export default function PickupDeliveryUI() {
           color: getColorFromPalette(index),
         }));
 
-        const baseSet = backendSet ? { ...backendSet } : { ...(deliveryRequestSet || {}) };
         nextRequestSet = { ...baseSet, demands: demandsWithColors };
+      } else if (deliveryRequestSet?.warehouse || backendSet?.warehouse) {
+        // Conserver l'entrepôt même si toutes les demandes sont supprimées
+        nextRequestSet = {
+          ...baseSet,
+          warehouse: backendSet?.warehouse || deliveryRequestSet?.warehouse || null,
+          demands: [],
+        };
       }
 
       setDeliveryRequestSet(nextRequestSet);
@@ -585,11 +623,20 @@ export default function PickupDeliveryUI() {
       showAlert('warning', 'Attention', 'Veuillez d\'abord charger une carte');
       return;
     }
+    if (!deliveryRequestSet?.warehouse) {
+      showAlert('warning', 'Attention', 'Définissez d\'abord un entrepôt');
+      setShowWarehouseForm(true);
+      return;
+    }
     setShowManualForm(true);
   };
 
   // Gestion de l'ajout manuel d'une demande
   const handleManualDemandAdd = async (demand) => {
+    if (!deliveryRequestSet?.warehouse) {
+      showAlert('warning', 'Attention', 'Veuillez définir un entrepôt avant d\'ajouter une demande');
+      return;
+    }
     try {
       // Ajouter la demande au backend
       const response = await apiService.addDeliveryRequest({
@@ -633,20 +680,109 @@ export default function PickupDeliveryUI() {
     setSavedFormData(null);
   };
 
+  // Gestion de l'ajout / modification manuelle de l'entrepôt
+  const handleAddWarehouseManually = () => {
+    if (!mapData) {
+      showAlert('warning', 'Attention', 'Veuillez d\'abord charger une carte');
+      return;
+    }
+    setShowWarehouseForm(true);
+    setSelectedNodeId(deliveryRequestSet?.warehouse?.nodeId || null);
+    setMapSelectionType(null);
+    setIsMapSelectionActive(false);
+  };
+
+  const handleManualWarehouseSave = async ({ nodeId }) => {
+    if (!mapData) {
+      showAlert('warning', 'Attention', 'Veuillez d\'abord charger une carte');
+      return;
+    }
+
+    const normalizedNodeId = (nodeId || '').toString().trim();
+    if (!normalizedNodeId) {
+      showAlert('warning', 'Attention', 'Veuillez renseigner un nœud pour l’entrepôt');
+      return;
+    }
+
+    const nodeExists = Array.isArray(mapData.nodes)
+      ? mapData.nodes.some((n) => String(n.id) === normalizedNodeId)
+      : false;
+    if (!nodeExists) {
+      showAlert('error', 'Nœud introuvable', 'Le nœud sélectionné n\'existe pas sur la carte chargée');
+      return;
+    }
+
+    const safeDeparture = DEFAULT_DEPARTURE_TIME;
+
+    setIsSavingWarehouse(true);
+    try {
+      await apiService.setWarehouse({
+        nodeId: normalizedNodeId,
+        departureTime: safeDeparture,
+      });
+
+      const existingDemands = deliveryRequestSet?.demands || [];
+      const demandsWithColors = existingDemands.map((d, index) => ({
+        ...d,
+        color: getColorFromPalette(index),
+      }));
+
+      await handleDeliveryRequestSetUpdated({
+        warehouse: {
+          nodeId: normalizedNodeId,
+          departureTime: safeDeparture,
+        },
+        demands: demandsWithColors,
+      });
+
+      showAlert(
+        'success',
+        'Entrepôt défini',
+        existingDemands.length
+          ? 'L’entrepôt a été mis à jour. Recalculez la tournée pour prendre en compte le nouveau départ.'
+          : 'L’entrepôt a été enregistré. Vous pouvez ajouter des pickups & deliveries.'
+      );
+    } catch (err) {
+      console.error('[PickupDeliveryUI] Erreur setWarehouse:', err);
+      showAlert('error', 'Erreur', err.message || 'Impossible d\'enregistrer l’entrepôt');
+    } finally {
+      setIsSavingWarehouse(false);
+      setShowWarehouseForm(false);
+      setIsMapSelectionActive(false);
+      setMapSelectionType(null);
+      setSelectedNodeId(null);
+      setSavedWarehouseData(null);
+    }
+  };
+
   // Gestion du démarrage de la sélection sur la carte
   const handleStartMapSelection = (type, formData) => {
-    setSavedFormData(formData); // Sauvegarder les données du formulaire
+    if (type === 'warehouse') {
+      setSavedWarehouseData(formData);
+      setShowWarehouseForm(false);
+    } else {
+      setSavedFormData(formData); // Sauvegarder les données du formulaire
+      setShowManualForm(false); // Fermer le formulaire
+    }
+    setSelectedNodeId(null);
     setMapSelectionType(type);
     setIsMapSelectionActive(true);
-    setShowManualForm(false); // Fermer le formulaire
   };
 
   // Gestion du clic sur un segment de la carte
   const handleMapSegmentClick = (nodeId) => {
     if (isMapSelectionActive) {
       setSelectedNodeId(nodeId);
+      if (mapSelectionType === 'warehouse') {
+        // Pré-remplir immédiatement le formulaire avec le nœud sélectionné
+        setSavedWarehouseData({ nodeId });
+      }
       setIsMapSelectionActive(false);
-      setShowManualForm(true); // Rouvrir le formulaire
+      if (mapSelectionType === 'warehouse') {
+        setShowWarehouseForm(true);
+      } else {
+        setShowManualForm(true); // Rouvrir le formulaire
+      }
     }
   };
 
@@ -981,6 +1117,26 @@ export default function PickupDeliveryUI() {
           />
         )}
 
+        {/* Manual Warehouse Form */}
+        {showWarehouseForm && mapData && (
+          <ManualWarehouseForm
+            onSave={handleManualWarehouseSave}
+            onCancel={() => {
+              setShowWarehouseForm(false);
+              setIsMapSelectionActive(false);
+              setMapSelectionType(null);
+              setSelectedNodeId(null);
+              setSavedWarehouseData(null);
+            }}
+            availableNodes={mapData.nodes}
+            onStartMapSelection={handleStartMapSelection}
+            selectedNodeId={mapSelectionType === 'warehouse' ? selectedNodeId : null}
+            savedFormData={savedWarehouseData}
+            initialWarehouse={deliveryRequestSet?.warehouse}
+            isSaving={isSavingWarehouse}
+          />
+        )}
+
         {/* Manual Delivery Form */}
         {showManualForm && mapData && (
           <ManualDeliveryForm 
@@ -1122,6 +1278,16 @@ export default function PickupDeliveryUI() {
                   {!tourData ? (
                     // Avant calcul de tournée : Sélecteur + Boutons
                     <div className="flex flex-col gap-4">
+                      {/* Entrepôt manuel */}
+                      <button
+                        onClick={handleAddWarehouseManually}
+                        disabled={!mapData || isSavingWarehouse || isCalculatingTour}
+                        className="bg-amber-500 hover:bg-amber-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-gray-900 font-semibold px-6 py-3 rounded-lg transition-colors shadow-lg"
+                        title="Définir ou modifier l'entrepôt"
+                      >
+                        {deliveryRequestSet?.warehouse ? 'Changer Entrepôt' : 'Ajouter Entrepôt'}
+                      </button>
+
                       {/* Sélecteur de coursiers - Affiché seulement si des demandes sont chargées */}
                       {deliveryRequestSet && deliveryRequestSet.demands && deliveryRequestSet.demands.length > 0 && (
                         <CourierCountSelector
@@ -1136,9 +1302,9 @@ export default function PickupDeliveryUI() {
                         {/* Bouton Ajouter Pickup&Delivery (manuel) */}
                         <button 
                           onClick={handleAddDeliveryManually}
-                          disabled={!deliveryRequestSet}
+                          disabled={!deliveryRequestSet?.warehouse || isCalculatingTour}
                           className="flex-1 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed text-white px-6 py-3 rounded-lg font-semibold transition-colors shadow-lg"
-                          title={!deliveryRequestSet ? "Chargez d'abord des demandes de livraison" : "Ajouter manuellement une demande de livraison"}
+                          title={!deliveryRequestSet?.warehouse ? "Définissez d'abord un entrepôt" : "Ajouter manuellement une demande de livraison"}
                         >
                           Ajouter Pickup&Delivery
                         </button>
@@ -1197,12 +1363,13 @@ export default function PickupDeliveryUI() {
                       </div>
                     </div>
                   ) : (
-                    // Boutons après calcul de tournée (4 boutons sur 2 lignes)
+                    // Boutons après calcul de tournée (sans changer l'entrepôt)
                     <div className="flex flex-col gap-3">
                       {/* Première ligne : Ajouter et Modifier tournée */}
                       <div className="flex gap-3">
                         <button 
                           onClick={handleAddDeliveryManually}
+                          disabled={!deliveryRequestSet?.warehouse || isCalculatingTour}
                           className="flex-1 bg-green-600 hover:bg-green-700 text-white px-4 py-2.5 rounded-lg font-semibold transition-colors shadow-lg
                                    flex items-center justify-center gap-2"
                           title="Ajouter une nouvelle demande de livraison"
