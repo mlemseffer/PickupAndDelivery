@@ -285,6 +285,17 @@ public class TourService {
         targetTour.setTotalDistance(0);
         targetTour.setTotalDurationSec(0);
 
+        // Mettre à jour l'affectation côté DemandeSet pour persister l'état
+        var requestSet = deliveryService.getCurrentRequestSet();
+        if (requestSet != null && requestSet.getDemands() != null) {
+            for (com.pickupdelivery.model.Demand demand : requestSet.getDemands()) {
+                if (demandId.equals(demand.getId())) {
+                    demand.setCourierId(newCourierId);
+                    break;
+                }
+            }
+        }
+
         // Sauvegarder les tournées mises à jour
         algoToursByCourier.put(resolvedOldCourierId, sourceTour);
         algoToursByCourier.put(newCourierId, targetTour);
