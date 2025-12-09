@@ -67,6 +67,9 @@ function generateItineraryText(tourData) {
   return content;
 }
 
+const MAX_COURIERS = 10;
+const clampCourierCount = (count) => Math.max(1, Math.min(MAX_COURIERS, Number(count) || 1));
+
 /**
  * Convertit une couleur HSL en format hexadécimal
  */
@@ -862,7 +865,8 @@ export default function PickupDeliveryUI() {
         || new Set(toursFromFile.map((t) => t.courierId)).size
         || toursFromFile.length
         || courierCount;
-      setCourierCount(couriersToUse);
+      const boundedCouriers = clampCourierCount(couriersToUse);
+      setCourierCount(boundedCouriers);
 
       try {
         const assignments = deriveAssignmentsFromTours(toursFromFile, addedDemandsWithIds, demandIdMap);
@@ -878,7 +882,7 @@ export default function PickupDeliveryUI() {
           console.log('✅ Tournée recalculée avec assignments restaurés');
         } else {
           // Fallback: recalcul standard si les assignments n'ont pas été pris en compte
-          const fallback = await apiService.calculateTour(couriersToUse);
+          const fallback = await apiService.calculateTour(boundedCouriers);
           if (fallback.success && fallback.data && Array.isArray(fallback.data.tours)) {
             recalculatedTours = fallback.data.tours || [];
             recalculatedUnassigned = fallback.data.unassignedDemands || [];
@@ -999,7 +1003,7 @@ export default function PickupDeliveryUI() {
           isOpen={showCourierModal}
           onClose={() => setShowCourierModal(false)}
           onConfirm={(count) => {
-            setCourierCount(count);
+            setCourierCount(clampCourierCount(count));
             console.log(`Nombre de livreurs défini à: ${count}`);
           }}
           currentCount={courierCount}
@@ -1007,11 +1011,11 @@ export default function PickupDeliveryUI() {
 
         {/* Map View */}
         {mapData && activeTab === 'map' && !showDeliveryUpload && (
-          <div className="flex-1 flex flex-col overflow-hidden p-4 gap-4 min-h-0">
+          <div className="flex-1 flex flex-col overflow-hidden p-4 gap-4 min-h-0 min-w-0">
             {/* Ligne principale : Carte + Panneau d'informations */}
             <div className="flex-1 flex gap-4 min-h-0">
               {/* Carte sur la gauche - plus grande */}
-              <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden">
+              <div className="w-2/3 flex flex-col bg-gray-700 rounded-lg overflow-hidden min-w-0">
                 <MapViewer 
                   mapData={mapData}
                   onClearMap={handleClearMap}
@@ -1026,9 +1030,9 @@ export default function PickupDeliveryUI() {
               </div>
               
               {/* Panneau droit avec informations et boutons */}
-              <div className={`flex-1 flex flex-col gap-4 min-h-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
+              <div className={`flex-1 flex flex-col gap-4 min-h-0 min-w-0 ${isMapSelectionActive ? 'pointer-events-none opacity-50' : ''}`}>
                 {/* Tableau de tournée ou onglets multi-tours */}
-                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 overflow-hidden">
+                <div className="bg-gray-700 rounded-lg p-6 flex flex-col flex-1 min-h-0 min-w-0 overflow-hidden">
                   <h3 className="text-xl font-semibold mb-4 flex-shrink-0">
                     {tourData ? (Array.isArray(tourData) && tourData.length > 1 ? 'Tournées Multi-Coursiers' : 'Tournée Calculée') : 'Informations'}
                   </h3>
@@ -1121,7 +1125,7 @@ export default function PickupDeliveryUI() {
                       {deliveryRequestSet && deliveryRequestSet.demands && deliveryRequestSet.demands.length > 0 && (
                         <CourierCountSelector
                           value={courierCount}
-                          onChange={setCourierCount}
+                          onChange={(value) => setCourierCount(clampCourierCount(value))}
                           disabled={isCalculatingTour}
                         />
                       )}
