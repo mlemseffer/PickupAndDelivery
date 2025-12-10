@@ -96,7 +96,7 @@ export default function GlobalStatistics({ tours }) {
           />
         </div>
         <p className="text-xs text-gray-400 mt-2">
-          Mesure l'équilibre entre la tournée la plus longue et la plus courte
+          Mesure l'équilibre entre la tournée la plus longue et la plus courte en durée
         </p>
       </div>
       

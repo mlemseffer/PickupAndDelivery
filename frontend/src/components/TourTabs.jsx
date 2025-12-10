@@ -231,7 +231,7 @@ export default function TourTabs({
               className="bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded text-sm font-semibold disabled:bg-gray-600 disabled:cursor-not-allowed"
               disabled={isBusy}
             >
-              Valider
+              Recalculer
             </button>
           </div>
         </div>
